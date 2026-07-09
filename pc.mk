@@ -66,10 +66,10 @@ PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a
 
 PC_LIBTRUSTEDLO_OBJ := libtrustedlo/libtrustedlo.a
 
-PC_ECHO_CLIENT_OBJS := pc/client_echo.o
-PC_FAULTING_CLIENT_OBJS := pc/client_faulting.o
-PC_LOOPING_CLIENT_OBJS := pc/client_looping.o
-PC_TIMEOUT_CLIENT_OBJS := pc/client_timeout.o
+PC_ECHO_CLIENT_OBJS := pc/client_echo.o pc/early-init.o
+PC_FAULTING_CLIENT_OBJS := pc/client_faulting.o pc/early-init.o
+PC_LOOPING_CLIENT_OBJS := pc/client_looping.o pc/early-init.o
+PC_TIMEOUT_CLIENT_OBJS := pc/client_timeout.o pc/early-init.o
 PC_MONITOR_OBJS := pc/monitor.o pc/ossvc.o pc/pico_vfs.o
 PC_ORCHESTRATOR_OBJS := \
 	pc/orchestrator.o \

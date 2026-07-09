@@ -28,9 +28,6 @@ __attribute__((__section__(".pc_svc_desc"))) const protocon_svc_desc_t ciface = 
     .t3_iface = { (uintptr_t)&serial_config, 0, 0, 0, 0, 0, 0, 0 }
 };
 
-
-#pragma once
-
 /**
  * Architecture specific PMU events.
  * The following should be declared:
