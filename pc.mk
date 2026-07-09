@@ -41,11 +41,15 @@ BM_UK_MAKE_ARGS := \
 pc:
 	mkdir -p pc
 
-PC_BUILD_DIR_GEN := pc/generated
+PC_BUILD_DIR_GEN := $(BUILD_DIR)/pc/generated
 
 PC_MONITOR_VM_LAYOUT := $(PC_CONFIG_DIR)/monitor_vm_layout.py
 PC_MONITOR_VM_LAYOUT_GEN := $(PC_TOOL_DIR)/gen_vm_layout.py
 PC_MONITOR_VM_LAYOUT_HEADER := $(PC_BUILD_DIR_GEN)/monitor_vm_layout.h
+
+PC_TSLDR_BUILD_DIR := $(BUILD_DIR)/pc/libtrustedlo
+PC_TSLDR_BUILD_DIR_GEN := $(PC_TSLDR_BUILD_DIR)/generated
+PC_TSLDR_VM_LAYOUT_HEADER := $(PC_TSLDR_BUILD_DIR_GEN)/tsldr_vm_layout.h
 
 PC_CLAGS := \
 	-I$(CONTAINER_LIBC_INCLUDE) \
@@ -54,7 +58,8 @@ PC_CLAGS := \
 	-I$(PC_MICRORL_SRC_DIR)/include \
 	-I$(PC_LIBTRUSTEDLO_DIR)/include \
 	-I$(PC_LIBMICROKITCO_DIR) \
-	-I$(PC_BUILD_DIR_GEN)
+	-I$(PC_BUILD_DIR_GEN) \
+	-I$(PC_TSLDR_BUILD_DIR_GEN)
 
 LIBMICROKITCO_CFLAGS_pc := ${PC_CLAGS}
 PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a

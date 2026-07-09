@@ -10,6 +10,7 @@
 #include <pc_config.h>
 #include <protocon.h>
 #include <libtrustedlo.h>
+#include <tsldr_vm_layout.h>
 
 #include "pd_io_queue.h"
 
@@ -38,7 +39,7 @@ static void app_early_init(void)
 {
     microkit_dbg_puts("application constructor\n");
     // FIXME: hardcoded for now.
-    trampoline_args_t *args = (trampoline_args_t *)0xa05000;
+    trampoline_args_t *args = (trampoline_args_t *)tsldr_vm_layout.trampoline_args.base;
     client_args_t *client_args =
         (client_args_t *)((unsigned char *)args + sizeof(trampoline_args_t));
 
