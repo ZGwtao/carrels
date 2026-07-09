@@ -4,6 +4,7 @@ PC_SRC_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 PC_CONFIG_DIR := $(PC_SRC_DIR)/config
 PC_HEADER_DIR := $(PC_SRC_DIR)/include
 PC_TOOL_DIR := $(PC_SRC_DIR)/tools
+PC_MICRORL_SRC_DIR := $(PC_SRC_DIR)/microrl
 PC_LIBMICROKITCO_DIR := $(LIBMICROKITCO_PATH)
 PC_LIBTRUSTEDLO_DIR := $(CARRELS)/dep/libtrustedlo
 
@@ -50,6 +51,7 @@ PC_CLAGS := \
 	-I$(CONTAINER_LIBC_INCLUDE) \
 	-I$(PC_HEADER_DIR) \
 	-I$(PC_SRC_DIR) \
+	-I$(PC_MICRORL_SRC_DIR)/include \
 	-I$(PC_LIBTRUSTEDLO_DIR)/include \
 	-I$(PC_LIBMICROKITCO_DIR) \
 	-I$(PC_BUILD_DIR_GEN)
@@ -64,8 +66,11 @@ PC_FAULTING_CLIENT_OBJS := pc/client_faulting.o
 PC_LOOPING_CLIENT_OBJS := pc/client_looping.o
 PC_TIMEOUT_CLIENT_OBJS := pc/client_timeout.o
 PC_MONITOR_OBJS := pc/monitor.o pc/ossvc.o pc/pico_vfs.o
-PC_ORCHESTRATOR_OBJS :=	pc/orchestrator.o pc/pico_vfs.o
-PC_PROTOCON_OBJS := 
+PC_ORCHESTRATOR_OBJS := \
+	pc/orchestrator.o \
+	pc/pico_vfs.o \
+	pc/microrl.o
+PC_PROTOCON_OBJS :=
 PC_TRAMPOLINE_OBJS :=
 PC_OBJS := \
 	PC_ORCHESTRATOR_OBJS \
@@ -123,6 +128,10 @@ pc/%.o: CFLAGS := $(PC_CLAGS) \
 pc/%.o: $(PC_SRC_DIR)/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
 	$(CC) -c $(CFLAGS) $< -o $@
 
+pc/microrl.o: CFLAGS := $(PC_CLAGS) \
+	$(CFLAGS) -I$(PC_MICRORL_SRC_DIR)/include
+pc/microrl.o: $(PC_MICRORL_SRC_DIR)/microrl.c | pc
+	$(CC) -c $(CFLAGS) $< -o $@
 
 orchestrator.elf: LDFLAGS += -L$(BOARD_DIR)/lib
 orchestrator.elf: $(PC_ORCHESTRATOR_OBJS) \

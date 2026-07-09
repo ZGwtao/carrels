@@ -16,8 +16,15 @@
 #include <libmicrokitco.h>
 #include <lions/fs/config.h>
 #include <pico_vfs.h>
+#include <misc.h>
 
 #define PROGNAME "[@orchestrator] "
+
+#define FNAME_BUF_SIZE 64
+#define MIN_REQ_PC_NUM 1U
+#define MAX_REQ_PC_NUM 4U
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 uintptr_t shared1 = 0x4000000;
 uintptr_t shared2 = 0xb000000;
@@ -41,24 +48,79 @@ char *fs_share;
 
 bool fs_init;
 
-static void print_prompt(void)
+#define MIN_REQ_PC_NUM 1U
+#define MAX_REQ_PC_NUM 4U
+
+uint32_t req_pc_num = MIN_REQ_PC_NUM;
+
+static microrl_t shell;
+static char fname_buf[FNAME_BUF_SIZE];
+
+static const char *const shell_commands[] = {
+    "start",
+    "lspcs",
+    "flip",
+    "stop",
+    "hang",
+    "resume",
+    "help",
+};
+
+#if MICRORL_CFG_USE_COMPLETE
+static char *completion_words[ARRAY_SIZE(shell_commands) + 1];
+#endif
+
+static int shell_output(microrl_t *mrl, const char *str)
 {
-    sddf_putchar_unbuffered('f');
-    sddf_putchar_unbuffered('r');
-    sddf_putchar_unbuffered('o');
-    sddf_putchar_unbuffered('n');
-    sddf_putchar_unbuffered('t');
-    sddf_putchar_unbuffered('e');
-    sddf_putchar_unbuffered('n');
-    sddf_putchar_unbuffered('d');
-    sddf_putchar_unbuffered('>');
-    sddf_putchar_unbuffered('$');
-    sddf_putchar_unbuffered(' ');
+    int count = 0;
+
+    MICRORL_UNUSED(mrl);
+
+    if (str == NULL) {
+        return 0;
+    }
+
+    while (*str != '\0') {
+        sddf_putchar_unbuffered(*str++);
+        count++;
+    }
+
+    return count;
 }
 
+static bool parse_u32_decimal(const char *text, uint32_t *value_out)
+{
+    uint32_t value = 0;
 
-void shell_inst_epilogue(void);
+    if (text == NULL || value_out == NULL || *text == '\0') {
+        return false;
+    }
 
+    while (*text != '\0') {
+        uint32_t digit;
+
+        if (*text < '0' || *text > '9') {
+            return false;
+        }
+
+        digit = (uint32_t)(*text - '0');
+
+        if (value > (UINT32_MAX - digit) / 10U) {
+            return false;
+        }
+
+        value = value * 10U + digit;
+        text++;
+    }
+
+    *value_out = value;
+    return true;
+}
+
+void shell_inst_epilogue(void)
+{
+    sddf_printf("\r\nType: \"Ctrl \\\\ 0\" to return\r\n");
+}
 
 void test_entrypoint(void)
 {
@@ -71,26 +133,257 @@ void test_entrypoint(void)
     fs_init = true;
 
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) finished fs initialisation\n");
-#if 1
+
     pico_vfs_readfile2buf((void *)shared1, "protocon.elf", &err);
     if (err != seL4_NoError) {
-        goto _exit;
+        return;
     }
     TSLDR_DBG_PRINT(PROGNAME "Wrote proto-container's ELF file into memory\n");
 
     pico_vfs_readfile2buf((void *)shared3, "trampoline.elf", &err);
     if (err != seL4_NoError) {
-        goto _exit;
+        return;
     }
     TSLDR_DBG_PRINT(PROGNAME "Wrote trampoline's ELF file into memory\n");
-#endif
-_exit:
-    sddf_putchar_unbuffered('\n');
-    print_prompt();
 }
+
+static void shell_print_help(void)
+{
+    sddf_printf(
+        "Commands:\r\n"
+        "  start <elf> [pc_num]  Load and start an ELF; pc_num is %u..%u\r\n"
+        "  lspcs                 List proto-containers\r\n"
+        "  flip                  Flip the ACL rule\r\n"
+        "  stop -i <pd_id>       Stop a protection domain\r\n"
+        "  hang -i <pd_id>       Hang a protection domain\r\n"
+        "  resume -i <pd_id>     Resume a protection domain\r\n"
+        "  help                  Show this help\r\n",
+        MIN_REQ_PC_NUM,
+        MAX_REQ_PC_NUM
+    );
+}
+
+void load_elf_payload(void)
+{
+    while(!fs_init) {
+        microkit_cothread_yield();
+    }
+    TSLDR_DBG_PRINT(PROGNAME "entry of load_elf_payload\n");
+
+    microkit_msginfo info;
+    seL4_Error error;
+
+    pico_vfs_readfile2buf((void *)shared2, fname_buf, &error);
+    if (error != seL4_NoError) {
+        TSLDR_DBG_PRINT(PROGNAME "Failed to read %s\n", fname_buf);
+        shell_inst_epilogue();
+        return;
+    }
+    TSLDR_DBG_PRINT(PROGNAME "Wrote test's ELF file into memory\n");
+
+    microkit_mr_set(0, 1);
+    microkit_mr_set(1, req_pc_num);
+    info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
+    error = microkit_msginfo_get_label(info);
+    if (error != seL4_NoError) {
+        microkit_internal_crash(error);
+    }
+}
+
+static int cmd_start(int argc, const char *const *argv)
+{
+    uint32_t requested_pc_num = req_pc_num;
+    size_t filename_len;
+
+    if (argc != 2 && argc != 3) {
+        sddf_printf("Usage: start <elf> [pc_num]\r\n");
+        return 1;
+    }
+
+    filename_len = strlen(argv[1]);
+    if (filename_len == 0 || filename_len >= sizeof(fname_buf)) {
+        sddf_printf(
+            "ELF filename must contain 1..%u characters\r\n",
+            (unsigned int)(sizeof(fname_buf) - 1)
+        );
+        return 1;
+    }
+
+    if (argc == 3) {
+        if (!parse_u32_decimal(argv[2], &requested_pc_num) ||
+            requested_pc_num < MIN_REQ_PC_NUM ||
+            requested_pc_num > MAX_REQ_PC_NUM) {
+            sddf_printf(
+                "pc_num must be an integer from %u to %u\r\n",
+                MIN_REQ_PC_NUM,
+                MAX_REQ_PC_NUM
+            );
+            return 1;
+        }
+    }
+
+    memcpy(fname_buf, argv[1], filename_len + 1);
+    req_pc_num = requested_pc_num;
+
+    if (microkit_cothread_spawn(load_elf_payload, NULL) ==
+        LIBMICROKITCO_NULL_HANDLE) {
+        TSLDR_DBG_PRINT(PROGNAME "Cannot spawn cothread to load payload\n");
+        sddf_printf("Failed to start payload loader\r\n");
+        return 1;
+    }
+
+    microkit_cothread_yield();
+    return 0;
+}
+
+static int call_monitor(seL4_Word syscall_id,
+                        bool has_argument,
+                        seL4_Word argument)
+{
+    microkit_msginfo info;
+    seL4_Error error;
+
+    microkit_mr_set(0, syscall_id);
+
+    if (has_argument) {
+        microkit_mr_set(1, argument);
+        info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
+    } else {
+        info = microkit_ppcall(1, microkit_msginfo_new(0, 1));
+    }
+
+    error = microkit_msginfo_get_label(info);
+    if (error != seL4_NoError) {
+        microkit_internal_crash(error);
+    }
+
+    return 0;
+}
+
+static int cmd_no_argument(int argc,
+                           seL4_Word syscall_id,
+                           const char *usage)
+{
+    if (argc != 1) {
+        sddf_printf("Usage: %s\r\n", usage);
+        return 1;
+    }
+
+    return call_monitor(syscall_id, false, 0);
+}
+
+static int cmd_pd_control(int argc,
+                          const char *const *argv,
+                          seL4_Word syscall_id,
+                          const char *command_name)
+{
+    uint32_t pd_id;
+
+    if (argc != 3 || strcmp(argv[1], "-i") != 0) {
+        sddf_printf("Usage: %s -i <pd_id>\r\n", command_name);
+        return 1;
+    }
+
+    if (!parse_u32_decimal(argv[2], &pd_id)) {
+        sddf_printf("Invalid PD id: %s\r\n", argv[2]);
+        return 1;
+    }
+
+    return call_monitor(syscall_id, true, (seL4_Word)pd_id);
+}
+
+static int shell_execute(microrl_t *mrl,
+                         int argc,
+                         const char *const *argv)
+{
+    MICRORL_UNUSED(mrl);
+
+    if (argc == 0) {
+        return 0;
+    }
+
+    if (strcmp(argv[0], "start") == 0) {
+        return cmd_start(argc, argv);
+    }
+
+    if (strcmp(argv[0], "lspcs") == 0) {
+        return cmd_no_argument(argc, 5, "lspcs");
+    }
+
+    if (strcmp(argv[0], "flip") == 0) {
+        return cmd_no_argument(argc, 17, "flip");
+    }
+
+    if (strcmp(argv[0], "stop") == 0) {
+        return cmd_pd_control(argc, argv, 6, "stop");
+    }
+
+    if (strcmp(argv[0], "hang") == 0) {
+        return cmd_pd_control(argc, argv, 3, "hang");
+    }
+
+    if (strcmp(argv[0], "resume") == 0) {
+        return cmd_pd_control(argc, argv, 4, "resume");
+    }
+
+    if (strcmp(argv[0], "help") == 0) {
+        if (argc != 1) {
+            sddf_printf("Usage: help\r\n");
+            return 1;
+        }
+
+        shell_print_help();
+        return 0;
+    }
+
+    sddf_printf("Unknown command: %s\r\n", argv[0]);
+    return 1;
+}
+
+#if MICRORL_CFG_USE_COMPLETE
+static char **shell_complete(microrl_t *mrl,
+                             int argc,
+                             const char *const *argv)
+{
+    size_t matches = 0;
+    size_t i;
+    const char *prefix = "";
+
+    MICRORL_UNUSED(mrl);
+
+    if (argc > 1) {
+        completion_words[0] = NULL;
+        return completion_words;
+    }
+
+    if (argc == 1) {
+        prefix = argv[0];
+    }
+
+    for (i = 0; i < ARRAY_SIZE(shell_commands); i++) {
+        size_t prefix_len = strlen(prefix);
+
+        if (strncmp(shell_commands[i], prefix, prefix_len) == 0) {
+            completion_words[matches++] = (char *)shell_commands[i];
+        }
+    }
+
+    completion_words[matches] = NULL;
+    return completion_words;
+}
+#endif
+
+#if MICRORL_CFG_USE_CTRL_C
+static void shell_sigint(microrl_t *mrl)
+{
+    shell_output(mrl, "^C\r\n");
+}
+#endif
 
 void init(void)
 {
+    microrlr_t result;
+
     TSLDR_DBG_PRINT(PROGNAME "Entered init\n");
     assert(serial_config_check_magic(&serial_config));
     TSLDR_DBG_PRINT(PROGNAME "check serial config\n");
@@ -121,550 +414,36 @@ void init(void)
     }
     microkit_cothread_yield();
 
+    result = microrl_init(&shell, shell_output, shell_execute);
+    if (result != microrlOK) {
+        TSLDR_DBG_PRINT(PROGNAME "microrl_init failed: %d\n", result);
+        microkit_internal_crash(-1);
+    }
+
+#if MICRORL_CFG_USE_COMPLETE
+    result = microrl_set_complete_callback(&shell, shell_complete);
+    if (result != microrlOK) {
+        TSLDR_DBG_PRINT(
+            PROGNAME "microrl_set_complete_callback failed: %d\n",
+            result
+        );
+        microkit_internal_crash(-1);
+    }
+#endif
+
+#if MICRORL_CFG_USE_CTRL_C
+    result = microrl_set_sigint_callback(&shell, shell_sigint);
+    if (result != microrlOK) {
+        TSLDR_DBG_PRINT(
+            PROGNAME "microrl_set_sigint_callback failed: %d\n",
+            result
+        );
+        microkit_internal_crash(-1);
+    }
+#endif
+
     TSLDR_DBG_PRINT(PROGNAME "finished init\n");
 }
-
-#define INPUT_BUF_SIZE 128
-#define FNAME_BUF_SIZE 64
-
-static char input_buf[INPUT_BUF_SIZE];
-static char fname_buf[FNAME_BUF_SIZE];
-static char _buf[FNAME_BUF_SIZE];
-static size_t input_len = 0;
-
-#define MIN_REQ_PC_NUM 1U
-#define MAX_REQ_PC_NUM 4U
-
-uint32_t req_pc_num = MIN_REQ_PC_NUM;
-
-void load_elf_payload(void)
-{
-    while(!fs_init) {
-        microkit_cothread_yield();
-    }
-    TSLDR_DBG_PRINT(PROGNAME "entry of load_elf_payload\n");
-
-    microkit_msginfo info;
-    seL4_Error error;
-
-    pico_vfs_readfile2buf((void *)shared2, fname_buf, &error);
-    if (error != seL4_NoError) {
-        TSLDR_DBG_PRINT(PROGNAME "Failed to read %s\n", fname_buf);
-        shell_inst_epilogue();
-        return;
-    }
-    TSLDR_DBG_PRINT(PROGNAME "Wrote test's ELF file into memory\n");
-
-    microkit_mr_set(0, 1);
-    microkit_mr_set(1, req_pc_num);
-    info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        microkit_internal_crash(error);
-    }
-}
-
-/* ----- Command handlers ----- */
-
-static int parse_start_cmd(const char *arg)
-{
-    const char *filename_start;
-    const char *filename_end;
-    size_t filename_len;
-    uint32_t requested_pc_num = MIN_REQ_PC_NUM;
-
-    /* Skip spaces before the filename. */
-    while (*arg == ' ') {
-        arg++;
-    }
-
-    if (*arg == '\0') {
-        sddf_printf(
-            "Invalid usage: expected 'start <elf>' "
-            "or 'start <elf> <pc_num>'\n> "
-        );
-        return 1;
-    }
-
-    /*
-     * Parse the filename.
-     *
-     * Accepted forms:
-     *   start elf
-     *   start elf x
-     */
-    filename_start = arg;
-
-    while (*arg != '\0' && *arg != ' ') {
-        arg++;
-    }
-
-    filename_end = arg;
-    filename_len = (size_t)(filename_end - filename_start);
-
-    if (filename_len == 0) {
-        sddf_printf("Invalid usage: missing ELF filename\n> ");
-        return 1;
-    }
-
-    if (filename_len >= sizeof(fname_buf)) {
-        sddf_printf(
-            "Invalid usage: ELF filename is too long "
-            "(maximum %u characters)\n> ",
-            (unsigned int)(sizeof(fname_buf) - 1)
-        );
-        return 1;
-    }
-
-    /* Skip spaces after the filename. */
-    while (*arg == ' ') {
-        arg++;
-    }
-
-    /*
-     * An optional pc_num follows the filename.
-     * When omitted, retain the current req_pc_num value.
-     */
-    if (*arg != '\0') {
-        uint32_t value = 0;
-
-        /*
-         * The first character must be a decimal digit.
-         * This rejects negative values and signs such as "+1".
-         */
-        if (*arg < '0' || *arg > '9') {
-            sddf_printf(
-                "Invalid pc_num: expected an integer from %u to %u\n> ",
-                MIN_REQ_PC_NUM,
-                MAX_REQ_PC_NUM
-            );
-            return 1;
-        }
-
-        while (*arg >= '0' && *arg <= '9') {
-            uint32_t digit = (uint32_t)(*arg - '0');
-
-            /*
-             * The accepted maximum is only four, so reject as
-             * soon as the parsed value becomes too large.
-             */
-            value = value * 10U + digit;
-
-            if (value > MAX_REQ_PC_NUM) {
-                sddf_printf(
-                    "Invalid pc_num: expected an integer from %u to %u\n> ",
-                    MIN_REQ_PC_NUM,
-                    MAX_REQ_PC_NUM
-                );
-                return 1;
-            }
-
-            arg++;
-        }
-
-        /* Spaces after pc_num are permitted. */
-        while (*arg == ' ') {
-            arg++;
-        }
-
-        /* Reject another argument or malformed numeric text. */
-        if (*arg != '\0') {
-            sddf_printf(
-                "Invalid usage: expected 'start <elf>' "
-                "or 'start <elf> <pc_num>'\n> "
-            );
-            return 1;
-        }
-
-        if (value < MIN_REQ_PC_NUM || value > MAX_REQ_PC_NUM) {
-            sddf_printf(
-                "Invalid pc_num: expected an integer from %u to %u\n> ",
-                MIN_REQ_PC_NUM,
-                MAX_REQ_PC_NUM
-            );
-            return 1;
-        }
-
-        requested_pc_num = value;
-    }
-
-    /*
-     * Commit both parsed values only after the complete command has
-     * passed validation. An invalid command therefore cannot partially
-     * modify fname_buf or req_pc_num.
-     */
-    memset(fname_buf, 0, sizeof(fname_buf));
-    memcpy(fname_buf, filename_start, filename_len);
-    fname_buf[filename_len] = '\0';
-
-    req_pc_num = requested_pc_num;
-
-    if (
-        microkit_cothread_spawn(
-            load_elf_payload,
-            NULL
-        ) == LIBMICROKITCO_NULL_HANDLE
-    ) {
-        TSLDR_DBG_PRINT(
-            PROGNAME "Cannot spawn cothread to load payload\n"
-        );
-        return 1;
-    }
-
-    microkit_cothread_yield();
-
-    sddf_printf("> ");
-    return 0;
-}
-
-static int parse_lspcs_cmd(void)
-{
-    microkit_msginfo info;
-    seL4_Error error;
-
-    /* syscall id: list proto containers */
-    microkit_mr_set(0, 5);
-
-    info = microkit_ppcall(1, microkit_msginfo_new(0, 1));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        microkit_internal_crash(error);
-    }
-    sddf_printf("> \n");
-    return 0;
-}
-
-static int parse_flip_cmd(void)
-{
-    microkit_msginfo info;
-    seL4_Error error;
-
-    /* syscall id: flip acl rule */
-    microkit_mr_set(0, 17);
-
-    info = microkit_ppcall(1, microkit_msginfo_new(0, 1));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        microkit_internal_crash(error);
-    }
-    sddf_printf("> \n");
-    return 0;
-}
-
-static int parse_resume_cmd(const char *arg)
-{
-    while (*arg == ' ') arg++;
-
-    if (*arg == '\0') {
-        sddf_printf("Invalid usage: 'resume' requires a PD id\n> ");
-        return 1;
-    }
-
-    /*
-     * Expected format:
-     *   -i num
-     */
-
-    if (arg[0] != '-' || arg[1] != 'i') {
-        sddf_printf("Invalid usage: expected '-i <pd_id>'\n> ");
-        return 1;
-    }
-
-    arg += 2;
-
-    if (*arg != ' ') {
-        sddf_printf("Invalid usage: expected space after '-i'\n> ");
-        return 1;
-    }
-
-    while (*arg == ' ') arg++;
-
-    if (*arg == '\0') {
-        sddf_printf("Invalid usage: missing PD id after '-i'\n> ");
-        return 1;
-    }
-
-    seL4_Word target_pd_id = 0;
-
-    while (*arg >= '0' && *arg <= '9') {
-        seL4_Word digit = *arg - '0';
-        target_pd_id = target_pd_id * 10 + digit;
-        arg++;
-    }
-
-    while (*arg == ' ') arg++;
-
-    if (*arg != '\0') {
-        sddf_printf("Invalid usage: unexpected trailing argument\n> ");
-        return 1;
-    }
-
-    /* init target_pd_id with _buf */
-
-    microkit_msginfo info;
-    seL4_Error error;
-
-    /* syscall id: resume proto containers */
-    microkit_mr_set(0, 4);
-    /* PD id as the second arg */
-    microkit_mr_set(1, target_pd_id);
-
-    info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        microkit_internal_crash(error);
-    }
-    sddf_printf("> \n");
-    return 0;
-}
-
-
-static int parse_hang_cmd(const char *arg)
-{
-    while (*arg == ' ') arg++;
-
-    if (*arg == '\0') {
-        sddf_printf("Invalid usage: 'hang' requires a PD id\n> ");
-        return 1;
-    }
-
-    /*
-     * Expected format:
-     *   -i num
-     */
-
-    if (arg[0] != '-' || arg[1] != 'i') {
-        sddf_printf("Invalid usage: expected '-i <pd_id>'\n> ");
-        return 1;
-    }
-
-    arg += 2;
-
-    if (*arg != ' ') {
-        sddf_printf("Invalid usage: expected space after '-i'\n> ");
-        return 1;
-    }
-
-    while (*arg == ' ') arg++;
-
-    if (*arg == '\0') {
-        sddf_printf("Invalid usage: missing PD id after '-i'\n> ");
-        return 1;
-    }
-
-    seL4_Word target_pd_id = 0;
-
-    while (*arg >= '0' && *arg <= '9') {
-        seL4_Word digit = *arg - '0';
-        target_pd_id = target_pd_id * 10 + digit;
-        arg++;
-    }
-
-    while (*arg == ' ') arg++;
-
-    if (*arg != '\0') {
-        sddf_printf("Invalid usage: unexpected trailing argument\n> ");
-        return 1;
-    }
-
-    /* init target_pd_id with _buf */
-
-    microkit_msginfo info;
-    seL4_Error error;
-
-    /* syscall id: stop proto containers */
-    microkit_mr_set(0, 3);
-    /* PD id as the second arg */
-    microkit_mr_set(1, target_pd_id);
-
-    info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        microkit_internal_crash(error);
-    }
-    sddf_printf("> \n");
-    return 0;
-}
-
-
-static int parse_stop_cmd(const char *arg)
-{
-    while (*arg == ' ') arg++;
-
-    if (*arg == '\0') {
-        sddf_printf("Invalid usage: 'stop' requires a PD id\n> ");
-        return 1;
-    }
-
-    /*
-     * Expected format:
-     *   -i num
-     */
-
-    if (arg[0] != '-' || arg[1] != 'i') {
-        sddf_printf("Invalid usage: expected '-i <pd_id>'\n> ");
-        return 1;
-    }
-
-    arg += 2;
-
-    if (*arg != ' ') {
-        sddf_printf("Invalid usage: expected space after '-i'\n> ");
-        return 1;
-    }
-
-    while (*arg == ' ') arg++;
-
-    if (*arg == '\0') {
-        sddf_printf("Invalid usage: missing PD id after '-i'\n> ");
-        return 1;
-    }
-
-    seL4_Word target_pd_id = 0;
-
-    while (*arg >= '0' && *arg <= '9') {
-        seL4_Word digit = *arg - '0';
-        target_pd_id = target_pd_id * 10 + digit;
-        arg++;
-    }
-
-    while (*arg == ' ') arg++;
-
-    if (*arg != '\0') {
-        sddf_printf("Invalid usage: unexpected trailing argument\n> ");
-        return 1;
-    }
-
-    /* init target_pd_id with _buf */
-
-    microkit_msginfo info;
-    seL4_Error error;
-
-    /* syscall id: stop proto containers */
-    microkit_mr_set(0, 6);
-    /* PD id as the second arg */
-    microkit_mr_set(1, target_pd_id);
-
-    info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        microkit_internal_crash(error);
-    }
-    sddf_printf("> \n");
-    return 0;
-}
-
-
-static int handle_line(const char *line)
-{
-    while (*line == ' ') line++;  // skip spaces
-
-    if (*line == '\0') {
-        // empty input
-        sddf_printf("> ");
-        return 0;
-    }
-
-    if (strncmp(line, "start", 5) == 0) {
-        const char *after = line + 5;
-        if (*after == '\0') {
-            sddf_printf("Invalid usage: 'start' requires a filename\n");
-            return 1;
-        } else if (*after == ' ') {
-            return parse_start_cmd(after);
-        } else {
-            sddf_printf("Invalid command format\n");
-            return 1;
-        }
-    } else if (strncmp(line, "lspcs", 5) == 0) {
-        const char *after = line + 5;
-        while (*after == ' ') after++;
-        if (*after != '\0') {
-            sddf_printf("Invalid command format\n");
-            return 1;
-        }
-        return parse_lspcs_cmd();
-    } else if (strncmp(line, "flip", 4) == 0) {
-        const char *after = line + 4;
-        while (*after == ' ') after++;
-        if (*after != '\0') {
-            sddf_printf("Invalid command format\n");
-            return 1;
-        }
-        return parse_flip_cmd();
-    } else if (strncmp(line, "stop", 4) == 0) {
-        const char *after = line + 4;
-        if (*after == '\0') {
-            sddf_printf("Invalid usage: 'stop' requires a PD id\n");
-            return 1;
-        } else if (*after == ' ') {
-            return parse_stop_cmd(after);
-        } else {
-            sddf_printf("Invalid command format\n");
-            return 1;
-        }
-    } else if (strncmp(line, "hang", 4) == 0) {
-        const char *after = line + 4;
-        if (*after == '\0') {
-            sddf_printf("Invalid usage: 'hang' requires a PD id\n");
-            return 1;
-        } else if (*after == ' ') {
-            return parse_hang_cmd(after);
-        } else {
-            sddf_printf("Invalid command format\n");
-            return 1;
-        }
-    } else if (strncmp(line, "resume", 6) == 0) {
-        const char *after = line + 6;
-        if (*after == '\0') {
-            sddf_printf("Invalid usage: 'resume' requires a PD id\n");
-            return 1;
-        } else if (*after == ' ') {
-            return parse_resume_cmd(after);
-        } else {
-            sddf_printf("Invalid command format\n");
-            return 1;
-        }
-    } else {
-        sddf_printf("Unknown command: %s\n", line);
-        return 1;
-    }
-}
-
-
-void shell_inst_epilogue(void)
-{
-    sddf_putchar_unbuffered('T');
-    sddf_putchar_unbuffered('y');
-    sddf_putchar_unbuffered('p');
-    sddf_putchar_unbuffered('e');
-    sddf_putchar_unbuffered(':');
-    sddf_putchar_unbuffered(' ');
-    sddf_putchar_unbuffered('\"');
-    sddf_putchar_unbuffered('C');
-    sddf_putchar_unbuffered('t');
-    sddf_putchar_unbuffered('r');
-    sddf_putchar_unbuffered('l');
-    sddf_putchar_unbuffered(' ');
-    sddf_putchar_unbuffered('\\');
-    sddf_putchar_unbuffered(' ');
-    sddf_putchar_unbuffered('0');
-    sddf_putchar_unbuffered('\"');
-    sddf_putchar_unbuffered(' ');
-    sddf_putchar_unbuffered('t');
-    sddf_putchar_unbuffered('o');
-    sddf_putchar_unbuffered(' ');
-    sddf_putchar_unbuffered('r');
-    sddf_putchar_unbuffered('e');
-    sddf_putchar_unbuffered('t');
-    sddf_putchar_unbuffered('u');
-    sddf_putchar_unbuffered('r');
-    sddf_putchar_unbuffered('n');
-    sddf_putchar_unbuffered('\n');
-}
-
-
-/* ----- Microkit callback ----- */
 
 void notified(microkit_channel ch)
 {
@@ -674,40 +453,17 @@ void notified(microkit_channel ch)
     if (ch == serial_config.rx.id) {
         char c;
         while (!serial_dequeue(&serial_rx_queue_handle, &c)) {
-            if (c == '\r') {
-                // end of line
-                sddf_putchar_unbuffered('\r');
-                sddf_putchar_unbuffered('\n');
+            microrlr_t result = microrl_processing_input(&shell, &c, 1);
 
-                input_buf[input_len] = '\0';
-                int err = handle_line(input_buf);
-
-                // reset buffer and show prompt
-                input_len = 0;
-                if (err) {
-                    print_prompt();
-                }
-            } else if (c == '\b' || c == 127) {
-                // backspace
-                if (input_len > 0) {
-                    input_len--;
-                    sddf_putchar_unbuffered('\b');
-                    sddf_putchar_unbuffered(' ');
-                    sddf_putchar_unbuffered('\b');
-                }
-            } else {
-                // normal char
-                if (input_len < INPUT_BUF_SIZE - 1) {
-                    input_buf[input_len++] = c;
-                    sddf_putchar_unbuffered(c); // immediate echo
-                } else {
-                    sddf_printf("\nInput too long, buffer cleared\n");
-                    input_len = 0;
-                    print_prompt();
-                }
+            if (result != microrlOK && result != microrlERRCLFULL) {
+                TSLDR_DBG_PRINT(
+                    PROGNAME "microrl input error: %d\n",
+                    result
+                );
             }
         }
-    } else if (ch == 30) { /* notification from monitor */
+    } else if (ch == 30) {
+        /* Notification from monitor. */
         shell_inst_epilogue();
     }
 }
