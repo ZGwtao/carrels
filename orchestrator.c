@@ -117,12 +117,29 @@ static bool parse_u32_decimal(const char *text, uint32_t *value_out)
     return true;
 }
 
+static inline
 void shell_inst_epilogue(void)
 {
     sddf_printf("\r\nType: \"Ctrl \\\\ 0\" to return\r\n");
 }
 
-void test_entrypoint(void)
+static void shell_print_help(void)
+{
+    sddf_printf(
+        "Commands:\r\n"
+        "  start <elf> [pc_num]  Load and start an ELF; pc_num is %u..%u\r\n"
+        "  lspcs                 List proto-containers\r\n"
+        "  flip                  Flip the ACL rule\r\n"
+        "  stop -i <pd_id>       Stop a protection domain\r\n"
+        "  hang -i <pd_id>       Hang a protection domain\r\n"
+        "  resume -i <pd_id>     Resume a protection domain\r\n"
+        "  help                  Show this help\r\n",
+        MIN_REQ_PC_NUM,
+        MAX_REQ_PC_NUM
+    );
+}
+
+void orchestrator_prologue(void)
 {
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) start fs initialisation\n");
     fs_cmpl_t completion;
@@ -145,22 +162,10 @@ void test_entrypoint(void)
         return;
     }
     TSLDR_DBG_PRINT(PROGNAME "Wrote trampoline's ELF file into memory\n");
-}
 
-static void shell_print_help(void)
-{
-    sddf_printf(
-        "Commands:\r\n"
-        "  start <elf> [pc_num]  Load and start an ELF; pc_num is %u..%u\r\n"
-        "  lspcs                 List proto-containers\r\n"
-        "  flip                  Flip the ACL rule\r\n"
-        "  stop -i <pd_id>       Stop a protection domain\r\n"
-        "  hang -i <pd_id>       Hang a protection domain\r\n"
-        "  resume -i <pd_id>     Resume a protection domain\r\n"
-        "  help                  Show this help\r\n",
-        MIN_REQ_PC_NUM,
-        MAX_REQ_PC_NUM
-    );
+    shell_output(&shell, "orche@>$ \n");
+    shell_print_help();
+    shell_output(&shell, "orche@>$ ");
 }
 
 void load_elf_payload(void)
@@ -408,7 +413,7 @@ void init(void)
     stack_ptrs_arg_array_t costacks = { (uintptr_t) mp_stack1, (uintptr_t) mp_stack2 };
     microkit_cothread_init(&co_controller_mem, 0x10000, costacks);
 
-    if (microkit_cothread_spawn(test_entrypoint, NULL) == LIBMICROKITCO_NULL_HANDLE) {
+    if (microkit_cothread_spawn(orchestrator_prologue, NULL) == LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(PROGNAME "Cannot initialise orchestrator cothread2\n");
         microkit_internal_crash(-1);
     }
