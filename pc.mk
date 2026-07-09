@@ -8,6 +8,21 @@ PC_MICRORL_SRC_DIR := $(PC_SRC_DIR)/microrl
 PC_LIBMICROKITCO_DIR := $(LIBMICROKITCO_PATH)
 PC_LIBTRUSTEDLO_DIR := $(CARRELS)/dep/libtrustedlo
 
+pc:
+	mkdir -p pc
+
+PC_BUILD_DIR_GEN := $(BUILD_DIR)/pc/generated
+
+PC_MONITOR_VM_LAYOUT := $(PC_CONFIG_DIR)/monitor_vm_layout.py
+PC_MONITOR_VM_LAYOUT_GEN := $(PC_TOOL_DIR)/gen_vm_layout.py
+PC_MONITOR_VM_LAYOUT_HEADER := $(PC_BUILD_DIR_GEN)/monitor_vm_layout.h
+
+PC_TSLDR_BUILD_DIR := $(BUILD_DIR)/pc/libtrustedlo
+PC_TSLDR_BUILD_DIR_GEN := $(PC_TSLDR_BUILD_DIR)/generated
+PC_TSLDR_VM_LAYOUT_HEADER := $(PC_TSLDR_BUILD_DIR_GEN)/tsldr_vm_layout.h
+
+PC_LIBTRUSTEDLO_OBJ := libtrustedlo/libtrustedlo.a
+
 # ===================== unikraft variables ==========================
 
 BM_UNIKRAFT_DIR := $(CARRELS)/dep/unikraft
@@ -30,26 +45,16 @@ BM_UK_MAKE_ARGS := \
 	UK_BUILD=$(BM_UK_BUILD_DIR) \
 	SDDF=$(SDDF) \
 	LIBMICROKITCO_PATH=$(LIBMICROKITCO_PATH) \
+	LIBTRUSTEDLO_PATH=$(PC_LIBTRUSTEDLO_DIR) \
+	LIBTRUSTEDLO_LIB=$(abspath pc/$(PC_LIBTRUSTEDLO_OBJ)) \
 	MICROKIT_SDK=$(MICROKIT_SDK) \
 	MICROKIT_BOARD=$(MICROKIT_BOARD) \
 	MICROKIT_CONFIG=$(MICROKIT_CONFIG) \
 	BOARD_DIR=$(BOARD_DIR) \
-	SDDF_UTIL_LIB=$(abspath libsddf_util.a)
+	SDDF_UTIL_LIB=$(abspath libsddf_util.a) \
+	TSLDR_HEADER=$(PC_TSLDR_BUILD_DIR_GEN)
 
 # ===================== unikraft variables ==========================
-
-pc:
-	mkdir -p pc
-
-PC_BUILD_DIR_GEN := $(BUILD_DIR)/pc/generated
-
-PC_MONITOR_VM_LAYOUT := $(PC_CONFIG_DIR)/monitor_vm_layout.py
-PC_MONITOR_VM_LAYOUT_GEN := $(PC_TOOL_DIR)/gen_vm_layout.py
-PC_MONITOR_VM_LAYOUT_HEADER := $(PC_BUILD_DIR_GEN)/monitor_vm_layout.h
-
-PC_TSLDR_BUILD_DIR := $(BUILD_DIR)/pc/libtrustedlo
-PC_TSLDR_BUILD_DIR_GEN := $(PC_TSLDR_BUILD_DIR)/generated
-PC_TSLDR_VM_LAYOUT_HEADER := $(PC_TSLDR_BUILD_DIR_GEN)/tsldr_vm_layout.h
 
 PC_CLAGS := \
 	-I$(CONTAINER_LIBC_INCLUDE) \
@@ -64,7 +69,6 @@ PC_CLAGS := \
 LIBMICROKITCO_CFLAGS_pc := ${PC_CLAGS}
 PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a
 
-PC_LIBTRUSTEDLO_OBJ := libtrustedlo/libtrustedlo.a
 
 PC_ECHO_CLIENT_OBJS := pc/client_echo.o pc/early-init.o
 PC_FAULTING_CLIENT_OBJS := pc/client_faulting.o pc/early-init.o
