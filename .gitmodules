@@ -10,10 +10,6 @@
 	path = dep/sddf
 	url = https://github.com/au-ts/sddf.git
 	branch = main
-[submodule "musllibc"]
-	path = dep/musllibc
-	url = https://github.com/au-ts/musllibc.git
-	branch = sel4
 [submodule "libtrustedlo"]
 	path = dep/libtrustedlo
 	url = https://github.com/ZGwtao/libtrustedlo.git

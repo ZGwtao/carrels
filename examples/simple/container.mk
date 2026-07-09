@@ -29,7 +29,6 @@ SUPPORTED_BOARDS:= \
 TOOLCHAIN ?= clang
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 SDDF := $(CARRELS)/dep/sddf
-LIONSOS := $(CARRELS)/../demo/lionsos
 LIBMICROKITCO_PATH := $(CARRELS)/dep/libmicrokitco
 SYSTEM_FILE := container.system
 IMAGE_FILE := container.img

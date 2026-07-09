@@ -8,6 +8,10 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+ifeq ($(strip $(LIONSOS)),)
+$(error LIONSOS must be specified)
+endif
+override LIONSOS:=$(abspath ${LIONSOS})
 
 export CARRELS ?= $(abspath ../..)
 export CONTAINER_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -39,9 +43,10 @@ ${BUILD_DIR}/Makefile: container.mk Makefile
 	cat container.mk >> $@
 
 submodules:
-	git submodule update --init $(CARRELS)/dep/musllibc
 	git submodule update --init $(CARRELS)/dep/sddf
 	git submodule update --init $(CARRELS)/dep/libmicrokitco
 	git submodule update --init $(CARRELS)/dep/libtrustedlo
+	git submodule update --init $(CARRELS)/dep/unikraft
+	git submodule update --init $(CARRELS)/dep/catalog-core
 
 FORCE:
