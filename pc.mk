@@ -130,7 +130,22 @@ $(BM_UK_CONFIGURED): $(BM_UK_CONFIG_SRC)
 
 pc/%.o: CFLAGS := $(PC_CLAGS) \
 			 		$(CFLAGS)
-pc/%.o: $(PC_SRC_DIR)/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+pc/%.o: $(PC_SRC_DIR)/src/client/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+	$(CC) -c $(CFLAGS) $< -o $@
+
+pc/%.o: CFLAGS := $(PC_CLAGS) \
+			 		$(CFLAGS)
+pc/%.o: $(PC_SRC_DIR)/src/util/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+	$(CC) -c $(CFLAGS) $< -o $@
+
+pc/%.o: CFLAGS := $(PC_CLAGS) \
+			 		$(CFLAGS)
+pc/%.o: $(PC_SRC_DIR)/src/monitor/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+	$(CC) -c $(CFLAGS) $< -o $@
+
+pc/%.o: CFLAGS := $(PC_CLAGS) \
+			 		$(CFLAGS)
+pc/%.o: $(PC_SRC_DIR)/src/orchestrator/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
 	$(CC) -c $(CFLAGS) $< -o $@
 
 pc/microrl.o: CFLAGS := $(PC_CLAGS) \
