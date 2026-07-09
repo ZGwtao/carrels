@@ -28,8 +28,9 @@ SUPPORTED_BOARDS:= \
 
 TOOLCHAIN ?= clang
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-SDDF := $(LIONSOS)/dep/sddf
-LIBMICROKITCO_PATH := $(LIONSOS)/dep/libmicrokitco
+SDDF := $(CARRELS)/dep/sddf
+LIONSOS := $(CARRELS)/../demo/lionsos
+LIBMICROKITCO_PATH := $(CARRELS)/dep/libmicrokitco
 SYSTEM_FILE := container.system
 IMAGE_FILE := container.img
 REPORT_FILE := report.txt
@@ -70,7 +71,7 @@ include ${BLK_COMPONENTS}/blk_components.mk
 %.py: ${CONTAINER_DIR}/%.py
 	cp $< $@
 
-LIBTRUSTEDLO_PATH ?= $(LIONSOS)/dep/libtrustedlo
+LIBTRUSTEDLO_PATH ?= $(CARRELS)/dep/libtrustedlo
 PROTOCON_VM_LAYOUT := $(LIBTRUSTEDLO_PATH)/config/vm_layout.py
 MONITOR_VM_LAYOUT := $()
 
@@ -80,7 +81,7 @@ include $(LIONSOS)/components/fs/fat/fat.mk
 
 CONTAINER_LIBC_LIB := $(LIONS_LIBC)/lib/libc.a
 CONTAINER_LIBC_INCLUDE := $(LIONS_LIBC)/include
-CONTAINER_COMPONENT_DIR := $(LIONSOS)/components/proto-container
+CONTAINER_COMPONENT_DIR := $(CARRELS)
 include $(CONTAINER_COMPONENT_DIR)/pc.mk
 
 LIBMICROKITCO_LIBC_INCLUDE := $(LIONS_LIBC)/include
@@ -127,7 +128,7 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) $(RAMDISK_INITIALISER)
 
 qemu_disk:
-	$(LIONSOS)/dep/sddf/tools/mkvirtdisk $@ 4 512 16777216 GPT
+	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 4 512 16777216 GPT
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) $(RAMDISK_INITIALISER)
 
 qemu: ${IMAGE_FILE} qemu_disk refresh-ramdisk
@@ -142,6 +143,6 @@ qemu: ${IMAGE_FILE} qemu_disk refresh-ramdisk
 		-drive file=qemu_disk,if=none,format=raw,id=hd \
 		-device virtio-blk-device,drive=hd
 
-${SDDF}/tools/make/board/common.mk ${SDDF_MAKEFILES} ${LIONSOS}/dep/sddf/include &:
-	cd $(LIONSOS); git submodule update --init dep/sddf
+${SDDF}/tools/make/board/common.mk ${SDDF_MAKEFILES} ${CARRELS}/dep/sddf/include &:
+	cd $(CARRELS); git submodule update --init dep/sddf
 

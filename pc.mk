@@ -5,12 +5,12 @@ PC_CONFIG_DIR := $(PC_SRC_DIR)/config
 PC_HEADER_DIR := $(PC_SRC_DIR)/include
 PC_TOOL_DIR := $(PC_SRC_DIR)/tools
 PC_LIBMICROKITCO_DIR := $(LIBMICROKITCO_PATH)
-PC_LIBTRUSTEDLO_DIR := $(LIONSOS)/dep/libtrustedlo
+PC_LIBTRUSTEDLO_DIR := $(CARRELS)/dep/libtrustedlo
 
 # ===================== unikraft variables ==========================
 
-BM_UNIKRAFT_DIR := $(LIONSOS)/dep/unikraft
-BM_CATALOG_CORE_DIR := $(LIONSOS)/dep/catalog-core
+BM_UNIKRAFT_DIR := $(CARRELS)/dep/unikraft
+BM_CATALOG_CORE_DIR := $(CARRELS)/dep/catalog-core
 
 BM_UK_APPLICATION ?= c-hello
 BM_UK_PAYLOAD_ELF ?= $(BM_UK_APPLICATION)_default-arm64
@@ -28,7 +28,6 @@ BM_UK_MAKE_ARGS := \
 	UK_APP=$(BM_UK_APP_DIR) \
 	UK_BUILD=$(BM_UK_BUILD_DIR) \
 	SDDF=$(SDDF) \
-	LIONSOS=$(LIONSOS) \
 	LIBMICROKITCO_PATH=$(LIBMICROKITCO_PATH) \
 	MICROKIT_SDK=$(MICROKIT_SDK) \
 	MICROKIT_BOARD=$(MICROKIT_BOARD) \

@@ -9,7 +9,7 @@ $(error MICROKIT_SDK must be specified)
 endif
 override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
-export LIONSOS ?= $(abspath ../..)
+export CARRELS ?= $(abspath ../..)
 export CONTAINER_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 export CONFIG_INCLUDE ?= $(abspath src/config)
 export MICROKIT_CONFIG ?= debug
@@ -30,7 +30,7 @@ ${BUILD_DIR}/Makefile: container.mk
 
 ${BUILD_DIR}/Makefile: container.mk Makefile
 	mkdir -p ${BUILD_DIR}
-	echo "export LIONSOS ?= ${LIONSOS}" > $@
+	echo "export CARRELS ?= ${CARRELS}" > $@
 	echo "export CONTAINER_DIR ?= ${CONTAINER_DIR}" >> $@
 	echo "export BUILD_DIR := ${BUILD_DIR}" >> $@
 	echo "export MICROKIT_BOARD ?= ${MICROKIT_BOARD}" >> $@
@@ -39,9 +39,9 @@ ${BUILD_DIR}/Makefile: container.mk Makefile
 	cat container.mk >> $@
 
 submodules:
-	git submodule update --init $(LIONSOS)/dep/musllibc
-	git submodule update --init $(LIONSOS)/dep/sddf
-	git submodule update --init $(LIONSOS)/dep/libmicrokitco
-	git submodule update --init $(LIONSOS)/dep/libtrustedlo
+	git submodule update --init $(CARRELS)/dep/musllibc
+	git submodule update --init $(CARRELS)/dep/sddf
+	git submodule update --init $(CARRELS)/dep/libmicrokitco
+	git submodule update --init $(CARRELS)/dep/libtrustedlo
 
 FORCE:
