@@ -13,8 +13,6 @@
 #include <pd_io_queue.h>
 #include <monitor_vm_layout.h>
 
-#define PROGNAME "[@monitor] "
-
 // these memory regions are shared memory between
 //    -> the monitor (container monitor)
 //    -> the dynamic pds (protocon - proto containers)
@@ -115,11 +113,18 @@ static uint32_t req_pc_num = 0;
 static bool deploy_request_active = false;
 static monitor_deploy_request_t deploy_request;
 
+static inline void monitor_main_notify_orchestrator()
+{
+    microkit_notify(PC_MONITOR_ORCHESTRATOR_CHANNEL);
+}
+
 static void monitor_finish_deploy_request(void)
 {
     req_pc_num = 0;
     deploy_request.num_req_pc = 0;
     deploy_request_active = false;
+
+    monitor_main_notify_orchestrator();
 }
 
 #define SET_PROTOCON_AS_INSTANTIATED(C) \
@@ -439,12 +444,6 @@ void monitor_main_init_storage(void)
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) finished fs initialisation\n");
 }
 
-
-static inline void monitor_main_notify_orchestrator()
-{
-    microkit_notify(PC_MONITOR_ORCHESTRATOR_CHANNEL);
-}
-
 void monitor_main_load_elfs_into_protocon(int cid)
 {
     uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
@@ -462,9 +461,90 @@ void monitor_main_load_elfs_into_protocon(int cid)
 }
 
 
+void protocon_start(uint32_t cid)
+{
+    tsldr_main_monitor_init_mdinfo(
+        (tsldr_mdinfodb_t *)microkit_trusted_loading_info,
+        cid,
+        (void *)monitor_vm_region_base(
+            &monitor_vm_layout.loader_metadata,
+            cid
+        )
+    );
+
+    tsldr_miscutil_memcpy(
+        (char *)monitor_vm_region_base(
+            &monitor_vm_layout.loader_context,
+            cid
+        ),
+        &protocon_ctx_db[cid],
+        sizeof(tsldr_context_t)
+    );
+
+    tsldr_main_monitor_privilege_pd(cid);
+
+    SET_PROTOCON_AS_INSTANTIATED(cid)
+
+    Elf64_Ehdr *protocon_eh =
+        (Elf64_Ehdr *)ORC_MONITOR_REGION_PROTOCON_ELF_BASE;
+
+    microkit_pd_restart(cid, protocon_eh->e_entry);
+    TSLDR_DBG_PRINT(
+        PROGNAME
+        "Started child PD at entrypoint address: %x\n",
+        protocon_eh->e_entry
+    );
+}
+
+
+seL4_Error protocon_deploy(payload_info_t *info)
+{
+    protocon_svc_req_t req = { 0 };
+    Elf64_Ehdr *client_payload_eh = NULL;
+    int cid = PC_CHILD_PER_MONITOR_MAX_NUM;
+
+
+    (void) service_manifest_parse(info, &req);
+
+    cid = service_registry_create(
+        &req,
+        protocon_states,
+        monitor_svc_dist_map
+    );
+    if (cid >= PC_CHILD_PER_MONITOR_MAX_NUM || cid < 0) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Failed to find suitable container for payload\n"
+        );
+        return -1;
+    }
+    TSLDR_DBG_PRINT(PROGNAME "cid available: %d\n", cid);
+
+    monitor_main_load_elfs_into_protocon(cid);
+
+    client_payload_eh =
+        (Elf64_Ehdr *)monitor_vm_region_base(
+            &monitor_vm_layout.container_image,
+            cid
+        );
+
+    service_installer_apply(
+        cid,
+        &req,
+        (uintptr_t)client_payload_eh,
+        msvcdb_base,
+        &monitor_svc_db.list[cid]
+    );
+
+    protocon_start(cid);
+    return seL4_NoError;
+}
+
+
 void monitor_call_deploy_protocon_second_half(void)
 {
     monitor_deploy_request_t *request = microkit_cothread_my_arg();
+    payload_info_t payload_info = { 0 };
     uint32_t num_req_pc = request->num_req_pc;
 
     TSLDR_DBG_PRINT(PROGNAME "entry of monitor_call_deploy_protocon_second_half\n");
@@ -475,119 +555,30 @@ void monitor_call_deploy_protocon_second_half(void)
             num_req_pc
         );
         monitor_finish_deploy_request();
-        monitor_main_notify_orchestrator();
         return;
     }
 
-    // FIXME: should not use shared memory to determine state...
-    Elf64_Ehdr *payload_eh = (Elf64_Ehdr *)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE;
-    if (payload_eh->e_shoff == 0 ||
-        payload_eh->e_shnum == 0 ||
-        payload_eh->e_shentsize != sizeof(Elf64_Shdr) ||
-        payload_eh->e_shstrndx == SHN_UNDEF ||
-        payload_eh->e_shstrndx >= payload_eh->e_shnum)
+    if (payload_info_parse(
+            &payload_info,
+            ((uintptr_t)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE)
+        ) != seL4_NoError
+    ) {
+        monitor_finish_deploy_request();
+        return;
+    }
+
+    for (uint32_t i = 0; i < num_req_pc; ++i)
     {
-        TSLDR_DBG_PRINT(
-            PROGNAME
-            "no section headers present or unexpected shentsize "
-            "or invalid e_shstrndx\n"
-        );
-        monitor_finish_deploy_request();
-        monitor_main_notify_orchestrator();
-        return;
-    }
-
-    protocon_svc_req_t req = {0};
-
-    Elf64_Shdr *user_defined_svc_section =
-        (Elf64_Shdr *)tsldr_miscutil_find_section_from_elf(
-            (void *)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE,
-            PC_SVC_DESC_SECTION_NAME
-        );
-    if (!user_defined_svc_section) {
-        TSLDR_DBG_PRINT(
-            PROGNAME
-            "Failed to restart container as no iface section specified\n"
-        );
-        monitor_finish_deploy_request();
-        monitor_main_notify_orchestrator();
-        return;
-    }
-
-    for (uint32_t to_deploy = 0; to_deploy < num_req_pc; ++to_deploy) {
-        int cid = monitor_match_ossvc_request_with_available_pd(
-            (void *)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE,
-            user_defined_svc_section,
-            &req,
-            protocon_states,
-            monitor_svc_dist_map
-        );
-        if (cid >= PC_CHILD_PER_MONITOR_MAX_NUM || cid < 0) {
+        if (protocon_deploy(&payload_info) != seL4_NoError) {
             TSLDR_DBG_PRINT(
                 PROGNAME
-                "Failed to find suitable container for payload\n"
+                "Failed to deploy container\n"
             );
-            TSLDR_DBG_PRINT(
-                PROGNAME "Requested PC number: %u\n",
-                num_req_pc
-            );
-            monitor_finish_deploy_request();
-            monitor_main_notify_orchestrator();
-            return;
+            break;
         }
-        TSLDR_DBG_PRINT(PROGNAME "cid available: %d\n", cid);
-
-        monitor_main_load_elfs_into_protocon(cid);
-
-        Elf64_Ehdr *client_payload_eh =
-            (Elf64_Ehdr *)monitor_vm_region_base(
-                &monitor_vm_layout.container_image,
-                cid
-            );
-
-        monitor_patch_payload_with_ossvc_info(
-            cid,
-            &req,
-            (uintptr_t)client_payload_eh,
-            msvcdb_base,
-            &monitor_svc_db.list[cid]
-        );
-
-        tsldr_main_monitor_init_mdinfo(
-            (tsldr_mdinfodb_t *)microkit_trusted_loading_info,
-            cid,
-            (void *)monitor_vm_region_base(
-                &monitor_vm_layout.loader_metadata,
-                cid
-            )
-        );
-
-        tsldr_miscutil_memcpy(
-            (char *)monitor_vm_region_base(
-                &monitor_vm_layout.loader_context,
-                cid
-            ),
-            &protocon_ctx_db[cid],
-            sizeof(tsldr_context_t)
-        );
-
-        tsldr_main_monitor_privilege_pd(cid);
-
-        SET_PROTOCON_AS_INSTANTIATED(cid)
-
-        Elf64_Ehdr *protocon_eh =
-            (Elf64_Ehdr *)ORC_MONITOR_REGION_PROTOCON_ELF_BASE;
-
-        microkit_pd_restart(cid, protocon_eh->e_entry);
-        TSLDR_DBG_PRINT(
-            PROGNAME
-            "Started child PD at entrypoint address: %x\n",
-            protocon_eh->e_entry
-        );
     }
 
     monitor_finish_deploy_request();
-    monitor_main_notify_orchestrator();
 }
 
 

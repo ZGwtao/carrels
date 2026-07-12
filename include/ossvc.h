@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <elf.h>
 #include <microkit.h>
 
 #define SVC_TYPE_MAX_NUM (8)
@@ -70,6 +71,17 @@ typedef struct {
 
 } protocon_svc_req_t;
 
+#define PROGNAME "[@monitor] "
+#define PC_SVC_DESC_SECTION_NAME ".pc_svc_desc"
+typedef struct {
+    Elf64_Ehdr *header_payload;
+    Elf64_Shdr *header_service_info;
+} payload_info_t;
+
+
+seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base);
+
+
 #define OSSVC_TYPE_COUNT 8
 #define OSSVC_MAX_INSTANCES_PER_TYPE 8
 
@@ -84,10 +96,10 @@ typedef struct {
 void monitor_init_ossvc_map(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]);
 
 
-void monitor_ossvc_parse_req_from_elf_section(void *elf_base, void *sh, protocon_svc_req_t *req);
+void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 
-void monitor_patch_payload_with_ossvc_info(
+void service_installer_apply(
     int cid,
     protocon_svc_req_t *req,
     uintptr_t payload_base,
@@ -96,15 +108,7 @@ void monitor_patch_payload_with_ossvc_info(
 );
 
 
-int monitor_match_ossvc_request_with_available_pd(
-        void *elf_base,
-        void *sh,
-        protocon_svc_req_t *req,
-        protocon_lifecycle_state_t *protocon_states,
-        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
-);
-
-int monitor_match_ossvc_request__worker_func(
+int service_registry_create(
         protocon_svc_req_t *req,
         protocon_lifecycle_state_t *protocon_states,
         int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]

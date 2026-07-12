@@ -78,7 +78,7 @@ void monitor_patch_payload_with_ossvc__worker_func(protocon_svc_t *svc, protocon
 }
 
 
-void monitor_patch_payload_with_ossvc_info(
+void service_installer_apply(
         int cid,
         protocon_svc_req_t *req,
         uintptr_t payload_base,

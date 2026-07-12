@@ -14,7 +14,7 @@ static inline seL4_Word monitor_match_ossvc_request_with_unipd(protocon_svc_req_
     return mask;
 }
 
-int monitor_match_ossvc_request__worker_func(
+int service_registry_create(
         protocon_svc_req_t *req,
         protocon_lifecycle_state_t *protocon_states,
         int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
@@ -30,16 +30,4 @@ int monitor_match_ossvc_request__worker_func(
         }
     }
     return PC_CHILD_PER_MONITOR_MAX_NUM;
-}
-
-int monitor_match_ossvc_request_with_available_pd(
-        void *elf_base,
-        void *sh,
-        protocon_svc_req_t *req,
-        protocon_lifecycle_state_t *protocon_states,
-        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
-) {
-    monitor_ossvc_parse_req_from_elf_section(elf_base, sh, req);
-
-    return monitor_match_ossvc_request__worker_func(req, protocon_states, monitor_svc_dist_map);
 }

@@ -26,11 +26,13 @@ static inline void monitor_ossvc_init_req_per_type(protocon_svc_req_t *req, prot
     };
 }
 
-void monitor_ossvc_parse_req_from_elf_section(void *elf_base, void *sh, protocon_svc_req_t *req)
+void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
 {
     // parse the interface section ...
     // i.e., get the user-defined section for declaring what OS services are requested
-    protocon_svc_desc_t *ib = (protocon_svc_desc_t *)(elf_base + (uint64_t)((Elf64_Shdr *)sh)->sh_offset);
+    protocon_svc_desc_t *ib = 
+            (protocon_svc_desc_t *)((void *)(payload->header_payload) + \
+            (uint64_t)(payload->header_service_info->sh_offset));
 
     // the list of numbers of requested OS services
     const uint8_t *svc_req_num_per_type = &ib->t1_num;
@@ -57,4 +59,41 @@ void monitor_ossvc_parse_req_from_elf_section(void *elf_base, void *sh, protocon
         seL4_Word *svc_data_list = *svc_per_type_data_map[i];
         monitor_ossvc_init_req_per_type(req, curr_type, n, svc_data_list);
     }
+}
+
+seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
+{
+    Elf64_Ehdr *header_payload = NULL;
+    Elf64_Shdr *header_service_info = NULL;
+
+    header_payload = (Elf64_Ehdr *)base;
+    if (header_payload->e_shoff == 0 ||
+        header_payload->e_shnum == 0 ||
+        header_payload->e_shentsize != sizeof(Elf64_Shdr) ||
+        header_payload->e_shstrndx == SHN_UNDEF ||
+        header_payload->e_shstrndx >= header_payload->e_shnum)
+    {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "no section headers present or unexpected shentsize "
+            "or invalid e_shstrndx\n"
+        );
+        return -1;
+    }
+
+    header_service_info =
+        (Elf64_Shdr *)tsldr_miscutil_find_section_from_elf((void *)(base), (char *)(PC_SVC_DESC_SECTION_NAME));
+
+    if (!header_service_info) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Failed to restart container as no iface section specified\n"
+        );
+        return -1;
+    }
+
+    info->header_payload = header_payload;
+    info->header_service_info = header_service_info;
+
+    return seL4_NoError;
 }
