@@ -444,6 +444,21 @@ void monitor_main_init_storage(void)
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) finished fs initialisation\n");
 }
 
+
+static inline
+seL4_Error protocon_deploy_plan_check(deploy_plan_t *plan)
+{
+    if (plan->pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM || plan->pc_id < 0) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Failed to find suitable container for payload\n"
+        );
+        return -1;
+    }
+    TSLDR_DBG_PRINT(PROGNAME "cid available: %d\n", plan->pc_id);
+    return seL4_NoError;
+}
+
 void monitor_main_load_elfs_into_protocon(int cid)
 {
     uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
@@ -460,83 +475,87 @@ void monitor_main_load_elfs_into_protocon(int cid)
     TSLDR_DBG_PRINT(PROGNAME "Copied trampoline program to child PD's memory region\n");
 }
 
+static inline
+void protocon_pre_instantiate(deploy_plan_t *plan)
+{
+    monitor_main_load_elfs_into_protocon(plan->pc_id);
 
-void protocon_start(uint32_t cid)
+    plan->pc_base =
+        monitor_vm_region_base(
+            &monitor_vm_layout.container_image,
+            plan->pc_id
+        );
+    assert(plan->pc_base != 0x0);
+    Elf64_Ehdr *pc_header = 
+        (Elf64_Ehdr *)(ORC_MONITOR_REGION_PROTOCON_ELF_BASE);
+        // (Elf64_Ehdr *) monitor_vm_region_base(
+        //     &monitor_vm_layout.loader_program,
+        //     plan->pc_id
+        // );
+    plan->pc_entry = pc_header->e_entry;
+}
+
+
+void protocon_start(deploy_plan_t *plan)
 {
     tsldr_main_monitor_init_mdinfo(
         (tsldr_mdinfodb_t *)microkit_trusted_loading_info,
-        cid,
+        plan->pc_id,
         (void *)monitor_vm_region_base(
             &monitor_vm_layout.loader_metadata,
-            cid
+            plan->pc_id
         )
     );
 
     tsldr_miscutil_memcpy(
         (char *)monitor_vm_region_base(
             &monitor_vm_layout.loader_context,
-            cid
+            plan->pc_id
         ),
-        &protocon_ctx_db[cid],
+        &protocon_ctx_db[plan->pc_id],
         sizeof(tsldr_context_t)
     );
 
-    tsldr_main_monitor_privilege_pd(cid);
+    tsldr_main_monitor_privilege_pd(plan->pc_id);
 
-    SET_PROTOCON_AS_INSTANTIATED(cid)
+    SET_PROTOCON_AS_INSTANTIATED(plan->pc_id)
 
-    Elf64_Ehdr *protocon_eh =
-        (Elf64_Ehdr *)ORC_MONITOR_REGION_PROTOCON_ELF_BASE;
-
-    microkit_pd_restart(cid, protocon_eh->e_entry);
+    microkit_pd_restart(plan->pc_id, plan->pc_entry);
     TSLDR_DBG_PRINT(
         PROGNAME
         "Started child PD at entrypoint address: %x\n",
-        protocon_eh->e_entry
+        plan->pc_entry
     );
 }
 
 
 seL4_Error protocon_deploy(payload_info_t *info)
 {
+    deploy_plan_t plan = { 0 };
     protocon_svc_req_t req = { 0 };
-    Elf64_Ehdr *client_payload_eh = NULL;
-    int cid = PC_CHILD_PER_MONITOR_MAX_NUM;
-
 
     (void) service_manifest_parse(info, &req);
 
-    cid = service_planner_select(
+    (void) service_planner_select_protocon(
         &req,
+        &plan,
         protocon_states,
         monitor_svc_dist_map
     );
-    if (cid >= PC_CHILD_PER_MONITOR_MAX_NUM || cid < 0) {
-        TSLDR_DBG_PRINT(
-            PROGNAME
-            "Failed to find suitable container for payload\n"
-        );
+    if (protocon_deploy_plan_check(&plan) != seL4_NoError) {
         return -1;
     }
-    TSLDR_DBG_PRINT(PROGNAME "cid available: %d\n", cid);
 
-    monitor_main_load_elfs_into_protocon(cid);
-
-    client_payload_eh =
-        (Elf64_Ehdr *)monitor_vm_region_base(
-            &monitor_vm_layout.container_image,
-            cid
-        );
+    protocon_pre_instantiate(&plan);
 
     service_installer_apply(
-        cid,
+        &plan,
         &req,
-        (uintptr_t)client_payload_eh,
         msvcdb_base,
-        &monitor_svc_db.list[cid]
+        &monitor_svc_db.list[plan.pc_id]
     );
 
-    protocon_start(cid);
+    protocon_start(&plan);
     return seL4_NoError;
 }
 

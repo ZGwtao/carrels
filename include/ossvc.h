@@ -6,6 +6,8 @@
 
 #define SVC_TYPE_MAX_NUM (8)
 
+#define PC_CHILD_PER_MONITOR_MAX_NUM (16)
+
 #define SVC_PER_TYPE_MAX_NUM (8)
 
 typedef struct {
@@ -81,6 +83,19 @@ typedef struct {
 
 seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base);
 
+typedef struct {
+    uint32_t pc_id;
+    uintptr_t pc_base;
+    Elf64_Addr pc_entry;
+} deploy_plan_t;
+
+static inline
+void deploy_plan_init(deploy_plan_t *p)
+{
+    p->pc_id = PC_CHILD_PER_MONITOR_MAX_NUM;
+    p->pc_base = 0x0;
+    p->pc_entry = 0x0;
+}
 
 #define OSSVC_TYPE_COUNT 8
 #define OSSVC_MAX_INSTANCES_PER_TYPE 8
@@ -100,16 +115,16 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 
 void service_installer_apply(
-    int cid,
+    const deploy_plan_t *plan,
     const protocon_svc_req_t *req,
-    uintptr_t payload_base,
     uintptr_t monitor_svcdb_base,
     const protocon_svcdb_t *svcdb
 );
 
 
-int service_planner_select(
-        protocon_svc_req_t *req,
+void service_planner_select_protocon(
+        const protocon_svc_req_t *req,
+        deploy_plan_t *plan,
         protocon_lifecycle_state_t *protocon_states,
         int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
 );

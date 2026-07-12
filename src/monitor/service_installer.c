@@ -6,7 +6,7 @@
 #include <lions/fs/config.h>
 #include <pico_vfs.h>
 
-void monitor_worker_func__patch_payload_by_ptr(void *elf_base, const char data_file[], uintptr_t vaddr)
+void monitor_worker_func__patch_payload_by_ptr(const void *elf_base, const char data_file[], uintptr_t vaddr)
 {
     int err = 0;
     seL4_Word target_sh = tsldr_miscutil_fetch_elf_section_with_vaddr(elf_base, vaddr, NULL);
@@ -31,7 +31,7 @@ service_installer_apply_one(
     const protocon_svc_t *svc,
     const protocon_svc_req_t *req,
     tsldr_acrtreq_t *req_acrt,
-    uintptr_t payload_base
+    const uintptr_t payload_base
 ) {
     if (!svc->svc_init) {
         return;
@@ -95,9 +95,8 @@ service_installer_apply_one(
 
 
 void service_installer_apply(
-        int cid,
+        const deploy_plan_t *plan,
         const protocon_svc_req_t *req,
-        uintptr_t payload_base,
         uintptr_t monitor_svcdb_base,
         const protocon_svcdb_t *svcdb
 ) {
@@ -126,11 +125,11 @@ void service_installer_apply(
             &curr_svc[i],
             req,
             &req_acrt,
-            payload_base
+            plan->pc_base
         );
     }
 
-    svc_num_ptr = (seL4_Word *)((char *)monitor_svcdb_base + 0x1000 * cid);
+    svc_num_ptr = (seL4_Word *)((char *)monitor_svcdb_base + 0x1000 * plan->pc_id);
     svc_data_ptr = (unsigned char*)(svc_num_ptr + 1);
 
     *svc_num_ptr = 

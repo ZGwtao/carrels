@@ -3,8 +3,11 @@
 #include <protocon.h>
 
 
-static inline seL4_Word monitor_match_ossvc_request_with_unipd(protocon_svc_req_t *req, int svc_dist_map[])
-{
+static inline
+seL4_Word monitor_match_ossvc_request_with_unipd(
+        const protocon_svc_req_t *req,
+        int svc_dist_map[]
+) {
     seL4_Word mask = 0;
     for (int i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
         mask |= (req->num_svc_per_type[i] > svc_dist_map[i]);
@@ -14,11 +17,15 @@ static inline seL4_Word monitor_match_ossvc_request_with_unipd(protocon_svc_req_
     return mask;
 }
 
-int service_planner_select(
-        protocon_svc_req_t *req,
+void service_planner_select_protocon(
+        const protocon_svc_req_t *req,
+        deploy_plan_t *plan,
         protocon_lifecycle_state_t *protocon_states,
         int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
 ) {
+
+    deploy_plan_init(plan);
+
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
         if (protocon_states[i] != PROTOCON_PASSIVE) {
             continue;
@@ -26,8 +33,7 @@ int service_planner_select(
         // check each dynamic pd and see if any of them matches with the OS service request
         seL4_Word mask = monitor_match_ossvc_request_with_unipd(req, monitor_svc_dist_map[i]);
         if (mask == 0) {
-            return i;
+            plan->pc_id = i;
         }
     }
-    return PC_CHILD_PER_MONITOR_MAX_NUM;
 }
