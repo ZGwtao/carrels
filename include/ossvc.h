@@ -70,12 +70,42 @@ typedef struct {
 
 } protocon_svc_req_t;
 
+#define OSSVC_TYPE_COUNT 8
+#define OSSVC_MAX_INSTANCES_PER_TYPE 8
 
-void monitor_init_ossvc_map();
+typedef struct {
+    uint8_t count[OSSVC_TYPE_COUNT];
+    seL4_Word iface_addr
+        [OSSVC_TYPE_COUNT]
+        [OSSVC_MAX_INSTANCES_PER_TYPE];
+} service_requirements_t;
 
 
-void monitor_patch_payload_with_ossvc_info(int cid, protocon_svc_req_t *req, uintptr_t payload_base, uintptr_t monitor_svcdb_base);
+void monitor_init_ossvc_map(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]);
 
 
-int monitor_match_ossvc_request_with_available_pd(void *elf_base, void *sh, protocon_svc_req_t *req, protocon_lifecycle_state_t *protocon_states);
+void monitor_ossvc_parse_req_from_elf_section(void *elf_base, void *sh, protocon_svc_req_t *req);
 
+
+void monitor_patch_payload_with_ossvc_info(
+    int cid,
+    protocon_svc_req_t *req,
+    uintptr_t payload_base,
+    uintptr_t monitor_svcdb_base,
+    protocon_svcdb_t *svcdb
+);
+
+
+int monitor_match_ossvc_request_with_available_pd(
+        void *elf_base,
+        void *sh,
+        protocon_svc_req_t *req,
+        protocon_lifecycle_state_t *protocon_states,
+        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
+);
+
+int monitor_match_ossvc_request__worker_func(
+        protocon_svc_req_t *req,
+        protocon_lifecycle_state_t *protocon_states,
+        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
+);

@@ -74,7 +74,13 @@ PC_ECHO_CLIENT_OBJS := pc/client_echo.o pc/early-init.o
 PC_FAULTING_CLIENT_OBJS := pc/client_faulting.o pc/early-init.o
 PC_LOOPING_CLIENT_OBJS := pc/client_looping.o pc/early-init.o
 PC_TIMEOUT_CLIENT_OBJS := pc/client_timeout.o pc/early-init.o
-PC_MONITOR_OBJS := pc/monitor.o pc/ossvc.o pc/pico_vfs.o
+PC_MONITOR_OBJS := \
+	pc/monitor.o \
+	pc/service_installer.o \
+	pc/service_manifest.o \
+	pc/service_planner.o \
+	pc/service_registry.o \
+	pc/pico_vfs.o 
 PC_ORCHESTRATOR_OBJS := \
 	pc/orchestrator.o \
 	pc/pico_vfs.o \

@@ -519,7 +519,8 @@ void monitor_call_deploy_protocon_second_half(void)
             (void *)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE,
             user_defined_svc_section,
             &req,
-            protocon_states
+            protocon_states,
+            monitor_svc_dist_map
         );
         if (cid >= PC_CHILD_PER_MONITOR_MAX_NUM || cid < 0) {
             TSLDR_DBG_PRINT(
@@ -548,7 +549,8 @@ void monitor_call_deploy_protocon_second_half(void)
             cid,
             &req,
             (uintptr_t)client_payload_eh,
-            msvcdb_base
+            msvcdb_base,
+            &monitor_svc_db.list[cid]
         );
 
         tsldr_main_monitor_init_mdinfo(
@@ -599,7 +601,7 @@ void init(void)
 
     // global os services state initialisation...
     tsldr_miscutil_memset(monitor_svc_dist_map, 0, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM * SVC_TYPE_MAX_NUM);
-    monitor_init_ossvc_map();
+    monitor_init_ossvc_map(&monitor_svc_db, monitor_svc_dist_map);
 
     // global client state initialisation...
     // tsldr_miscutil_memset(protocon_states, PROTOCON_PASSIVE, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM);
