@@ -101,10 +101,10 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 void service_installer_apply(
     int cid,
-    protocon_svc_req_t *req,
+    const protocon_svc_req_t *req,
     uintptr_t payload_base,
     uintptr_t monitor_svcdb_base,
-    protocon_svcdb_t *svcdb
+    const protocon_svcdb_t *svcdb
 );
 
 

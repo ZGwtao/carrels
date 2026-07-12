@@ -94,7 +94,7 @@ static void closefile(uint64_t fd)
 }
 
 
-uint64_t pico_vfs_readfile2buf(void *buf, char *path, int *err)
+uint64_t pico_vfs_readfile2buf(void *buf, const char *path, int *err)
 {
     *err = seL4_NoError;
 
