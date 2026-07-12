@@ -29,7 +29,7 @@ void monitor_worker_func__patch_payload_by_ptr(const void *elf_base, const char 
 static inline void
 service_installer_apply_one(
     const protocon_svc_t *svc,
-    const protocon_svc_req_t *req,
+    protocon_svc_req_t *cursor,
     tsldr_acrtreq_t *req_acrt,
     const uintptr_t payload_base
 ) {
@@ -37,14 +37,12 @@ service_installer_apply_one(
         return;
     }
     uint8_t type = svc->svc_type;
-    if (!req->num_svc_per_type[type]) {
+
+    if (!cursor->num_svc_per_type[type]) {
         return;
     }
 
     uintptr_t target_section;
-    protocon_svc_req_t cursor;
-
-    tsldr_miscutil_memcpy(&cursor, req, sizeof(protocon_svc_desc_t));
 
     {
         // maximumlly, we allow each OS svc to have at most:
@@ -81,8 +79,9 @@ service_installer_apply_one(
         }
     }
 
-    target_section = \
-        cursor.data_per_svc_instance[type][cursor.num_svc_per_type[type] - 1];
+    target_section =
+        cursor->data_per_svc_instance[type]
+                                     [cursor->num_svc_per_type[type] - 1];
 
     monitor_worker_func__patch_payload_by_ptr(
         (void *)payload_base,
@@ -90,15 +89,15 @@ service_installer_apply_one(
         (uintptr_t)(target_section)
     );
 
-    cursor.num_svc_per_type[type]--;
+    cursor->num_svc_per_type[type]--;
 }
 
 
 void service_installer_apply(
-        const deploy_plan_t *plan,
-        const protocon_svc_req_t *req,
-        uintptr_t monitor_svcdb_base,
-        const protocon_svcdb_t *svcdb
+    const deploy_plan_t *plan,
+    const protocon_svc_req_t *req,
+    uintptr_t monitor_svcdb_base,
+    const protocon_svcdb_t *svcdb
 ) {
 
     TSLDR_DBG_PRINT(LIB_NAME_MACRO "pd index of the given os svcdb: %d\n", svcdb->pd_idx);
@@ -110,9 +109,12 @@ void service_installer_apply(
     // the reason we need it is that the trusted loader does not handle high-level information
     // so we put an information flow transition that turns requested OS services into low-level details
     tsldr_acrtreq_t req_acrt = {};
+    protocon_svc_req_t cursor;
     const protocon_svc_t *curr_svc;
     seL4_Word *svc_num_ptr = NULL;
     unsigned char *svc_data_ptr = NULL;
+
+    tsldr_miscutil_memcpy(&cursor, req, sizeof(cursor));
 
     curr_svc = svcdb->array;
     // check all available os services, and patch each of them accordingly
@@ -123,7 +125,7 @@ void service_installer_apply(
         // (we will put the pointers to access the svcs in the given place specified by the client)
         service_installer_apply_one(
             &curr_svc[i],
-            req,
+            &cursor,
             &req_acrt,
             plan->pc_base
         );
@@ -132,12 +134,12 @@ void service_installer_apply(
     svc_num_ptr = (seL4_Word *)((char *)monitor_svcdb_base + 0x1000 * plan->pc_id);
     svc_data_ptr = (unsigned char*)(svc_num_ptr + 1);
 
-    *svc_num_ptr = 
+    *svc_num_ptr =
             req_acrt.num_req_notifications + \
             req_acrt.num_req_ppcs + \
             req_acrt.num_req_ioports + \
             req_acrt.num_req_mappings + \
-            req_acrt.num_req_irqs;
+        req_acrt.num_req_irqs;
 
     tsldr_main_monitor_encode_required_rights(svc_data_ptr, &req_acrt);
 }
