@@ -93,7 +93,7 @@ typedef struct {
 } service_requirements_t;
 
 
-void monitor_init_ossvc_map(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]);
+void service_registry_create(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]);
 
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
@@ -108,7 +108,7 @@ void service_installer_apply(
 );
 
 
-int service_registry_create(
+int service_planner_select(
         protocon_svc_req_t *req,
         protocon_lifecycle_state_t *protocon_states,
         int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]

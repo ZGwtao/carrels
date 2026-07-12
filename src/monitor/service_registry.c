@@ -3,31 +3,39 @@
 #include <protocon.h>
 
 
-static inline seL4_Word monitor_match_ossvc_request_with_unipd(protocon_svc_req_t *req, int svc_dist_map[])
+void monitor_ossvc_populate_all_svc_of_unipd(protocon_svcdb_t *svcdb, int map[])
 {
-    seL4_Word mask = 0;
-    for (int i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
-        mask |= (req->num_svc_per_type[i] > svc_dist_map[i]);
-    }
-    // if mask is zero, it means all requested OS services are no less than what have been provided
-    // so that means we have a match between a dynamic PD and a set of OS services request
-    return mask;
-}
-
-int service_registry_create(
-        protocon_svc_req_t *req,
-        protocon_lifecycle_state_t *protocon_states,
-        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
-) {
-    for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
-        if (protocon_states[i] != PROTOCON_PASSIVE) {
+    protocon_svc_t *curr_svc;
+    for (int i = 0; i < svcdb->svc_num; ++i) {
+        /* Iterate all OS services of a PD */
+        curr_svc = &svcdb->array[i];
+        if (curr_svc->svc_init == false) {
             continue;
         }
-        // check each dynamic pd and see if any of them matches with the OS service request
-        seL4_Word mask = monitor_match_ossvc_request_with_unipd(req, monitor_svc_dist_map[i]);
-        if (mask == 0) {
-            return i;
+        /* Determine what type the OS service is */
+        int svc_type = curr_svc->svc_type;
+        /* Check the number of OS service of the same type */
+        int num_curr_type = map[svc_type];
+        if (num_curr_type >= SVC_PER_TYPE_MAX_NUM) {
+            microkit_dbg_puts("Too many OS services of the same type\n");
+            microkit_internal_crash(-1);
         }
+        /* Pin the OS service on the map */
+        map[curr_svc->svc_type]++;
     }
-    return PC_CHILD_PER_MONITOR_MAX_NUM;
+}
+
+// FIXME: we should pass the map as an argument to avoid the dependency on the global variable,
+//  but it is not a big deal for now as we are still in the early stage of prototyping
+void service_registry_create(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM])
+{
+    // we will populate the global map that records the distribution of OS services for each dynamic PD (protocon)
+    // monitor_svcdb_t *svcdb_list = &monitor_svc_db;
+    // for all dynamic PDs, try to populate the map with this loop
+    for (int i = 0; i < svcdb_list->len; ++i) {
+        // get the pointer to the OS service database of this PD,
+        protocon_svcdb_t *curr_svcdb = &svcdb_list->list[i];
+        // for each dynamic PD, we will populate the map with the information of all OS services of this PD
+        monitor_ossvc_populate_all_svc_of_unipd(curr_svcdb, monitor_svc_dist_map[i]);
+    }
 }

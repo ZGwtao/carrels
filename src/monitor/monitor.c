@@ -506,7 +506,7 @@ seL4_Error protocon_deploy(payload_info_t *info)
 
     (void) service_manifest_parse(info, &req);
 
-    cid = service_registry_create(
+    cid = service_planner_select(
         &req,
         protocon_states,
         monitor_svc_dist_map
@@ -592,7 +592,7 @@ void init(void)
 
     // global os services state initialisation...
     tsldr_miscutil_memset(monitor_svc_dist_map, 0, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM * SVC_TYPE_MAX_NUM);
-    monitor_init_ossvc_map(&monitor_svc_db, monitor_svc_dist_map);
+    service_registry_create(&monitor_svc_db, monitor_svc_dist_map);
 
     // global client state initialisation...
     // tsldr_miscutil_memset(protocon_states, PROTOCON_PASSIVE, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM);
