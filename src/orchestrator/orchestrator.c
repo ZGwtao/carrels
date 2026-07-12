@@ -197,7 +197,7 @@ void load_elf_payload(void)
 
 static int cmd_start(int argc, const char *const *argv)
 {
-    uint32_t requested_pc_num = req_pc_num;
+    uint32_t requested_pc_num = MIN_REQ_PC_NUM;
     size_t filename_len;
 
     if (argc != 2 && argc != 3) {
