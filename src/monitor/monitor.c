@@ -744,7 +744,6 @@ seL4_MessageInfo_t monitor_call_deploy_protocon_first_half(seL4_Word num_req_pc)
             "cannot initialise monitor cothread for monitor call.\n"
         );
         monitor_finish_deploy_request();
-        monitor_main_notify_orchestrator();
         return microkit_msginfo_new(-1, 0);
     }
 
