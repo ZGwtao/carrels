@@ -497,7 +497,7 @@ void monitor_call_deploy_protocon_second_half(void)
         return;
     }
 
-    protocon_svc_req_t req;
+    protocon_svc_req_t req = {0};
 
     Elf64_Shdr *user_defined_svc_section =
         (Elf64_Shdr *)tsldr_miscutil_find_section_from_elf(
