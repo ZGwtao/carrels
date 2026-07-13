@@ -164,27 +164,39 @@ pc_monitor_Error protocon_deploy_plan_check(deploy_plan_t *plan)
     return mon_NoError;
 }
 
-void monitor_main_load_elfs_into_protocon(int cid)
+static inline void
+monitor_main_load_trustedlo(uint32_t cid)
 {
-    uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
-    uintptr_t protocon_base = monitor_vm_region_base(&monitor_vm_layout.loader_program, cid);
-    uintptr_t trampoline_base = monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
+    uintptr_t protocon_base =
+            monitor_vm_region_base(&monitor_vm_layout.loader_program, cid);
+    uintptr_t trampoline_base =
+            monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
+
+    tsldr_miscutil_memset((void *)protocon_base, 0, (ORC_MONITOR_REGION_SIZE));
+    tsldr_miscutil_memset((void *)trampoline_base, 0, (ORC_MONITOR_REGION_SIZE));
 
     tsldr_miscutil_load_elf(
         (void*)protocon_base,
         (const Elf64_Ehdr *)(__carrels_protocon_start)
     );
-    TSLDR_DBG_PRINT(PROGNAME "Copied proto container to child PD's memory region\n");
-
-    tsldr_miscutil_memcpy((void*)payload_base, (char *)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE, ORC_MONITOR_REGION_SIZE);
-    TSLDR_DBG_PRINT(PROGNAME "Copied client program to child PD's memory region\n");
-
     tsldr_miscutil_memcpy(
         (void*)trampoline_base,
         (const char *)(__carrels_trampoline_start),
         monitor_trampoline_capacity()
     );
-    TSLDR_DBG_PRINT(PROGNAME "Copied trampoline program to child PD's memory region\n");
+}
+
+static inline void
+monitor_main_load_elfs_into_protocon(uint32_t cid)
+{
+    uintptr_t payload_base =
+            monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
+
+    tsldr_miscutil_memcpy(
+        (void*)payload_base,
+        (char *)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE),
+        (ORC_MONITOR_REGION_SIZE)
+    );
 }
 
 static inline
@@ -387,6 +399,7 @@ seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch)
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", ch);
     } else {
         SET_PROTOCON_AS_AVAILABLE(cid)
+        monitor_main_load_trustedlo(cid);
     }
     monitor_main_notify_orchestrator();
     return microkit_msginfo_new(mon_NoError, 0);
@@ -612,8 +625,12 @@ void init(void)
 
     // global client state initialisation...
     // tsldr_miscutil_memset(protocon_states, PROTOCON_PASSIVE, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM);
-    for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
+    for (uint32_t i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
         protocon_states[i] = PROTOCON_PASSIVE;
+    }
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        monitor_main_load_trustedlo(i);
     }
 
     req_pc_num = 0;
