@@ -76,6 +76,8 @@ PC_LOOPING_CLIENT_OBJS := pc/client_looping.o pc/early-init.o
 PC_TIMEOUT_CLIENT_OBJS := pc/client_timeout.o pc/early-init.o
 PC_MONITOR_OBJS := \
 	pc/monitor.o \
+	pc/fault.o \
+	pc/forwarder.o \
 	pc/service_installer.o \
 	pc/service_manifest.o \
 	pc/service_planner.o \
