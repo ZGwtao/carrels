@@ -590,6 +590,9 @@ monitor_main_handle_pccall(microkit_channel ch)
         break;
     case PC_MONITOR_CALL_TERMINATE_EXT: {
         seL4_Word target_pd_id = seL4_GetMR(1);
+        if (ch >= 24) {
+            target_pd_id = monitor_main_get_cid_from_channel(ch);
+        }
         TSLDR_DBG_PRINT(PROGNAME "Terminate dynamic PD with ID: %d\n", target_pd_id);
         ret = monitor_call_stop_and_restore_protocon(target_pd_id);
         break;

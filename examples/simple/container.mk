@@ -12,6 +12,7 @@ IMAGES := \
 	client_looping.elf \
 	client_faulting.elf \
 	client_timeout.elf \
+	bench_simple.elf \
 	trampoline.elf \
 	protocon.elf \
 	unikraft.elf \

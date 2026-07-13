@@ -86,6 +86,10 @@ PC_TIMEOUT_CLIENT_OBJS := \
 	pc/client/client_timeout.o \
 	pc/client/early-init.o
 
+PC_BENCH_SIMPLE_OBJS := \
+	pc/client/bench_simple.o \
+	pc/client/early-init.o
+
 PC_MONITOR_OBJS := \
 	pc/monitor/monitor.o \
 	pc/monitor/fault.o \
@@ -112,7 +116,8 @@ PC_OBJS := \
 	$(PC_ECHO_CLIENT_OBJS) \
 	$(PC_FAULTING_CLIENT_OBJS) \
 	$(PC_LOOPING_CLIENT_OBJS) \
-	$(PC_TIMEOUT_CLIENT_OBJS)
+	$(PC_TIMEOUT_CLIENT_OBJS) \
+	$(PC_BENCH_SIMPLE_OBJS)
 
 
 $(PC_MONITOR_VM_LAYOUT_HEADER): pc \
@@ -205,6 +210,10 @@ monitor.elf: \
 		$(CONTAINER_LIBC_LIB) \
 		libsddf_util.a payloads.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+bench_simple.elf: LDFLAGS += -L$(BOARD_DIR)/lib
+bench_simple.elf: $(PC_BENCH_SIMPLE_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
+	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
 
 client_echo.elf: LDFLAGS += -L$(BOARD_DIR)/lib
 client_echo.elf: $(PC_ECHO_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
