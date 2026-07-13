@@ -16,6 +16,7 @@
 #include <libmicrokitco.h>
 #include <lions/fs/config.h>
 #include <pico_vfs.h>
+#include <monitor.h>
 #include <misc.h>
 
 #define PROGNAME "[@orchestrator] "
@@ -188,7 +189,7 @@ void load_elf_payload(void)
     }
     TSLDR_DBG_PRINT(PROGNAME "Wrote test's ELF file into memory\n");
 
-    microkit_mr_set(0, 1);
+    microkit_mr_set(0, (PC_MONITOR_CALL_DEPLOY));
     microkit_mr_set(1, req_pc_num);
     info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
     error = microkit_msginfo_get_label(info);
@@ -314,23 +315,23 @@ static int shell_execute(microrl_t *mrl,
     }
 
     if (strcmp(argv[0], "lspcs") == 0) {
-        return cmd_no_argument(argc, 5, "lspcs");
+        return cmd_no_argument(argc, (PC_MONITOR_CALL_LIST_PROTOCONS), "lspcs");
     }
 
     if (strcmp(argv[0], "flip") == 0) {
-        return cmd_no_argument(argc, 17, "flip");
+        return cmd_no_argument(argc, (PC_MONITOR_CALL_FLIP_ACL_RULE), "flip");
     }
 
     if (strcmp(argv[0], "stop") == 0) {
-        return cmd_pd_control(argc, argv, 6, "stop");
+        return cmd_pd_control(argc, argv, (PC_MONITOR_CALL_TERMINATE_EXT), "stop");
     }
 
     if (strcmp(argv[0], "hang") == 0) {
-        return cmd_pd_control(argc, argv, 3, "hang");
+        return cmd_pd_control(argc, argv, (PC_MONITOR_CALL_HANG), "hang");
     }
 
     if (strcmp(argv[0], "resume") == 0) {
-        return cmd_pd_control(argc, argv, 4, "resume");
+        return cmd_pd_control(argc, argv, (PC_MONITOR_CALL_RESUME), "resume");
     }
 
     if (strcmp(argv[0], "help") == 0) {
