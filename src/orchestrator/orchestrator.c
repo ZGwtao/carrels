@@ -20,6 +20,8 @@
 
 #define PROGNAME "[@orchestrator] "
 
+#define SHELL_INPUT_BUFFER_SIZE 64
+
 #define FNAME_BUF_SIZE 64
 #define MIN_REQ_PC_NUM 1U
 #define MAX_REQ_PC_NUM 4U
@@ -450,23 +452,63 @@ void init(void)
     TSLDR_DBG_PRINT(PROGNAME "finished init\n");
 }
 
+static inline char
+shell_normalise_input(char c)
+{
+    unsigned char uc = (unsigned char)c;
+    if (uc == 0x02 || uc == 0x08 || uc == 0x7f) {
+        return (char)0x7f;
+    }
+    return c;
+}
+
+static inline void
+orche_handle_serial_event(void)
+{
+    char input[SHELL_INPUT_BUFFER_SIZE];
+    size_t input_len = 0;
+    char c;
+
+    while (!serial_dequeue(&serial_rx_queue_handle, &c)) {
+        input[input_len++] = shell_normalise_input(c);
+
+        if (input_len == sizeof(input)) {
+            microrlr_t result =
+                microrl_processing_input(&shell, input, input_len);
+
+            if (result != microrlOK &&
+                result != microrlERRCLFULL) {
+                TSLDR_DBG_PRINT(
+                    PROGNAME "microrl input error: %d\n",
+                    result
+                );
+            }
+
+            input_len = 0;
+        }
+    }
+
+    if (input_len != 0) {
+        microrlr_t result =
+            microrl_processing_input(&shell, input, input_len);
+
+        if (result != microrlOK &&
+            result != microrlERRCLFULL) {
+            TSLDR_DBG_PRINT(
+                PROGNAME "microrl input error: %d\n",
+                result
+            );
+        }
+    }
+}
+
 void notified(microkit_channel ch)
 {
     fs_process_completions(NULL);
     microkit_cothread_recv_ntfn(ch);
 
     if (ch == serial_config.rx.id) {
-        char c;
-        while (!serial_dequeue(&serial_rx_queue_handle, &c)) {
-            microrlr_t result = microrl_processing_input(&shell, &c, 1);
-
-            if (result != microrlOK && result != microrlERRCLFULL) {
-                TSLDR_DBG_PRINT(
-                    PROGNAME "microrl input error: %d\n",
-                    result
-                );
-            }
-        }
+        orche_handle_serial_event();
     } else if (ch == 30) {
         /* Notification from monitor. */
         shell_inst_epilogue();

@@ -258,9 +258,16 @@ MICRORL_CFG_STATIC_INLINE void prv_terminal_print_prompt(microrl_t* mrl) {
  *                      and move the cursor to its position
  * \param[in]       mrl: \ref microrl_t working instance
  */
+#if 0
 MICRORL_CFG_STATIC_INLINE void prv_terminal_backspace(microrl_t* mrl) {
     mrl->out_fn(mrl, "\033[D \033[D");
 }
+#else
+MICRORL_CFG_STATIC_INLINE void prv_terminal_backspace(microrl_t* mrl)
+{
+    mrl->out_fn(mrl, "\b \b");
+}
+#endif
 
 /**
  * \brief           Print end line symbol defined in \ref MICRORL_CFG_END_LINE config
