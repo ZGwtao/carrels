@@ -1,6 +1,8 @@
 
 #include <microkit.h>
 #include <stdarg.h>
+#include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 #include <libtrustedlo.h>
 
@@ -35,7 +37,17 @@
 #define ORC_MONITOR_REGION_TRAMPOLINE_ELF_BASE (0x6800000)
 #define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
 
-__attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
+__attribute__((__section__(".serial_client_config")))
+serial_client_config_t serial_config;
+__attribute__((__section__(".fs_client_config")))
+fs_client_config_t fs_config;
+
+serial_queue_handle_t serial_rx_queue_handle;
+serial_queue_handle_t serial_tx_queue_handle;
+
+fs_queue_t *fs_command_queue;
+fs_queue_t *fs_completion_queue;
+char *fs_share;
 
 // these are the craziest thing for microkit cothreads
 co_control_t co_controller_mem;
@@ -76,10 +88,6 @@ seL4_Word pd_io_acl_rule = 0;
 // the dynamic PD can then read the OS svc information at high-level, while initialise the trusted loader
 // with the low-level information provided here...
 uintptr_t msvcdb_base = MONITOR_VM_OSSVC_METADATA_BASE;
-
-fs_queue_t *fs_command_queue;
-fs_queue_t *fs_completion_queue;
-char *fs_share;
 
 __attribute__((__section__(".monitor_svc_db"))) monitor_svcdb_t monitor_svc_db;
 
@@ -569,8 +577,23 @@ monitor_main_handle_pccall(microkit_channel ch)
 
 void init(void)
 {
+    assert(serial_config_check_magic(&serial_config));
+    if (serial_config.rx.queue.vaddr != NULL) {
+        serial_queue_init(&serial_rx_queue_handle,
+                          serial_config.rx.queue.vaddr,
+                          serial_config.rx.data.size,
+                          serial_config.rx.data.vaddr);
+    }
+    serial_queue_init(&serial_tx_queue_handle,
+                      serial_config.tx.queue.vaddr,
+                      serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+
     assert(fs_config_check_magic(&fs_config));
+
     fs_set_blocking_wait(blocking_wait);
+
     fs_command_queue = fs_config.server.command_queue.vaddr;
     fs_completion_queue = fs_config.server.completion_queue.vaddr;
     fs_share = fs_config.server.share.vaddr;

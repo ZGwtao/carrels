@@ -182,8 +182,12 @@ orchestrator.elf: $(PC_ORCHESTRATOR_OBJS) \
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 monitor.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-monitor.elf: $(PC_MONITOR_OBJS) pc/$(PC_LIBTRUSTEDLO_OBJ) $(PC_LIBMICROKITCO_OBJ) \
-			 $(CONTAINER_LIBC_LIB)
+monitor.elf: \
+		$(PC_MONITOR_OBJS) \
+		pc/$(PC_LIBTRUSTEDLO_OBJ) \
+		$(PC_LIBMICROKITCO_OBJ) \
+		$(CONTAINER_LIBC_LIB) \
+		libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 protocon.elf:
