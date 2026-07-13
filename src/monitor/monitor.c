@@ -361,23 +361,10 @@ seL4_MessageInfo_t monitor_call_deploy_protocon_first_half(seL4_Word num_req_pc)
 }
 
 
-int monitor_main_get_cid_from_channel(microkit_channel ch)
-{
-    if (ch < PC_MONITOR_PROTOCON_BASE_CHANNEL ||
-        ch >= (PC_MONITOR_PROTOCON_BASE_CHANNEL + PC_CHILD_PER_MONITOR_MAX_NUM))
-    {
-        TSLDR_DBG_PRINT(PROGNAME "Received signal from non-client PD that tries to uninstantiate client PD!\n");
-        // microkit_internal_crash(-1);
-        return 0xffc;
-    }
-    return ch - PC_MONITOR_PROTOCON_BASE_CHANNEL;
-}
-
-
 seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch)
 {
     int cid = monitor_main_get_cid_from_channel(ch);
-    if (cid == 0xffc) {
+    if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", ch);
     } else {
         // assert(protocon_states[cid] == PROTOCON_ACTIVE);
@@ -407,7 +394,7 @@ seL4_MessageInfo_t monitor_call_hang_protocon(microkit_channel ch)
     }
     int cid_to_check = target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL;
     int cid = monitor_main_get_cid_from_channel(cid_to_check);
-    if (cid == 0xffc) {
+    if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", cid_to_check);
     } else {
         if (protocon_states[cid] != PROTOCON_ACTIVE) {
@@ -430,7 +417,7 @@ seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
     }
     int cid_to_check = target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL;
     int cid = monitor_main_get_cid_from_channel(cid_to_check);
-    if (cid == 0xffc) {
+    if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to resume given with ch: %d\n", cid_to_check);
     } else {
         if (protocon_states[cid] != PROTOCON_HANG) {
