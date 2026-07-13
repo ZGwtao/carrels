@@ -56,7 +56,7 @@ BM_UK_MAKE_ARGS := \
 
 # ===================== unikraft variables ==========================
 
-PC_CLAGS := \
+PC_CFLAGS := \
 	-I$(CONTAINER_LIBC_INCLUDE) \
 	-I$(PC_HEADER_DIR) \
 	-I$(PC_SRC_DIR) \
@@ -66,38 +66,54 @@ PC_CLAGS := \
 	-I$(PC_BUILD_DIR_GEN) \
 	-I$(PC_TSLDR_BUILD_DIR_GEN)
 
-LIBMICROKITCO_CFLAGS_pc := ${PC_CLAGS}
+LIBMICROKITCO_CFLAGS_pc := ${PC_CFLAGS}
 PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a
 
 
-PC_ECHO_CLIENT_OBJS := pc/client_echo.o pc/early-init.o
-PC_FAULTING_CLIENT_OBJS := pc/client_faulting.o pc/early-init.o
-PC_LOOPING_CLIENT_OBJS := pc/client_looping.o pc/early-init.o
-PC_TIMEOUT_CLIENT_OBJS := pc/client_timeout.o pc/early-init.o
+PC_ECHO_CLIENT_OBJS := \
+	pc/client/client_echo.o \
+	pc/client/early-init.o
+
+PC_FAULTING_CLIENT_OBJS := \
+	pc/client/client_faulting.o \
+	pc/client/early-init.o
+
+PC_LOOPING_CLIENT_OBJS := \
+	pc/client/client_looping.o \
+	pc/client/early-init.o
+
+PC_TIMEOUT_CLIENT_OBJS := \
+	pc/client/client_timeout.o \
+	pc/client/early-init.o
+
 PC_MONITOR_OBJS := \
-	pc/monitor.o \
-	pc/fault.o \
-	pc/forwarder.o \
-	pc/service_installer.o \
-	pc/service_manifest.o \
-	pc/service_planner.o \
-	pc/service_registry.o \
-	pc/pico_vfs.o 
+	pc/monitor/monitor.o \
+	pc/monitor/fault.o \
+	pc/monitor/forwarder.o \
+	pc/monitor/service/service_installer.o \
+	pc/monitor/service/service_manifest.o \
+	pc/monitor/service/service_planner.o \
+	pc/monitor/service/service_registry.o \
+	pc/util/pico_vfs.o
+
 PC_ORCHESTRATOR_OBJS := \
-	pc/orchestrator.o \
-	pc/pico_vfs.o \
+	pc/orchestrator/orchestrator.o \
+	pc/util/pico_vfs.o \
 	pc/microrl.o
+
 PC_PROTOCON_OBJS :=
 PC_TRAMPOLINE_OBJS :=
+
 PC_OBJS := \
-	PC_ORCHESTRATOR_OBJS \
-	PC_MONITOR_OBJS \
-	PC_PROTOCON_OBJS \
-	PC_TRAMPOLINE_OBJS \
-	PC_ECHO_CLIENT_OBJS \
-	PC_FAULTING_CLIENT_OBJS \
-	PC_LOOPING_CLIENT_OBJS \
-	PC_TIMEOUT_CLIENT_OBJS
+	$(PC_ORCHESTRATOR_OBJS) \
+	$(PC_MONITOR_OBJS) \
+	$(PC_PROTOCON_OBJS) \
+	$(PC_TRAMPOLINE_OBJS) \
+	$(PC_ECHO_CLIENT_OBJS) \
+	$(PC_FAULTING_CLIENT_OBJS) \
+	$(PC_LOOPING_CLIENT_OBJS) \
+	$(PC_TIMEOUT_CLIENT_OBJS)
+
 
 $(PC_MONITOR_VM_LAYOUT_HEADER): pc \
 	$(PC_MONITOR_VM_LAYOUT) $(PC_MONITOR_VM_LAYOUT_GEN)
@@ -140,29 +156,23 @@ $(BM_UK_CONFIGURED): $(BM_UK_CONFIG_SRC)
 
 # ===================== unikraft variables ==========================
 
-pc/%.o: CFLAGS := $(PC_CLAGS) \
-			 		$(CFLAGS)
-pc/%.o: $(PC_SRC_DIR)/src/client/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+vpath client/%.c $(PC_SRC_DIR)/src
+vpath util/%.c $(PC_SRC_DIR)/src
+vpath monitor/%.c $(PC_SRC_DIR)/src
+vpath monitor/service/%.c $(PC_SRC_DIR)/src
+vpath orchestrator/%.c $(PC_SRC_DIR)/src
+
+pc/%.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS)
+
+pc/%.o: %.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
-pc/%.o: CFLAGS := $(PC_CLAGS) \
-			 		$(CFLAGS)
-pc/%.o: $(PC_SRC_DIR)/src/util/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
-	$(CC) -c $(CFLAGS) $< -o $@
+pc/microrl.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS) \
+	-I$(PC_MICRORL_SRC_DIR)/include
 
-pc/%.o: CFLAGS := $(PC_CLAGS) \
-			 		$(CFLAGS)
-pc/%.o: $(PC_SRC_DIR)/src/monitor/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
-	$(CC) -c $(CFLAGS) $< -o $@
-
-pc/%.o: CFLAGS := $(PC_CLAGS) \
-			 		$(CFLAGS)
-pc/%.o: $(PC_SRC_DIR)/src/orchestrator/%.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
-	$(CC) -c $(CFLAGS) $< -o $@
-
-pc/microrl.o: CFLAGS := $(PC_CLAGS) \
-	$(CFLAGS) -I$(PC_MICRORL_SRC_DIR)/include
 pc/microrl.o: $(PC_MICRORL_SRC_DIR)/microrl.c | pc
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
 orchestrator.elf: LDFLAGS += -L$(BOARD_DIR)/lib
