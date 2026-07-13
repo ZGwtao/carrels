@@ -122,7 +122,7 @@ void monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, c
 {
     if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(err_msg);
-        microkit_internal_crash(-1);
+        microkit_internal_crash(mon_FailToInitCoroutine);
     }
     microkit_cothread_yield();
 }
@@ -142,17 +142,17 @@ void monitor_main_init_storage(void)
 
 
 static inline
-seL4_Error protocon_deploy_plan_check(deploy_plan_t *plan)
+pc_monitor_Error protocon_deploy_plan_check(deploy_plan_t *plan)
 {
     if (plan->pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM || plan->pc_id < 0) {
         TSLDR_DBG_PRINT(
             PROGNAME
             "Failed to find suitable container for payload\n"
         );
-        return -1;
+        return mon_NoAvailPc;
     }
     TSLDR_DBG_PRINT(PROGNAME "cid available: %d\n", plan->pc_id);
-    return seL4_NoError;
+    return mon_NoError;
 }
 
 void monitor_main_load_elfs_into_protocon(int cid)
@@ -225,10 +225,11 @@ void protocon_start(deploy_plan_t *plan)
 }
 
 
-seL4_Error protocon_deploy(payload_info_t *info)
+pc_monitor_Error protocon_deploy(payload_info_t *info)
 {
     deploy_plan_t plan = { 0 };
     protocon_svc_req_t req = { 0 };
+    pc_monitor_Error err = mon_NoError;
 
     (void) service_manifest_parse(info, &req);
 
@@ -238,8 +239,10 @@ seL4_Error protocon_deploy(payload_info_t *info)
         protocon_states,
         monitor_svc_dist_map
     );
-    if (protocon_deploy_plan_check(&plan) != seL4_NoError) {
-        return -1;
+
+    err = protocon_deploy_plan_check(&plan);
+    if (err != mon_NoError) {
+        return err;
     }
 
     protocon_pre_instantiate(&plan);
@@ -252,7 +255,7 @@ seL4_Error protocon_deploy(payload_info_t *info)
     );
 
     protocon_start(&plan);
-    return seL4_NoError;
+    return err;
 }
 
 
@@ -284,7 +287,7 @@ void monitor_call_deploy_protocon_second_half(void)
 
     for (uint32_t i = 0; i < num_req_pc; ++i)
     {
-        if (protocon_deploy(&payload_info) != seL4_NoError) {
+        if (protocon_deploy(&payload_info) != mon_NoError) {
             TSLDR_DBG_PRINT(
                 PROGNAME
                 "Failed to deploy container\n"
@@ -303,7 +306,7 @@ seL4_MessageInfo_t monitor_call_deploy_protocon_first_half(seL4_Word num_req_pc)
             PROGNAME "Invalid requested PC count: %lu\n",
             (unsigned long)num_req_pc
         );
-        return microkit_msginfo_new(-1, 0);
+        return microkit_msginfo_new(mon_InvalidReqPCNum, 0);
     }
 
     /*
@@ -353,11 +356,11 @@ seL4_MessageInfo_t monitor_call_deploy_protocon_first_half(seL4_Word num_req_pc)
             "cannot initialise monitor cothread for monitor call.\n"
         );
         monitor_finish_deploy_request();
-        return microkit_msginfo_new(-1, 0);
+        return microkit_msginfo_new(mon_FailToInitCoroutine, 0);
     }
 
     microkit_cothread_yield();
-    return microkit_msginfo_new(seL4_NoError, 0);
+    return microkit_msginfo_new(mon_NoError, 0);
 }
 
 
@@ -367,11 +370,10 @@ seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch)
     if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", ch);
     } else {
-        // assert(protocon_states[cid] == PROTOCON_ACTIVE);
         SET_PROTOCON_AS_AVAILABLE(cid)
     }
     monitor_main_notify_orchestrator();
-    return microkit_msginfo_new(seL4_NoError, 0);
+    return microkit_msginfo_new(mon_NoError, 0);
 }
 
 seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch)
@@ -379,7 +381,7 @@ seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch)
     int target_pd_id = ch;
     if (target_pd_id < 0 || target_pd_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id given for stop and restore\n");
-        return microkit_msginfo_new(-1, 0);
+        return microkit_msginfo_new(mon_InvalidPCId, 0);
     }
     microkit_pd_stop(target_pd_id);
     return monitor_call_restore_protocon(target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL);
@@ -390,7 +392,7 @@ seL4_MessageInfo_t monitor_call_hang_protocon(microkit_channel ch)
     int target_pd_id = ch;
     if (target_pd_id < 0 || target_pd_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id given for hang\n");
-        return microkit_msginfo_new(-1, 0);
+        return microkit_msginfo_new(mon_InvalidPCId, 0);
     }
     int cid_to_check = target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL;
     int cid = monitor_main_get_cid_from_channel(cid_to_check);
@@ -405,7 +407,7 @@ seL4_MessageInfo_t monitor_call_hang_protocon(microkit_channel ch)
         }
     }
     monitor_main_notify_orchestrator();
-    return microkit_msginfo_new(seL4_NoError, 0);
+    return microkit_msginfo_new(mon_NoError, 0);
 }
 
 seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
@@ -413,7 +415,7 @@ seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
     int target_pd_id = ch;
     if (target_pd_id < 0 || target_pd_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id given for resume\n");
-        return microkit_msginfo_new(-1, 0);
+        return microkit_msginfo_new(mon_InvalidPCId, 0);
     }
     int cid_to_check = target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL;
     int cid = monitor_main_get_cid_from_channel(cid_to_check);
@@ -436,7 +438,7 @@ seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
         }
     }
     monitor_main_notify_orchestrator();
-    return microkit_msginfo_new(seL4_NoError, 0);
+    return microkit_msginfo_new(mon_NoError, 0);
 }
 
 static inline void monitor_main_list_protocon_states(int num_protocons)
@@ -468,7 +470,7 @@ seL4_MessageInfo_t monitor_call_list_protocons()
 {
     // FIXME: should not hardcode the number of pc to list
     monitor_main_list_protocon_states(4);
-    return microkit_msginfo_new(seL4_NoError, 0);
+    return microkit_msginfo_new(mon_NoError, 0);
 }
 
 seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
@@ -483,7 +485,7 @@ seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
             bitmap |= (1ULL << i);
         }
     }
-    seL4_MessageInfo_t ret = microkit_msginfo_new(seL4_NoError, 2);
+    seL4_MessageInfo_t ret = microkit_msginfo_new(mon_NoError, 2);
     microkit_mr_set(0, bitmap);
     microkit_mr_set(1, monitor_main_get_cid_from_channel(ch));
     if (bitmap == 0) {
@@ -501,7 +503,7 @@ seL4_MessageInfo_t monitor_call_backup_protocon_loading_context(microkit_channel
 
     tsldr_miscutil_memcpy(&protocon_ctx_db[cid], context, sizeof(tsldr_context_t));
 
-    return microkit_msginfo_new(seL4_NoError, 0);
+    return microkit_msginfo_new(mon_NoError, 0);
 }
 
 static inline seL4_MessageInfo_t

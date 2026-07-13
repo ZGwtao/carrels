@@ -17,6 +17,19 @@
 
 #define INVALID_PC_ID (0xffc)
 
+
+typedef enum {
+    mon_NoError = seL4_NoError,
+    mon_DummyError = seL4_NumErrors + 1,
+    mon_InvalidPCId,
+    mon_InvalidReqPCNum,
+    mon_FailToInitCoroutine,
+    mon_FailToInitStorage,
+    mon_NoAvailPc,
+} pc_monitor_Error;
+
+
+
 seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch);
 
 
