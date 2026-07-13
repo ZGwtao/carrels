@@ -122,7 +122,7 @@ void monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, c
 {
     if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(err_msg);
-        microkit_internal_crash(mon_FailToInitCoroutine);
+        microkit_internal_crash(-1);
     }
     microkit_cothread_yield();
 }

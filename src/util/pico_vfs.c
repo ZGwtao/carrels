@@ -8,7 +8,7 @@
 #define PROGNAME "  => [@picovfs] "
 
 
-static uint64_t openfile(char fname[])
+static uint64_t openfile(const char fname[])
 {
     ptrdiff_t buffer;
     int err = fs_buffer_allocate(&buffer);
