@@ -15,6 +15,7 @@
 #include <monitor.h>
 #include <fault.h>
 #include <forwarder.h>
+#include <payload.h>
 #include <pd_io_queue.h>
 #include <monitor_vm_layout.h>
 
@@ -169,13 +170,20 @@ void monitor_main_load_elfs_into_protocon(int cid)
     uintptr_t protocon_base = monitor_vm_region_base(&monitor_vm_layout.loader_program, cid);
     uintptr_t trampoline_base = monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
 
-    tsldr_miscutil_load_elf((void*)protocon_base, (const Elf64_Ehdr *)ORC_MONITOR_REGION_PROTOCON_ELF_BASE);
+    tsldr_miscutil_load_elf(
+        (void*)protocon_base,
+        (const Elf64_Ehdr *)(__carrels_protocon_start)
+    );
     TSLDR_DBG_PRINT(PROGNAME "Copied proto container to child PD's memory region\n");
 
     tsldr_miscutil_memcpy((void*)payload_base, (char *)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE, ORC_MONITOR_REGION_SIZE);
     TSLDR_DBG_PRINT(PROGNAME "Copied client program to child PD's memory region\n");
 
-    tsldr_miscutil_memcpy((void*)trampoline_base, (char *)ORC_MONITOR_REGION_TRAMPOLINE_ELF_BASE, ORC_MONITOR_REGION_SIZE);
+    tsldr_miscutil_memcpy(
+        (void*)trampoline_base,
+        (const char *)(__carrels_trampoline_start),
+        monitor_trampoline_capacity()
+    );
     TSLDR_DBG_PRINT(PROGNAME "Copied trampoline program to child PD's memory region\n");
 }
 

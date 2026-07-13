@@ -181,20 +181,30 @@ orchestrator.elf: $(PC_ORCHESTRATOR_OBJS) \
               	  $(CONTAINER_LIBC_LIB)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-monitor.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-monitor.elf: \
-		$(PC_MONITOR_OBJS) \
-		pc/$(PC_LIBTRUSTEDLO_OBJ) \
-		$(PC_LIBMICROKITCO_OBJ) \
-		$(CONTAINER_LIBC_LIB) \
-		libsddf_util.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 protocon.elf:
 	cp $(BUILD_DIR)/pc/libtrustedlo/loader.elf $@
 
 trampoline.elf:
 	cp $(BUILD_DIR)/pc/libtrustedlo/trampoline.elf $@
+
+payloads.o: \
+		protocon.elf \
+		trampoline.elf
+	cp $(PC_SRC_DIR)/src/monitor/package_payloads.S .
+	$(CC) -c $(CFLAGS) \
+		-DCARRELS_PROTOCON_PATH=\"$(BUILD_DIR)/protocon.elf\" \
+		-DCARRELS_TRAMPOLINE_PATH=\"$(BUILD_DIR)/trampoline.elf\" \
+		package_payloads.S -o $@
+
+monitor.elf: LDFLAGS += -L$(BOARD_DIR)/lib
+monitor.elf: \
+		$(PC_MONITOR_OBJS) \
+		pc/$(PC_LIBTRUSTEDLO_OBJ) \
+		$(PC_LIBMICROKITCO_OBJ) \
+		$(CONTAINER_LIBC_LIB) \
+		libsddf_util.a payloads.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 client_echo.elf: LDFLAGS += -L$(BOARD_DIR)/lib
 client_echo.elf: $(PC_ECHO_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
