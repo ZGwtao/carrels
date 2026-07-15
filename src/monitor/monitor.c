@@ -462,15 +462,7 @@ seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
         if (protocon_states[cid] != PROTOCON_HANG) {
             TSLDR_DBG_PRINT(PROGNAME "Invalid PD state to resume!\n");
         } else {
-            /* static inline void microkit_pd_resume(microkit_child pd) */
-            seL4_Error err;
-            err = seL4_TCB_Resume(BASE_TCB_CAP + target_pd_id);
-            if (err != seL4_NoError) {
-                microkit_dbg_puts("microkit_pd_resume: error resuming TCB '");
-                microkit_dbg_put32(target_pd_id);
-                microkit_dbg_puts("'\n");
-                microkit_internal_crash(err);
-            }
+            microkit_pd_resume(target_pd_id);
             SET_PROTOCON_AS_INSTANTIATED(cid)
         }
     }
