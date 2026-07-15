@@ -169,7 +169,7 @@ vpath orchestrator/%.c $(PC_SRC_DIR)/src
 
 pc/%.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS)
 
-pc/%.o: %.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER)
+pc/%.o: %.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 

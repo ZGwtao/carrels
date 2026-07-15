@@ -17,6 +17,7 @@
 #include <forwarder.h>
 #include <payload.h>
 #include <pd_io_queue.h>
+#include <tsldr_vm_layout.h>
 #include <monitor_vm_layout.h>
 
 // these memory regions are shared memory between
@@ -218,13 +219,10 @@ void protocon_pre_instantiate(deploy_plan_t *plan)
             plan->pc_id
         );
     assert(plan->pc_base != 0x0);
-    Elf64_Ehdr *pc_header = 
-        (Elf64_Ehdr *)(ORC_MONITOR_REGION_PROTOCON_ELF_BASE);
-        // (Elf64_Ehdr *) monitor_vm_region_base(
-        //     &monitor_vm_layout.loader_program,
-        //     plan->pc_id
-        // );
-    plan->pc_entry = pc_header->e_entry;
+
+    plan->pc_entry =
+        (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
+    assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
 }
 
 
