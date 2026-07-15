@@ -4,26 +4,31 @@
 #include <libtrustedlo.h>
 
 
-static inline void monitor_ossvc_init_req_per_type(protocon_svc_req_t *req, protocon_svc_type_t svc_type, uint8_t svc_num_per_type, seL4_Word svc_data_list[])
+static inline bool
+service_manifest_check_type(protocon_svc_type_t svc_type)
 {
-    switch(svc_type) {
-    // these OS services are what we support for now, but can extend later
-    // possibly more than eight types of OS services?
-    // but if an application requires more OS service types than 8,
-    // probably it is a sign that the application is too heavy to be put in a dynamic PD
-    case FS_IFACE:
-    case TIMER_IFACE:
-    case SERIAL_IFACE: {
-        for (uint8_t i = 0; i < svc_num_per_type; ++i) {
-            seL4_Word svc_data = svc_data_list[i];
-            req->data_per_svc_instance[svc_type][i] = svc_data;
-        }
-        break;
+    return (svc_type < SERVICE_RESERVED) &&
+            (svc_type > SERVICE_DUMMY);
+}
+
+static inline void
+monitor_ossvc_init_req_per_type(
+    protocon_svc_req_t *req,
+    protocon_svc_type_t svc_type,
+    uint8_t svc_num_per_type,
+    seL4_Word svc_data_list[]
+) {
+    if (service_manifest_check_type(svc_type) != true) {
+        TSLDR_DBG_PRINT(
+            "Unsupported service type: %d\n",
+            svc_type
+        );
+        return;
     }
-    default:
-        TSLDR_DBG_PRINT("Unsupported SVC type: %d\n", svc_type);
-        break;
-    };
+    for (uint8_t i = 0; i < svc_num_per_type; ++i) {
+        seL4_Word svc_data = svc_data_list[i];
+        req->data_per_svc_instance[svc_type][i] = svc_data;
+    }
 }
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)

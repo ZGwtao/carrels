@@ -23,7 +23,7 @@ __attribute__((__section__(".pc_svc_desc"))) const protocon_svc_desc_t ciface = 
     /* numbers of each interface type */
     .t3_num = 1,
     /* type identifiers */
-    .type3 = SERIAL_IFACE,
+    .type3 = SERVICE_DEVICE_SERIAL,
     /* pointer array of each interface type */
     .t3_iface = { (uintptr_t)&serial_config, 0, 0, 0, 0, 0, 0, 0 }
 };
