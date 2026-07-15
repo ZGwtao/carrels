@@ -97,6 +97,7 @@ _Static_assert(sizeof(service_manifest_entry_t) == 20,
 typedef struct {
     Elf64_Ehdr *header_payload;
     Elf64_Shdr *header_service_info;
+    uint32_t service_count;
     service_manifest_entry_t *service_entries;
 } payload_info_t;
 

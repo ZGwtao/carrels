@@ -210,6 +210,7 @@ monitor_main_load_elfs_into_protocon(uint32_t cid)
     );
 }
 
+#if 0
 static inline
 void protocon_pre_instantiate(deploy_plan_t *plan)
 {
@@ -226,6 +227,35 @@ void protocon_pre_instantiate(deploy_plan_t *plan)
         (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
     assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
 }
+#else
+static inline void protocon_pre_instantiate(
+    deploy_plan_t *plan,
+    const payload_info_t *payload
+)
+{
+    uintptr_t destination =
+        monitor_vm_region_base(
+            &monitor_vm_layout.container_image,
+            plan->pc_id
+        );
+
+    const void *source = payload->header_payload;
+
+    size_t elf_size = 0x40000;
+    tsldr_miscutil_memcpy(
+        (void *)destination,
+        source,
+        elf_size
+    );
+
+    plan->pc_base = destination;
+    assert(plan->pc_base != 0x0);
+
+    plan->pc_entry =
+        (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
+    assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
+}
+#endif
 
 
 void protocon_start(deploy_plan_t *plan)
@@ -281,7 +311,7 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
         return err;
     }
 
-    protocon_pre_instantiate(&plan);
+    protocon_pre_instantiate(&plan, info);
 
     service_installer_apply(
         &plan,

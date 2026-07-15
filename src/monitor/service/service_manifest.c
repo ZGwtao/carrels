@@ -31,7 +31,7 @@ monitor_ossvc_init_req_per_type(
     }
 }
 
-void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
+void _service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
 {
     // parse the interface section ...
     // i.e., get the user-defined section for declaring what OS services are requested
@@ -63,6 +63,43 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
         // which will then go into requests of low-level access rights
         seL4_Word *svc_data_list = *svc_per_type_data_map[i];
         monitor_ossvc_init_req_per_type(req, curr_type, n, svc_data_list);
+    }
+}
+
+
+void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
+{
+    for (int i = 0; i < payload->service_count; ++i) {
+        const service_manifest_entry_t *entry = &payload->service_entries[i];
+        protocon_svc_type_t type = entry->type;
+        if (service_manifest_check_type(type) != true) {
+            TSLDR_DBG_PRINT(
+                "Unsupported service type: %d\n",
+                type
+            );
+            continue;
+        }
+        uint32_t curr_num = req->num_svc_per_type[type];
+        // req->data_per_svc_instance[type][curr_num] = 
+        //     (seL4_Word)(
+        //         (uintptr_t)(entry->offset) + 
+        //         (uintptr_t)(payload->header_payload)
+        //     );
+        Elf64_Addr target_vaddr =
+            payload->header_payload->e_entry + entry->offset;
+
+        req->data_per_svc_instance[type][curr_num] =
+            (seL4_Word)target_vaddr;
+
+        req->num_svc_per_type[type] = curr_num + 1;
+        
+        TSLDR_DBG_PRINT(
+            "service[%d]: type=%d, offset=%x, size=%d\n",
+            i,
+            entry->type,
+            (unsigned long)req->data_per_svc_instance[type][curr_num],
+            (unsigned long)entry->size
+        );
     }
 }
 
@@ -110,7 +147,8 @@ service_manifest_retrieve_elf(service_manifest_header_t *header, uintptr_t base)
 seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
 {
     service_manifest_header_t *header_manifest = (service_manifest_header_t *)base;
-    service_manifest_entry_t *entries = NULL;
+    service_manifest_entry_t *entries_start = NULL;
+    uint32_t entries_num = 0;
     Elf64_Ehdr *header_payload = NULL;
     Elf64_Shdr *header_service_info = NULL;
 
@@ -121,10 +159,11 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
         );
         return -1;
     }
-    entries = (service_manifest_entry_t *)(
+    entries_num = header_manifest->service_count;
+    entries_start = (service_manifest_entry_t *)(
         (char *)base + sizeof(service_manifest_header_t)
     );
-    service_manifest_dump_entries(header_manifest, entries);
+    service_manifest_dump_entries(header_manifest, entries_start);
 
     header_payload = (Elf64_Ehdr *)service_manifest_retrieve_elf(header_manifest, base);
     if (header_payload->e_shoff == 0 ||
@@ -154,7 +193,8 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
 
     info->header_payload = header_payload;
     info->header_service_info = header_service_info;
-    info->service_entries = entries;
+    info->service_count = entries_num;
+    info->service_entries = entries_start;
 
     return seL4_NoError;
 }
