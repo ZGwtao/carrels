@@ -215,6 +215,10 @@ bench_simple.elf: LDFLAGS += -L$(BOARD_DIR)/lib
 bench_simple.elf: $(PC_BENCH_SIMPLE_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
 
+bench_simple.img: bench_simple.elf
+	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
+		$(PC_TOOL_DIR)/service-helper.py --mf $(PC_SRC_DIR)/src/client/service.mf --elf bench_simple.elf -o $@
+
 client_echo.elf: LDFLAGS += -L$(BOARD_DIR)/lib
 client_echo.elf: $(PC_ECHO_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@

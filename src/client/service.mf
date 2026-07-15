@@ -1,0 +1,12 @@
+
+[[service]]
+type = "device_timer"
+target = ".timer_client_config"
+
+[[service]]
+type = "file_system"
+target = ".fs_client_config"
+
+[[service]]
+type = "device_serial"
+target = ".serial_client_config"

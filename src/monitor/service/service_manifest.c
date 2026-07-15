@@ -66,12 +66,67 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
     }
 }
 
+
+static inline seL4_Error
+service_manifest_check(service_manifest_header_t *header)
+{
+    size_t expected_size =
+        sizeof(service_manifest_header_t) +
+        header->service_count * sizeof(service_manifest_entry_t);
+
+    if (header->magic != MANIFEST_MAGIC ||
+        header->manifest_size != expected_size) {
+        return -1;
+    }
+
+    return seL4_NoError;
+}
+
+static inline void
+service_manifest_dump_entries(
+    const service_manifest_header_t *header,
+    const service_manifest_entry_t *entries
+)
+{
+    for (uint32_t i = 0; i < header->service_count; ++i) {
+        const service_manifest_entry_t *entry = &entries[i];
+
+        TSLDR_DBG_PRINT(
+            "service[%d]: type=%d, offset=%x, size=%d\n",
+            i,
+            entry->type,
+            (unsigned long)entry->offset,
+            (unsigned long)entry->size
+        );
+    }
+}
+
+static inline uintptr_t
+service_manifest_retrieve_elf(service_manifest_header_t *header, uintptr_t base)
+{
+    return (uintptr_t)((unsigned char *)(base) + header->manifest_size);
+}
+
 seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
 {
+    service_manifest_header_t *header_manifest = (service_manifest_header_t *)base;
+    service_manifest_entry_t *entries = NULL;
     Elf64_Ehdr *header_payload = NULL;
     Elf64_Shdr *header_service_info = NULL;
 
-    header_payload = (Elf64_Ehdr *)base;
+    if (service_manifest_check(header_manifest)) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "img format is not correct\n"
+        );
+        return -1;
+    }
+    entries = (service_manifest_entry_t *)(
+        (char *)base + sizeof(service_manifest_header_t)
+    );
+    service_manifest_dump_entries(header_manifest, entries);
+
+    header_payload = (Elf64_Ehdr *)service_manifest_retrieve_elf(header_manifest, base);
     if (header_payload->e_shoff == 0 ||
         header_payload->e_shnum == 0 ||
         header_payload->e_shentsize != sizeof(Elf64_Shdr) ||
@@ -87,7 +142,7 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
     }
 
     header_service_info =
-        (Elf64_Shdr *)tsldr_miscutil_find_section_from_elf((void *)(base), (char *)(PC_SVC_DESC_SECTION_NAME));
+        (Elf64_Shdr *)tsldr_miscutil_find_section_from_elf((void *)(header_payload), (char *)(PC_SVC_DESC_SECTION_NAME));
 
     if (!header_service_info) {
         TSLDR_DBG_PRINT(
@@ -99,6 +154,7 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
 
     info->header_payload = header_payload;
     info->header_service_info = header_service_info;
+    info->service_entries = entries;
 
     return seL4_NoError;
 }

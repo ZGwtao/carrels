@@ -39,6 +39,8 @@
 #define ORC_MONITOR_REGION_TRAMPOLINE_ELF_BASE (0x6800000)
 #define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
 
+uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
+
 __attribute__((__section__(".serial_client_config")))
 serial_client_config_t serial_config;
 __attribute__((__section__(".fs_client_config")))
@@ -203,7 +205,7 @@ monitor_main_load_elfs_into_protocon(uint32_t cid)
 
     tsldr_miscutil_memcpy(
         (void*)payload_base,
-        (char *)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE),
+        (char *)(__carrels_payload_start),
         (ORC_MONITOR_REGION_SIZE)
     );
 }
@@ -295,6 +297,7 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
 
 void monitor_call_deploy_protocon_second_half(void)
 {
+    seL4_Error err = seL4_NoError;
     monitor_deploy_request_t *request = microkit_cothread_my_arg();
     payload_info_t payload_info = { 0 };
     uint32_t num_req_pc = request->num_req_pc;
@@ -310,11 +313,9 @@ void monitor_call_deploy_protocon_second_half(void)
         return;
     }
 
-    if (payload_info_parse(
-            &payload_info,
-            ((uintptr_t)ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE)
-        ) != seL4_NoError
-    ) {
+    err = payload_info_parse(&payload_info,
+                             (__carrels_payload_start));
+    if (err != seL4_NoError) {
         monitor_finish_deploy_request();
         return;
     }

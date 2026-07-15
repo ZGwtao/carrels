@@ -12,6 +12,7 @@ COPY_TABLE = [
     ("client_echo.elf", 1),
     ("client_looping.elf", 1),
     ("bench_simple.elf", 1),
+    ("bench_simple.img", 1),
     ("unikraft.elf", 1),
     ("serial_client_protocon0.data", 2),
     ("serial_client_protocon1.data", 2),

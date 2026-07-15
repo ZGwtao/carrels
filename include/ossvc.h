@@ -73,11 +73,31 @@ typedef struct {
 
 } protocon_svc_req_t;
 
+typedef struct __attribute__((packed)) {
+    uint64_t magic;
+    uint32_t service_count;
+    uint32_t manifest_size;
+} service_manifest_header_t;
+
+#define MANIFEST_MAGIC UINT64_C(0x504353564D414E31)
+
+typedef struct __attribute__((packed)) {
+    int32_t type;
+    uint64_t offset;
+    uint64_t size;
+} service_manifest_entry_t;
+
+_Static_assert(sizeof(service_manifest_header_t) == 16,
+               "Invalid manifest header size");
+_Static_assert(sizeof(service_manifest_entry_t) == 20,
+               "Invalid manifest entry size");
+
 #define PROGNAME "[@monitor] "
 #define PC_SVC_DESC_SECTION_NAME ".pc_svc_desc"
 typedef struct {
     Elf64_Ehdr *header_payload;
     Elf64_Shdr *header_service_info;
+    service_manifest_entry_t *service_entries;
 } payload_info_t;
 
 
