@@ -11,26 +11,6 @@ service_manifest_check_type(protocon_svc_type_t svc_type)
             (svc_type > SERVICE_DUMMY);
 }
 
-static inline void
-monitor_ossvc_init_req_per_type(
-    protocon_svc_req_t *req,
-    protocon_svc_type_t svc_type,
-    uint8_t svc_num_per_type,
-    seL4_Word svc_data_list[]
-) {
-    if (service_manifest_check_type(svc_type) != true) {
-        TSLDR_DBG_PRINT(
-            "Unsupported service type: %d\n",
-            svc_type
-        );
-        return;
-    }
-    for (uint8_t i = 0; i < svc_num_per_type; ++i) {
-        seL4_Word svc_data = svc_data_list[i];
-        req->data_per_svc_instance[svc_type][i] = svc_data;
-    }
-}
-
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
 {
@@ -45,11 +25,6 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
             continue;
         }
         uint32_t curr_num = req->num_svc_per_type[type];
-        // req->data_per_svc_instance[type][curr_num] = 
-        //     (seL4_Word)(
-        //         (uintptr_t)(entry->offset) + 
-        //         (uintptr_t)(payload->header_payload)
-        //     );
         Elf64_Addr target_vaddr =
             payload->header_payload->e_entry + entry->offset;
 
@@ -57,6 +32,8 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
             (seL4_Word)target_vaddr;
 
         req->num_svc_per_type[type] = curr_num + 1;
+        req->service_entries[req->service_count] = entry;
+        req->service_count += 1;
         
         TSLDR_DBG_PRINT(
             "service[%d]: type=%d, offset=%x, size=%d\n",

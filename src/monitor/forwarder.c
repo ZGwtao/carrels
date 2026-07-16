@@ -3,7 +3,6 @@
 #include <ossvc.h>
 
 extern int pd_io_acl_rule;
-extern protocon_lifecycle_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 static pd_io_link_t client_links[PD_IO_CLIENT_COUNT];
 
@@ -70,7 +69,7 @@ static bool monitor_pd_can_receive(uint32_t cid)
 {
     return cid < PD_IO_CLIENT_COUNT &&
            cid < PC_CHILD_PER_MONITOR_MAX_NUM &&
-           protocon_states[cid] != PROTOCON_PASSIVE;
+           !protocon_state_check_lifecycle_state(cid, PROTOCON_PASSIVE);
 }
 
 static int monitor_send_pong(uint32_t sender_cid)

@@ -1,8 +1,10 @@
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <elf.h>
 #include <microkit.h>
+#include <libtrustedlo.h>
 
 #define SVC_TYPE_MAX_NUM (8)
 
@@ -53,25 +55,14 @@ typedef struct {
     protocon_svcdb_t list[16];
 } monitor_svcdb_t;
 
-typedef enum {
-    
+typedef uint8_t protocon_lifecycle_state_t;
+enum {
     PROTOCON_ACTIVE = 1,
     PROTOCON_PASSIVE,
     PROTOCON_HANG,
-
-} protocon_lifecycle_state_t;
-
-
-typedef struct {
-
-    int num_svc_per_type[SVC_TYPE_MAX_NUM];
-
-    // for each type of ossvc, there are at most SVC_PER_TYPE_MAX_NUM instances
-    // for each instance, uintptr_t is the data word for them...
-
-    seL4_Word data_per_svc_instance[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
-
-} protocon_svc_req_t;
+};
+_Static_assert(sizeof(protocon_lifecycle_state_t) == sizeof(uint8_t),
+               "protocon_lifecycle_state_t must be uint8_t");
 
 typedef struct __attribute__((packed)) {
     uint64_t magic;
@@ -94,6 +85,18 @@ _Static_assert(sizeof(service_manifest_entry_t) == 20,
                "Invalid manifest entry size");
 
 #define PROGNAME "[@monitor] "
+
+
+typedef struct {
+    uint32_t service_count;
+    service_manifest_entry_t *service_entries[16];
+    protocon_svc_t *service_sources[16];
+    uint8_t num_svc_per_type[SVC_TYPE_MAX_NUM];
+    seL4_Word data_per_svc_instance[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
+
+} protocon_svc_req_t;
+
+
 
 typedef struct {
     Elf64_Ehdr *header_payload;
@@ -130,7 +133,54 @@ typedef struct {
 } service_requirements_t;
 
 
-void service_registry_create(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]);
+typedef struct pc_state {
+    uint32_t pc_id;
+    tsldr_context_t context;
+    protocon_lifecycle_state_t life_cycle_state;
+    uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
+} pc_state_t;
+
+
+extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
+
+
+static inline tsldr_context_t *
+protocon_state_retrieve_context(uint32_t pc_id)
+{
+    if (pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Invalid cid given for retrieving context from protocon_states\n"
+        );
+        return NULL;
+    }
+    return &(protocon_states[pc_id].context);
+}
+
+static inline void
+protocon_state_set_lifecycle_state(
+    uint32_t pc_id,
+    protocon_lifecycle_state_t state
+) {
+    protocon_states[pc_id].life_cycle_state = state;
+}
+
+static inline protocon_lifecycle_state_t
+protocon_state_get_lifecycle_state(uint32_t pc_id)
+{
+    return protocon_states[pc_id].life_cycle_state;
+}
+
+static inline bool
+protocon_state_check_lifecycle_state(
+    uint32_t pc_id,
+    protocon_lifecycle_state_t state
+) {
+    return protocon_state_get_lifecycle_state(pc_id) == state;
+}
+
+
+void service_registry_create(monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states);
 
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
@@ -147,6 +197,5 @@ void service_installer_apply(
 void service_planner_select_protocon(
         const protocon_svc_req_t *req,
         deploy_plan_t *plan,
-        protocon_lifecycle_state_t *protocon_states,
-        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
+        pc_state_t *protocon_states
 );

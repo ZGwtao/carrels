@@ -59,16 +59,9 @@ static char monitor_costack1[0x10000];
 static char monitor_costack2[0x10000];
 static void blocking_wait(microkit_channel ch) { microkit_cothread_wait_on_channel(ch); }
 
-// record the number of OS services of each type provided by each dynamic PD (protocon)
-// so, at first level the index is the dynamic PD index (16 dynamic PDs at most),
-// and at second level the index is the OS service type index (8 types at most)
-int monitor_svc_dist_map[PC_CHILD_PER_MONITOR_MAX_NUM][SVC_TYPE_MAX_NUM];
 
-// record the trusted loading context of each dynamic PD (protocon)
-tsldr_context_t protocon_ctx_db[PC_CHILD_PER_MONITOR_MAX_NUM];
+pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
-// record the current lifecycle state of each dynamic PD (protocon)
-protocon_lifecycle_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 #define SMALL_PAGE_SIZE     (0x1000)
 
@@ -121,13 +114,13 @@ static void monitor_finish_deploy_request(void)
 }
 
 #define SET_PROTOCON_AS_INSTANTIATED(C) \
-    do { protocon_states[C] = PROTOCON_ACTIVE; } while (0);
+    do { protocon_state_set_lifecycle_state(C, PROTOCON_ACTIVE); } while (0);
 
 #define SET_PROTOCON_AS_HANG(C) \
-    do { protocon_states[C] = PROTOCON_HANG; } while (0);
+    do { protocon_state_set_lifecycle_state(C, PROTOCON_HANG); } while (0);
 
 #define SET_PROTOCON_AS_AVAILABLE(C) \
-    do { protocon_states[C] = PROTOCON_PASSIVE; } while (0);
+    do { protocon_state_set_lifecycle_state(C, PROTOCON_PASSIVE); } while (0);
 
 
 void monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
@@ -253,7 +246,7 @@ void protocon_start(deploy_plan_t *plan)
             &monitor_vm_layout.loader_context,
             plan->pc_id
         ),
-        &protocon_ctx_db[plan->pc_id],
+        protocon_state_retrieve_context(plan->pc_id),
         sizeof(tsldr_context_t)
     );
 
@@ -281,8 +274,7 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
     (void) service_planner_select_protocon(
         &req,
         &plan,
-        protocon_states,
-        monitor_svc_dist_map
+        protocon_states
     );
 
     err = protocon_deploy_plan_check(&plan);
@@ -444,7 +436,7 @@ seL4_MessageInfo_t monitor_call_hang_protocon(microkit_channel ch)
     if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", cid_to_check);
     } else {
-        if (protocon_states[cid] != PROTOCON_ACTIVE) {
+        if (!protocon_state_check_lifecycle_state(cid, PROTOCON_ACTIVE)) {
             TSLDR_DBG_PRINT(PROGNAME "PD to hang must be active first!\n");
         } else {
             SET_PROTOCON_AS_HANG(cid)
@@ -467,7 +459,7 @@ seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
     if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to resume given with ch: %d\n", cid_to_check);
     } else {
-        if (protocon_states[cid] != PROTOCON_HANG) {
+        if (!protocon_state_check_lifecycle_state(cid, PROTOCON_HANG)) {
             TSLDR_DBG_PRINT(PROGNAME "Invalid PD state to resume!\n");
         } else {
             microkit_pd_resume(target_pd_id);
@@ -486,7 +478,9 @@ static inline void monitor_main_list_protocon_states(int num_protocons)
     }
     for (int i = 0; i < num_protocons; ++i) {
         sddf_printf("[*] dynamic-PD [id=%d] has state: ", i);
-        switch (protocon_states[i]) {
+        const protocon_lifecycle_state_t state = 
+                protocon_state_get_lifecycle_state(i);
+        switch (state) {
             case PROTOCON_ACTIVE:
                 sddf_printf("in-use");
                 break;
@@ -497,7 +491,7 @@ static inline void monitor_main_list_protocon_states(int num_protocons)
                 sddf_printf("hang");
                 break;
             default:
-                sddf_printf("unknown: %d", protocon_states[i]);
+                sddf_printf("unknown: %d", state);
         };
         sddf_printf("\n");
     }
@@ -518,7 +512,8 @@ seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
     seL4_Word self_id = monitor_main_get_cid_from_channel(ch);
     seL4_Word bitmap = 0;
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
-        if ((protocon_states[i] == PROTOCON_ACTIVE || protocon_states[i] == PROTOCON_HANG) && i != self_id) {
+        if ((protocon_state_check_lifecycle_state(i, PROTOCON_ACTIVE) ||
+             protocon_state_check_lifecycle_state(i, PROTOCON_HANG)) && i != self_id) {
             bitmap |= (1ULL << i);
         }
     }
@@ -538,7 +533,7 @@ seL4_MessageInfo_t monitor_call_backup_protocon_loading_context(microkit_channel
     tsldr_context_t *context = \
         (tsldr_context_t *)monitor_vm_region_base(&monitor_vm_layout.loader_context, cid);
 
-    tsldr_miscutil_memcpy(&protocon_ctx_db[cid], context, sizeof(tsldr_context_t));
+    tsldr_miscutil_memcpy(protocon_state_retrieve_context(cid), context, sizeof(tsldr_context_t));
 
     return microkit_msginfo_new(mon_NoError, 0);
 }
@@ -630,15 +625,16 @@ void init(void)
     fs_completion_queue = fs_config.server.completion_queue.vaddr;
     fs_share = fs_config.server.share.vaddr;
 
-    // global os services state initialisation...
-    tsldr_miscutil_memset(monitor_svc_dist_map, 0, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM * SVC_TYPE_MAX_NUM);
-    service_registry_create(&monitor_svc_db, monitor_svc_dist_map);
-
-    // global client state initialisation...
-    // tsldr_miscutil_memset(protocon_states, PROTOCON_PASSIVE, sizeof(int) * PC_CHILD_PER_MONITOR_MAX_NUM);
     for (uint32_t i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
-        protocon_states[i] = PROTOCON_PASSIVE;
+        protocon_states[i].pc_id = i;
+        for (uint32_t j = 0; j < SVC_TYPE_MAX_NUM; ++j) {
+            protocon_states[i].avail_service_per_type[j] = 0;
+        }
+        SET_PROTOCON_AS_AVAILABLE(i);
+        tsldr_miscutil_memset(&protocon_states[i].context, 0, sizeof(tsldr_context_t));
     }
+    service_registry_create(&monitor_svc_db, protocon_states);
+
 
     for (uint32_t i = 0; i < 4; ++i) {
         monitor_main_load_trustedlo(i);
@@ -647,9 +643,6 @@ void init(void)
     req_pc_num = 0;
     deploy_request.num_req_pc = 0;
     deploy_request_active = false;
-
-    // clean all loader context...
-    tsldr_miscutil_memset(protocon_ctx_db, 0, sizeof(tsldr_context_t) * PC_CHILD_PER_MONITOR_MAX_NUM);
 
     stack_ptrs_arg_array_t costacks = { (uintptr_t) monitor_costack1, (uintptr_t) monitor_costack2 };
     microkit_cothread_init(&co_controller_mem, 0x10000, costacks);

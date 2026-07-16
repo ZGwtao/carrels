@@ -20,18 +20,17 @@ seL4_Word monitor_match_ossvc_request_with_unipd(
 void service_planner_select_protocon(
         const protocon_svc_req_t *req,
         deploy_plan_t *plan,
-        protocon_lifecycle_state_t *protocon_states,
-        int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM]
+        pc_state_t *protocon_states
 ) {
 
     deploy_plan_init(plan);
 
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
-        if (protocon_states[i] != PROTOCON_PASSIVE) {
+        if (!protocon_state_check_lifecycle_state(i, PROTOCON_PASSIVE)) {
             continue;
         }
         // check each dynamic pd and see if any of them matches with the OS service request
-        seL4_Word mask = monitor_match_ossvc_request_with_unipd(req, monitor_svc_dist_map[i]);
+        seL4_Word mask = monitor_match_ossvc_request_with_unipd(req, protocon_states[i].avail_service_per_type);
         if (mask == 0) {
             plan->pc_id = i;
         }

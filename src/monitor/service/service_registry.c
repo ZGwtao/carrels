@@ -27,7 +27,7 @@ void monitor_ossvc_populate_all_svc_of_unipd(protocon_svcdb_t *svcdb, int map[])
 
 // FIXME: we should pass the map as an argument to avoid the dependency on the global variable,
 //  but it is not a big deal for now as we are still in the early stage of prototyping
-void service_registry_create(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_map[][SVC_TYPE_MAX_NUM])
+void service_registry_create(monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states)
 {
     // we will populate the global map that records the distribution of OS services for each dynamic PD (protocon)
     // monitor_svcdb_t *svcdb_list = &monitor_svc_db;
@@ -36,6 +36,6 @@ void service_registry_create(monitor_svcdb_t *svcdb_list, int monitor_svc_dist_m
         // get the pointer to the OS service database of this PD,
         protocon_svcdb_t *curr_svcdb = &svcdb_list->list[i];
         // for each dynamic PD, we will populate the map with the information of all OS services of this PD
-        monitor_ossvc_populate_all_svc_of_unipd(curr_svcdb, monitor_svc_dist_map[i]);
+        monitor_ossvc_populate_all_svc_of_unipd(curr_svcdb, protocon_states[i].avail_service_per_type);
     }
 }
