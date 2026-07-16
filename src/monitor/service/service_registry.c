@@ -3,39 +3,86 @@
 #include <protocon.h>
 
 
-void monitor_ossvc_populate_all_svc_of_unipd(protocon_svcdb_t *svcdb, int map[])
+static inline void
+service_registry_register_protocon_services(
+    const protocon_svcdb_t *services,
+    uint32_t pc_id,
+    pc_state_t *protocon_states
+)
 {
-    protocon_svc_t *curr_svc;
-    for (int i = 0; i < svcdb->svc_num; ++i) {
-        /* Iterate all OS services of a PD */
-        curr_svc = &svcdb->array[i];
-        if (curr_svc->svc_init == false) {
+    pc_state_t *state = &protocon_states[pc_id];
+
+    for (uint32_t i = 0; i < services->svc_num; ++i) {
+        const protocon_svc_t *service = &services->array[i];
+
+        if (service->svc_init == false) {
             continue;
         }
-        /* Determine what type the OS service is */
-        int svc_type = curr_svc->svc_type;
-        /* Check the number of OS service of the same type */
-        int num_curr_type = map[svc_type];
-        if (num_curr_type >= SVC_PER_TYPE_MAX_NUM) {
-            microkit_dbg_puts("Too many OS services of the same type\n");
-            microkit_internal_crash(-1);
+
+        const protocon_svc_type_t type = service->svc_type;
+        if (type >= SVC_TYPE_MAX_NUM) {
+            TSLDR_DBG_PRINT(
+                PROGNAME "Invalid service type: %d\n",
+                type
+            );
+            continue;
         }
-        /* Pin the OS service on the map */
-        map[curr_svc->svc_type]++;
+
+        const uint32_t service_index =
+            state->avail_service_per_type[type];
+
+        if (service_index >= SVC_PER_TYPE_MAX_NUM) {
+            TSLDR_DBG_PRINT(
+                PROGNAME
+                "Too many services of type %u for PC %zu\n",
+                (unsigned int)type,
+                pc_id
+            );
+            continue;
+        }
+
+        state->avail_service_refs[type][service_index] = service;
+        state->avail_service_per_type[type] = service_index + 1;
     }
 }
 
-// FIXME: we should pass the map as an argument to avoid the dependency on the global variable,
-//  but it is not a big deal for now as we are still in the early stage of prototyping
-void service_registry_create(monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states)
+
+static inline void
+service_registry_validate_pc_count(size_t pc_count)
 {
-    // we will populate the global map that records the distribution of OS services for each dynamic PD (protocon)
-    // monitor_svcdb_t *svcdb_list = &monitor_svc_db;
-    // for all dynamic PDs, try to populate the map with this loop
-    for (int i = 0; i < svcdb_list->len; ++i) {
-        // get the pointer to the OS service database of this PD,
-        protocon_svcdb_t *curr_svcdb = &svcdb_list->list[i];
-        // for each dynamic PD, we will populate the map with the information of all OS services of this PD
-        monitor_ossvc_populate_all_svc_of_unipd(curr_svcdb, protocon_states[i].avail_service_per_type);
+    if (pc_count > PC_CHILD_PER_MONITOR_MAX_NUM) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Invalid PC count: %d; maximum supported count is %d\n",
+            pc_count,
+            (PC_CHILD_PER_MONITOR_MAX_NUM)
+        );
+        microkit_internal_crash(-1);
+    }
+
+    TSLDR_DBG_PRINT(
+        PROGNAME
+        "Number of available PCs recorded from svcdb: %d\n",
+        pc_count
+    );
+}
+
+
+void
+service_registry_create(
+    const monitor_svcdb_t *svcdb_list,
+    pc_state_t *protocon_states
+)
+{
+    const size_t pc_count = svcdb_list->len;
+
+    service_registry_validate_pc_count(pc_count);
+
+    for (size_t pc_id = 0; pc_id < pc_count; ++pc_id) {
+        service_registry_register_protocon_services(
+            &svcdb_list->list[pc_id],
+            pc_id,
+            protocon_states
+        );
     }
 }

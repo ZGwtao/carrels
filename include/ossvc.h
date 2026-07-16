@@ -91,6 +91,7 @@ typedef struct {
     uint32_t service_count;
     service_manifest_entry_t *service_entries[16];
     protocon_svc_t *service_sources[16];
+
     uint8_t num_svc_per_type[SVC_TYPE_MAX_NUM];
     seL4_Word data_per_svc_instance[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
 
@@ -130,6 +131,7 @@ typedef struct pc_state {
     tsldr_context_t context;
     protocon_lifecycle_state_t life_cycle_state;
     uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
+    const protocon_svc_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
 } pc_state_t;
 
 
@@ -171,8 +173,33 @@ protocon_state_check_lifecycle_state(
     return protocon_state_get_lifecycle_state(pc_id) == state;
 }
 
+static inline void
+protocon_state_memzero_services(uint32_t pc_id)
+{
+    pc_state_t *state = &protocon_states[pc_id];
 
-void service_registry_create(monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states);
+    for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
+        tsldr_miscutil_memset(
+            state->avail_service_refs[i],
+            0,
+            (SVC_PER_TYPE_MAX_NUM) * sizeof(protocon_svc_t *)
+        );
+        state->avail_service_per_type[i] = 0;
+    }
+}
+
+static inline void
+protocon_state_memzero_context(uint32_t pc_id)
+{
+    pc_state_t *state = &protocon_states[pc_id];
+    tsldr_miscutil_memset(
+        &state->context,
+        0,
+        sizeof(tsldr_context_t)
+    );
+}
+
+void service_registry_create(const monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states);
 
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);

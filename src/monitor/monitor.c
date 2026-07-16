@@ -123,16 +123,6 @@ static void monitor_finish_deploy_request(void)
     do { protocon_state_set_lifecycle_state(C, PROTOCON_PASSIVE); } while (0);
 
 
-void monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
-{
-    if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
-        TSLDR_DBG_PRINT(err_msg);
-        microkit_internal_crash(-1);
-    }
-    microkit_cothread_yield();
-}
-
-
 void monitor_main_init_storage(void)
 {
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) start fs initialisation\n");
@@ -601,6 +591,48 @@ monitor_main_handle_pccall(microkit_channel ch)
 }
 
 
+static inline void
+monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
+{
+    if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
+        TSLDR_DBG_PRINT(err_msg);
+        while(1);
+    }
+    microkit_cothread_yield();
+}
+
+static inline void
+monitor_main_init_protocon_states(uint32_t pc_num)
+{
+    for (uint32_t i = 0; i < pc_num; ++i) {
+        protocon_states[i].pc_id = i;
+        protocon_state_memzero_services(i);
+        protocon_state_memzero_context(i);
+        SET_PROTOCON_AS_AVAILABLE(i);
+    }
+    service_registry_create(&monitor_svc_db, protocon_states);
+}
+
+static inline void
+monitor_main_init_system(void)
+{
+    /* init all protocon and states */
+    monitor_main_init_protocon_states(PC_CHILD_PER_MONITOR_MAX_NUM);
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        monitor_main_load_trustedlo(i);
+    }
+
+    (void) monitor_main_cothread_spawn(
+        monitor_main_init_storage,
+        NULL,
+        "failed to spawn thread for storage initialisation.\n"
+    );
+
+    monitor_init_all_client_links();
+}
+
+
 void init(void)
 {
     assert(serial_config_check_magic(&serial_config));
@@ -624,30 +656,14 @@ void init(void)
     fs_completion_queue = fs_config.server.completion_queue.vaddr;
     fs_share = fs_config.server.share.vaddr;
 
-    for (uint32_t i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
-        protocon_states[i].pc_id = i;
-        for (uint32_t j = 0; j < SVC_TYPE_MAX_NUM; ++j) {
-            protocon_states[i].avail_service_per_type[j] = 0;
-        }
-        SET_PROTOCON_AS_AVAILABLE(i);
-        tsldr_miscutil_memset(&protocon_states[i].context, 0, sizeof(tsldr_context_t));
-    }
-    service_registry_create(&monitor_svc_db, protocon_states);
-
-
-    for (uint32_t i = 0; i < 4; ++i) {
-        monitor_main_load_trustedlo(i);
-    }
-
     req_pc_num = 0;
     deploy_request.num_req_pc = 0;
     deploy_request_active = false;
 
     stack_ptrs_arg_array_t costacks = { (uintptr_t) monitor_costack1, (uintptr_t) monitor_costack2 };
     microkit_cothread_init(&co_controller_mem, 0x10000, costacks);
-    monitor_main_cothread_spawn(monitor_main_init_storage, NULL, " failed to spawn thread for storage initialisation.\n");
 
-    monitor_init_all_client_links();
+    monitor_main_init_system();
 }
 
 seL4_MessageInfo_t
