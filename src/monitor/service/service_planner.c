@@ -48,7 +48,13 @@ service_planner_select_protocon(
         plan->pc_id = pc_id;
         break;
     }
-
+    if (plan->pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "No PC has sufficient services for the payload\n"
+        );
+        return;
+    }
     plan->req = req;
 
     uint32_t cursor_service_num[SVC_TYPE_MAX_NUM];
