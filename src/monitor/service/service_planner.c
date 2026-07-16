@@ -3,36 +3,50 @@
 #include <protocon.h>
 
 
-static inline
-seL4_Word monitor_match_ossvc_request_with_unipd(
-        const protocon_svc_req_t *req,
-        int svc_dist_map[]
+static inline bool
+service_planner_can_satisfy_request(
+    const protocon_svc_req_t *req,
+    const uint32_t avail_service_per_type[]
 ) {
-    seL4_Word mask = 0;
-    for (int i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
-        mask |= (req->num_svc_per_type[i] > svc_dist_map[i]);
+    // if any requested service is more than whats offered
+    // return false...
+
+    for (int type = 0; type < SVC_TYPE_MAX_NUM; ++type) {
+        if (req->num_svc_per_type[type] >
+            avail_service_per_type[type]) {
+            return false;
+        }
     }
-    // if mask is zero, it means all requested OS services are no less than what have been provided
-    // so that means we have a match between a dynamic PD and a set of OS services request
-    return mask;
+
+    return true;
 }
 
-void service_planner_select_protocon(
-        const protocon_svc_req_t *req,
-        deploy_plan_t *plan,
-        pc_state_t *protocon_states
+void
+service_planner_select_protocon(
+    const protocon_svc_req_t *req,
+    deploy_plan_t *plan,
+    const pc_state_t *protocon_states
 ) {
+    deploy_plan_reset(plan);
 
-    deploy_plan_init(plan);
-
-    for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
-        if (!protocon_state_check_lifecycle_state(i, PROTOCON_PASSIVE)) {
+    for (int pc_id = 0;
+         pc_id < PC_CHILD_PER_MONITOR_MAX_NUM;
+         ++pc_id) {
+        if (!protocon_state_check_lifecycle_state(
+                pc_id,
+                PROTOCON_PASSIVE)) {
             continue;
         }
-        // check each dynamic pd and see if any of them matches with the OS service request
-        seL4_Word mask = monitor_match_ossvc_request_with_unipd(req, protocon_states[i].avail_service_per_type);
-        if (mask == 0) {
-            plan->pc_id = i;
+
+        if (!service_planner_can_satisfy_request(
+                req,
+                protocon_states[pc_id].avail_service_per_type)) {
+            continue;
         }
+
+        plan->pc_id = pc_id;
+        break;
     }
+
+    plan->req = req;
 }

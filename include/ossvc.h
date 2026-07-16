@@ -112,25 +112,17 @@ typedef struct {
     uint32_t pc_id;
     uintptr_t pc_base;
     Elf64_Addr pc_entry;
+    protocon_svc_req_t *req;
 } deploy_plan_t;
 
 static inline
-void deploy_plan_init(deploy_plan_t *p)
+void deploy_plan_reset(deploy_plan_t *p)
 {
     p->pc_id = PC_CHILD_PER_MONITOR_MAX_NUM;
     p->pc_base = 0x0;
     p->pc_entry = 0x0;
+    p->req = NULL;
 }
-
-#define OSSVC_TYPE_COUNT 8
-#define OSSVC_MAX_INSTANCES_PER_TYPE 8
-
-typedef struct {
-    uint8_t count[OSSVC_TYPE_COUNT];
-    seL4_Word iface_addr
-        [OSSVC_TYPE_COUNT]
-        [OSSVC_MAX_INSTANCES_PER_TYPE];
-} service_requirements_t;
 
 
 typedef struct pc_state {
@@ -188,14 +180,13 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 void service_installer_apply(
     const deploy_plan_t *plan,
-    const protocon_svc_req_t *req,
     uintptr_t monitor_svcdb_base,
     const protocon_svcdb_t *svcdb
 );
 
 
 void service_planner_select_protocon(
-        const protocon_svc_req_t *req,
-        deploy_plan_t *plan,
-        pc_state_t *protocon_states
+    const protocon_svc_req_t *req,
+    deploy_plan_t *plan,
+    const pc_state_t *protocon_states
 );

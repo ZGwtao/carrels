@@ -103,7 +103,6 @@ service_installer_apply_one(
 
 void service_installer_apply(
     const deploy_plan_t *plan,
-    const protocon_svc_req_t *req,
     uintptr_t monitor_svcdb_base,
     const protocon_svcdb_t *svcdb
 ) {
@@ -127,7 +126,7 @@ void service_installer_apply(
     unsigned char *svc_data_ptr = NULL;
 
 
-    tsldr_miscutil_memcpy(&cursor, req, sizeof(cursor));
+    tsldr_miscutil_memcpy(&cursor, plan->req, sizeof(cursor));
 
     for (uint8_t i = 0; i < svc_num; ++i)
     {
