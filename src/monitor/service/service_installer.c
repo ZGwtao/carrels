@@ -74,33 +74,6 @@ service_installer_append_acrtreq(tsldr_acrtreq_t *req_acrt, const protocon_svc_t
 }
 
 
-static inline void
-service_installer_apply_one(
-    const protocon_svc_t *svc,
-    protocon_svc_req_t *cursor,
-    const uintptr_t payload_base
-) {
-    protocon_svc_type_t type = svc->svc_type;
-    uint32_t cursor_svc_num = cursor->num_svc_per_type[type];
-    uint32_t cursor_svc_idx = cursor_svc_num - 1;
-
-    if (cursor_svc_num == 0) {
-        return;
-    }
-
-    seL4_Word target_section =
-        cursor->data_per_svc_instance[type][cursor_svc_idx];
-
-    monitor_worker_func__patch_payload_by_ptr(
-        (void *)payload_base,
-        svc->data_path,
-        (uintptr_t)(target_section)
-    );
-
-    cursor->num_svc_per_type[type] = cursor_svc_num - 1;
-}
-
-
 void service_installer_apply(const deploy_plan_t *plan, uintptr_t monitor_svcdb_base)
 {
     // the request variable, which should be filled out with the low-level access rights information
@@ -116,7 +89,7 @@ void service_installer_apply(const deploy_plan_t *plan, uintptr_t monitor_svcdb_
     {
         const protocon_svc_req_t *req = plan->req;
         const protocon_svc_t *curr_svc =
-                        req->service_sources[i];
+                        plan->service_sources[i];
 
         TSLDR_DBG_PRINT(
             PROGNAME

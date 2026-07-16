@@ -12,10 +12,11 @@ service_manifest_check_type(protocon_svc_type_t svc_type)
 }
 
 
-void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
+void service_manifest_parse(payload_info_t *info, protocon_svc_req_t *req)
 {
-    for (int i = 0; i < payload->service_count; ++i) {
-        const service_manifest_entry_t *entry = &payload->service_entries[i];
+    for (int i = 0; i < info->service_count; ++i) {
+        const service_manifest_entry_t *entry =
+                            &info->service_entries[i];
         protocon_svc_type_t type = entry->type;
         if (service_manifest_check_type(type) != true) {
             TSLDR_DBG_PRINT(
@@ -24,26 +25,11 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
             );
             continue;
         }
-        uint32_t curr_num = req->num_svc_per_type[type];
-        Elf64_Addr target_vaddr =
-            payload->header_payload->e_entry + entry->offset;
-
-        req->data_per_svc_instance[type][curr_num] =
-            (seL4_Word)target_vaddr;
-
-        req->num_svc_per_type[type] = curr_num + 1;
+        req->service_count_per_type[type] += 1;
         req->service_entries[req->service_count] = entry;
         req->service_count += 1;
-        
-        TSLDR_DBG_PRINT(
-            "service[%d]: type=%d, offset=%x, size=%d\n",
-            i,
-            entry->type,
-            (unsigned long)req->data_per_svc_instance[type][curr_num],
-            (unsigned long)entry->size
-        );
     }
-    req->payload_e_entry = payload->header_payload->e_entry;
+    req->payload_e_entry = info->header_payload->e_entry;
 }
 
 

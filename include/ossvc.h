@@ -89,13 +89,9 @@ _Static_assert(sizeof(service_manifest_entry_t) == 20,
 
 typedef struct {
     uint32_t service_count;
+    uint32_t service_count_per_type[SVC_TYPE_MAX_NUM];
     service_manifest_entry_t *service_entries[16];
-    const protocon_svc_t *service_sources[16];
     Elf64_Addr payload_e_entry;
-
-    uint8_t num_svc_per_type[SVC_TYPE_MAX_NUM];
-    seL4_Word data_per_svc_instance[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
-
 } protocon_svc_req_t;
 
 
@@ -114,8 +110,20 @@ typedef struct {
     uint32_t pc_id;
     uintptr_t pc_base;
     Elf64_Addr pc_entry;
-    protocon_svc_req_t *req;
+    const protocon_svc_req_t *req;
+    const protocon_svc_t *service_sources[16];
 } deploy_plan_t;
+
+
+static inline void
+deploy_plan_memzero_services(deploy_plan_t *p)
+{
+    tsldr_miscutil_memset(
+        p->service_sources,
+        0,
+        sizeof(protocon_svc_t *)
+    );
+}
 
 static inline
 void deploy_plan_reset(deploy_plan_t *p)
@@ -124,6 +132,7 @@ void deploy_plan_reset(deploy_plan_t *p)
     p->pc_base = 0x0;
     p->pc_entry = 0x0;
     p->req = NULL;
+    deploy_plan_memzero_services(p);
 }
 
 
@@ -213,7 +222,7 @@ void service_installer_apply(
 
 
 void service_planner_select_protocon(
-    protocon_svc_req_t *req,
+    const protocon_svc_req_t *req,
     deploy_plan_t *plan,
     const pc_state_t *protocon_states
 );

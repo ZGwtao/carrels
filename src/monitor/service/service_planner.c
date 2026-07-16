@@ -13,7 +13,7 @@ service_planner_can_satisfy_request(
     // return false...
 
     for (int type = 0; type < SVC_TYPE_MAX_NUM; ++type) {
-        if (req->num_svc_per_type[type] >
+        if (req->service_count_per_type[type] >
             avail_service_per_type[type]) {
             return false;
         }
@@ -24,7 +24,7 @@ service_planner_can_satisfy_request(
 
 void
 service_planner_select_protocon(
-    protocon_svc_req_t *req,
+    const protocon_svc_req_t *req,
     deploy_plan_t *plan,
     const pc_state_t *protocon_states
 ) {
@@ -74,9 +74,9 @@ service_planner_select_protocon(
         const uint32_t curr_service_index =
             --cursor_service_num[type];
 
-        req->service_sources[i] =
+        plan->service_sources[i] =
             state->avail_service_refs[type][curr_service_index];
 
-        assert(req->service_sources[i] != NULL);
+        assert(plan->service_sources[i] != NULL);
     }
 }
