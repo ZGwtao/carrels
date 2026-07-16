@@ -26,62 +26,70 @@ void monitor_worker_func__patch_payload_by_ptr(const void *elf_base, const char 
     }
 }
 
+
+static inline bool
+service_installer_check_svc(const protocon_svc_t *svc)
+{
+    if (svc->svc_init != true) {
+        return false;
+    }
+    return true;
+}
+
+static inline void
+service_installer_append_acrtreq(tsldr_acrtreq_t *req_acrt, const protocon_svc_t *svc)
+{
+    // maximumlly, we allow each OS svc to have at most:
+    //  - 4 notifications
+    //  - 4 ppcs
+    //  - 4 irqs (not implemented here)
+    //  - *4 x86ioports (not implemented in microkit)
+    //  - 4 mappings (4 pieaces of memory regions)
+    // these low-level access rights should be enough to describe an OS service
+    for (int i = 0; i < 4; ++i) {
+        if (svc->ppcs[i] >= MICROKIT_MAX_CHANNELS) {
+            continue;
+        }
+        seL4_Word ppc = req_acrt->num_req_ppcs;
+        req_acrt->ppcs[ppc] = (seL4_Word)svc->ppcs[i];
+        req_acrt->num_req_ppcs++;
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (svc->notifications[i] >= MICROKIT_MAX_CHANNELS) {
+            continue;
+        }
+        seL4_Word ntfn = req_acrt->num_req_notifications;
+        req_acrt->notifications[ntfn] = (seL4_Word)svc->notifications[i];
+        req_acrt->num_req_notifications++;
+    }
+    /* TODO: irq, and x86ioports... */
+    for (int i = 0; i < 4; ++i) {
+        if (!svc->mappings[i].vaddr) {
+            continue;
+        }
+        seL4_Word mapping = req_acrt->num_req_mappings;
+        req_acrt->mappings[mapping] = (seL4_Word)svc->mappings[i].vaddr;
+        req_acrt->num_req_mappings++;
+    }
+}
+
+
 static inline void
 service_installer_apply_one(
     const protocon_svc_t *svc,
     protocon_svc_req_t *cursor,
-    tsldr_acrtreq_t *req_acrt,
     const uintptr_t payload_base
 ) {
-    if (!svc->svc_init) {
+    protocon_svc_type_t type = svc->svc_type;
+    uint32_t cursor_svc_num = cursor->num_svc_per_type[type];
+    uint32_t cursor_svc_idx = cursor_svc_num - 1;
+
+    if (cursor_svc_num == 0) {
         return;
     }
-    uint8_t type = svc->svc_type;
 
-    if (!cursor->num_svc_per_type[type]) {
-        return;
-    }
-
-    uintptr_t target_section;
-
-    {
-        // maximumlly, we allow each OS svc to have at most:
-        //  - 4 notifications
-        //  - 4 ppcs
-        //  - 4 irqs (not implemented here)
-        //  - *4 x86ioports (not implemented in microkit)
-        //  - 4 mappings (4 pieaces of memory regions)
-        // these low-level access rights should be enough to describe an OS service
-        for (int i = 0; i < 4; ++i) {
-            if (svc->ppcs[i] >= MICROKIT_MAX_CHANNELS) {
-                continue;
-            }
-            seL4_Word ppc = req_acrt->num_req_ppcs;
-            req_acrt->ppcs[ppc] = (seL4_Word)svc->ppcs[i];
-            req_acrt->num_req_ppcs++;
-        }
-        for (int i = 0; i < 4; ++i) {
-            if (svc->notifications[i] >= MICROKIT_MAX_CHANNELS) {
-                continue;
-            }
-            seL4_Word ntfn = req_acrt->num_req_notifications;
-            req_acrt->notifications[ntfn] = (seL4_Word)svc->notifications[i];
-            req_acrt->num_req_notifications++;
-        }
-        /* TODO: irq, and x86ioports... */
-        for (int i = 0; i < 4; ++i) {
-            if (!svc->mappings[i].vaddr) {
-                continue;
-            }
-            seL4_Word mapping = req_acrt->num_req_mappings;
-            req_acrt->mappings[mapping] = (seL4_Word)svc->mappings[i].vaddr;
-            req_acrt->num_req_mappings++;
-        }
-    }
-
-    target_section =
-        cursor->data_per_svc_instance[type]
-                                     [cursor->num_svc_per_type[type] - 1];
+    seL4_Word target_section =
+        cursor->data_per_svc_instance[type][cursor_svc_idx];
 
     monitor_worker_func__patch_payload_by_ptr(
         (void *)payload_base,
@@ -89,7 +97,7 @@ service_installer_apply_one(
         (uintptr_t)(target_section)
     );
 
-    cursor->num_svc_per_type[type]--;
+    cursor->num_svc_per_type[type] = cursor_svc_num - 1;
 }
 
 
@@ -109,26 +117,30 @@ void service_installer_apply(
     // the reason we need it is that the trusted loader does not handle high-level information
     // so we put an information flow transition that turns requested OS services into low-level details
     tsldr_acrtreq_t req_acrt = {};
+
     protocon_svc_req_t cursor;
-    const protocon_svc_t *curr_svc;
+    const protocon_svc_t *svc_array = svcdb->array;
+    const uint8_t svc_num = svcdb->svc_num;
+    protocon_svc_t *curr_svc = NULL;
+
     seL4_Word *svc_num_ptr = NULL;
     unsigned char *svc_data_ptr = NULL;
 
+
     tsldr_miscutil_memcpy(&cursor, req, sizeof(cursor));
 
-    curr_svc = svcdb->array;
-    // check all available os services, and patch each of them accordingly
-    //  - patch the elf with information that describes the required os services
-    // this is a part of the process of elf preparation
-    for (int i = 0; i < svcdb->svc_num; ++i) {
-        // basically it is similar to tell the client program where to access the OS services
-        // (we will put the pointers to access the svcs in the given place specified by the client)
+    for (uint8_t i = 0; i < svc_num; ++i)
+    {
+        curr_svc = &svc_array[i];
+        if (!service_installer_check_svc(curr_svc)) {
+            continue;
+        }
         service_installer_apply_one(
-            &curr_svc[i],
+            curr_svc,
             &cursor,
-            &req_acrt,
             plan->pc_base
         );
+        service_installer_append_acrtreq(&req_acrt, curr_svc);
     }
 
     svc_num_ptr = (seL4_Word *)((char *)monitor_svcdb_base + 0x1000 * plan->pc_id);
