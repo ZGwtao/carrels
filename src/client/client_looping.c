@@ -38,16 +38,6 @@ fs_client_config_t fs_config;
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
 
-__attribute__((__section__(".pc_svc_desc")))
-const protocon_svc_desc_t ciface = {
-    .t1_num = 1,
-    .t3_num = 1,
-    .type1 = SERVICE_DEVICE_TIMER,
-    .type3 = SERVICE_DEVICE_SERIAL,
-    .t1_iface = { (uintptr_t)&timer_config, 0, 0, 0, 0, 0, 0, 0 },
-    .t3_iface = { (uintptr_t)&serial_config, 0, 0, 0, 0, 0, 0, 0 },
-};
-
 typedef struct {
     uint64_t _unused;
     bool avail;

@@ -94,10 +94,9 @@ _Static_assert(sizeof(service_manifest_entry_t) == 20,
                "Invalid manifest entry size");
 
 #define PROGNAME "[@monitor] "
-#define PC_SVC_DESC_SECTION_NAME ".pc_svc_desc"
+
 typedef struct {
     Elf64_Ehdr *header_payload;
-    Elf64_Shdr *header_service_info;
     uint64_t elf_payload_size;
     uint32_t service_count;
     service_manifest_entry_t *service_entries;

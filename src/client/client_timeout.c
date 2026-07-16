@@ -18,16 +18,6 @@ __attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
 
-// interface per client payload
-__attribute__((__section__(".pc_svc_desc"))) const protocon_svc_desc_t ciface = {
-    /* numbers of each interface type */
-    .t3_num = 1,
-    /* type identifiers */
-    .type3 = SERVICE_DEVICE_SERIAL,
-    /* pointer array of each interface type */
-    .t3_iface = { (uintptr_t)&serial_config, 0, 0, 0, 0, 0, 0, 0 }
-};
-
 /**
  * Architecture specific PMU events.
  * The following should be declared:
