@@ -211,33 +211,54 @@ monitor.elf: \
 		libsddf_util.a payloads.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-bench_simple.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-bench_simple.elf: $(PC_BENCH_SIMPLE_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
+
+PC_CLIENT_NAMES := \
+	bench_simple \
+	client_echo \
+	client_looping \
+	client_faulting \
+	client_timeout
+
+PC_CLIENT_ELFS := $(addsuffix .elf,$(PC_CLIENT_NAMES))
+PC_CLIENT_IMGS := $(addsuffix .img,$(PC_CLIENT_NAMES))
+
+PC_SERVICE_MANIFEST := $(PC_SRC_DIR)/src/client/service.mf
+PC_UNIKRAFT_MANIFEST := $(PC_SRC_DIR)/src/client/uk.mf
+
+$(PC_CLIENT_ELFS): LDFLAGS += -L$(BOARD_DIR)/lib
+
+bench_simple.elf:    $(PC_BENCH_SIMPLE_OBJS)
+client_echo.elf:     $(PC_ECHO_CLIENT_OBJS)
+client_looping.elf:  $(PC_LOOPING_CLIENT_OBJS)
+client_faulting.elf: $(PC_FAULTING_CLIENT_OBJS)
+client_timeout.elf:  $(PC_TIMEOUT_CLIENT_OBJS)
+
+$(PC_CLIENT_ELFS): libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
 
-bench_simple.img: bench_simple.elf
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
-		$(PC_TOOL_DIR)/service-helper.py --mf $(PC_SRC_DIR)/src/client/service.mf --elf bench_simple.elf -o $@
+PC_SERVICE_IMGS := $(PC_CLIENT_IMGS) unikraft.img
 
-client_echo.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-client_echo.elf: $(PC_ECHO_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
-	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
+.PHONY: pc-images
+pc-images: $(PC_SERVICE_IMGS)
 
-
-client_looping.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-client_looping.elf: $(PC_LOOPING_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
-	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
-
-
-client_faulting.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-client_faulting.elf: $(PC_FAULTING_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
-	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
-
-client_timeout.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-client_timeout.elf: $(PC_TIMEOUT_CLIENT_OBJS) libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
-	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
+$(PC_SERVICE_IMGS): %.img: %.elf $(PC_SERVICE_MANIFEST) \
+		$(PC_TOOL_DIR)/service-helper.py
+	PYTHONPATH=$(SDDF)/tools/meta:$$PYTHONPATH $(PYTHON) \
+		$(PC_TOOL_DIR)/service-helper.py \
+		--mf $(PC_SERVICE_MANIFEST) \
+		--elf $< \
+		-o $@
 
 unikraft.elf: uk-build
-	cp $(BUILD_DIR)/pc/$(BM_UK_PAYLOAD_ELF) $(BUILD_DIR)/unikraft.elf
+	cp pc/$(BM_UK_PAYLOAD_ELF) unikraft.elf
+
+
+unikraft.img: unikraft.elf $(PC_UNIKRAFT_MANIFEST) \
+		$(PC_TOOL_DIR)/service-helper.py
+	PYTHONPATH=$(SDDF)/tools/meta:$$PYTHONPATH $(PYTHON) \
+		$(PC_TOOL_DIR)/service-helper.py \
+		--mf $(PC_UNIKRAFT_MANIFEST) \
+		--elf $< \
+		-o $@
 
 -include $(PC_OBJS:.o=.d)

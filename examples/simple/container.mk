@@ -8,15 +8,14 @@ IMAGES := \
 	monitor.elf \
 	orchestrator.elf \
 	fat.elf \
-	client_echo.elf \
-	client_looping.elf \
-	client_faulting.elf \
-	client_timeout.elf \
-	bench_simple.elf \
+	client_echo.img \
+	client_looping.img \
+	client_faulting.img \
+	client_timeout.img \
 	bench_simple.img \
+	unikraft.img \
 	trampoline.elf \
 	protocon.elf \
-	unikraft.elf \
 	serial_driver.elf \
 	serial_virt_rx.elf \
 	serial_virt_tx.elf \

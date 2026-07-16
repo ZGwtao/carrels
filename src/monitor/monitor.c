@@ -241,7 +241,8 @@ static inline void protocon_pre_instantiate(
 
     const void *source = payload->header_payload;
 
-    size_t elf_size = 0x40000;
+    // FIXME
+    size_t elf_size = (ORC_MONITOR_REGION_SIZE) - 0x4000;
     tsldr_miscutil_memcpy(
         (void *)destination,
         source,
