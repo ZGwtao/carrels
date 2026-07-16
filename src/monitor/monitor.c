@@ -21,14 +21,6 @@
 #include <monitor_vm_layout.h>
 
 
-// each elf file is of the same upper size limit
-#define ORC_MONITOR_REGION_SIZE (0x800000)
-// elf files from orchestrator as external files...
-// shared memory with the orchestrator PD
-#define ORC_MONITOR_REGION_PROTOCON_ELF_BASE (0x6000000)
-#define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
-
-uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
 
 __attribute__((__section__(".serial_client_config")))
 serial_client_config_t serial_config;
@@ -51,8 +43,9 @@ static void blocking_wait(microkit_channel ch) { microkit_cothread_wait_on_chann
 
 pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
-
-#define SMALL_PAGE_SIZE     (0x1000)
+#define ORC_MONITOR_REGION_SIZE (0x800000)
+#define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
+uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
 
 
 seL4_Word pd_io_acl_rule = 0;
