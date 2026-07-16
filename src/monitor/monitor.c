@@ -197,66 +197,44 @@ monitor_main_load_trustedlo(uint32_t cid)
     tsldr_miscutil_memset((void *)payload_base, 0, ORC_MONITOR_REGION_SIZE);
 }
 
+
 static inline void
-monitor_main_load_elfs_into_protocon(uint32_t cid)
+protocon_load_payload(uintptr_t dest, uintptr_t src, uint64_t size)
 {
-    uintptr_t payload_base =
-            monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
-
     tsldr_miscutil_memcpy(
-        (void*)payload_base,
-        (char *)(__carrels_payload_start),
-        (ORC_MONITOR_REGION_SIZE)
+        (void *)dest,
+        (const void *)src,
+        size
+    );
+    TSLDR_DBG_PRINT(
+        PROGNAME "src: %x, dest: %x, size: %d\n",
+        src,
+        dest,
+        size
     );
 }
 
-#if 0
-static inline
-void protocon_pre_instantiate(deploy_plan_t *plan)
+static inline void
+protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
 {
-    monitor_main_load_elfs_into_protocon(plan->pc_id);
-
-    plan->pc_base =
+    uintptr_t dest =
         monitor_vm_region_base(
             &monitor_vm_layout.container_image,
             plan->pc_id
         );
+    plan->pc_base = dest;
     assert(plan->pc_base != 0x0);
 
     plan->pc_entry =
         (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
     assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
-}
-#else
-static inline void protocon_pre_instantiate(
-    deploy_plan_t *plan,
-    const payload_info_t *payload
-)
-{
-    uintptr_t destination =
-        monitor_vm_region_base(
-            &monitor_vm_layout.container_image,
-            plan->pc_id
-        );
 
-    const void *source = payload->header_payload;
-
-    // FIXME
-    size_t elf_size = (ORC_MONITOR_REGION_SIZE) - 0x4000;
-    tsldr_miscutil_memcpy(
-        (void *)destination,
-        source,
-        elf_size
+    protocon_load_payload(
+        (uintptr_t)(plan->pc_base),
+        (uintptr_t)(payload->header_payload),
+        (uint64_t)(payload->elf_payload_size)
     );
-
-    plan->pc_base = destination;
-    assert(plan->pc_base != 0x0);
-
-    plan->pc_entry =
-        (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
-    assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
 }
-#endif
 
 
 void protocon_start(deploy_plan_t *plan)

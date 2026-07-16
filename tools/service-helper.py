@@ -6,7 +6,7 @@ from pathlib import Path
 from elftools.elf.elffile import ELFFile
 import struct
 
-hdr = struct.Struct("<QII")
+hdr = struct.Struct("<QIIQ")
 svc = struct.Struct("<iQQ")
 
 MANIFEST_MAGIC = 0x504353564D414E31
@@ -86,13 +86,14 @@ def serialize_services(services: list[dict]) -> bytes:
     return bytes(data)
 
 
-def serialize_manifest(services: list[dict]) -> bytes:
+def serialize_manifest(services: list[dict], elf_size: int) -> bytes:
     data_services = serialize_services(services)
     total_size = hdr.size + len(data_services)
     data_header = hdr.pack(
         MANIFEST_MAGIC,
         len(services),
         total_size,
+        elf_size,
     )
     data_mf = data_header + data_services
     return data_mf
@@ -103,8 +104,8 @@ def image(
     path_out: Path,
     services: list[dict],
 ) -> None:
-    data_mf = serialize_manifest(services)
     data_elf = path_elf.read_bytes()
+    data_mf = serialize_manifest(services=services, elf_size=len(data_elf))
     path_out.write_bytes(data_mf + data_elf)
 
 

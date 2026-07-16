@@ -151,6 +151,7 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
     uint32_t entries_num = 0;
     Elf64_Ehdr *header_payload = NULL;
     Elf64_Shdr *header_service_info = NULL;
+    uint64_t elf_payload_size = 0;
 
     if (service_manifest_check(header_manifest)) {
         TSLDR_DBG_PRINT(
@@ -180,6 +181,15 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
         return -1;
     }
 
+    elf_payload_size = header_manifest->elf_size;
+    if (elf_payload_size == 0) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Invalid elf size given for payload to be loaded\n"
+        );
+        return -1;
+    }
+
     header_service_info =
         (Elf64_Shdr *)tsldr_miscutil_find_section_from_elf((void *)(header_payload), (char *)(PC_SVC_DESC_SECTION_NAME));
 
@@ -193,6 +203,7 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
 
     info->header_payload = header_payload;
     info->header_service_info = header_service_info;
+    info->elf_payload_size = elf_payload_size;
     info->service_count = entries_num;
     info->service_entries = entries_start;
 

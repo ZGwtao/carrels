@@ -77,6 +77,7 @@ typedef struct __attribute__((packed)) {
     uint64_t magic;
     uint32_t service_count;
     uint32_t manifest_size;
+    uint64_t elf_size;
 } service_manifest_header_t;
 
 #define MANIFEST_MAGIC UINT64_C(0x504353564D414E31)
@@ -87,7 +88,7 @@ typedef struct __attribute__((packed)) {
     uint64_t size;
 } service_manifest_entry_t;
 
-_Static_assert(sizeof(service_manifest_header_t) == 16,
+_Static_assert(sizeof(service_manifest_header_t) == 24,
                "Invalid manifest header size");
 _Static_assert(sizeof(service_manifest_entry_t) == 20,
                "Invalid manifest entry size");
@@ -97,6 +98,7 @@ _Static_assert(sizeof(service_manifest_entry_t) == 20,
 typedef struct {
     Elf64_Ehdr *header_payload;
     Elf64_Shdr *header_service_info;
+    uint64_t elf_payload_size;
     uint32_t service_count;
     service_manifest_entry_t *service_entries;
 } payload_info_t;
