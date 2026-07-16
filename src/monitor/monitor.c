@@ -276,8 +276,7 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
 
     service_installer_apply(
         &plan,
-        msvcdb_base,
-        &monitor_svc_db.list[plan.pc_id]
+        (uintptr_t)(msvcdb_base)
     );
 
     protocon_start(&plan);

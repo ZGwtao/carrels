@@ -101,15 +101,8 @@ service_installer_apply_one(
 }
 
 
-void service_installer_apply(
-    const deploy_plan_t *plan,
-    uintptr_t monitor_svcdb_base,
-    const protocon_svcdb_t *svcdb
-) {
-
-    TSLDR_DBG_PRINT(LIB_NAME_MACRO "pd index of the given os svcdb: %d\n", svcdb->pd_idx);
-    TSLDR_DBG_PRINT(LIB_NAME_MACRO "number of svcs in the os svcdb: %d\n", svcdb->svc_num);
-
+void service_installer_apply(const deploy_plan_t *plan, uintptr_t monitor_svcdb_base)
+{
     // the request variable, which should be filled out with the low-level access rights information
     // we use it to record the access rights of the required OS services (i.e., svcs from above)
     // we will then send this thing to the trusted loading functions for actual trusted loading
@@ -117,30 +110,33 @@ void service_installer_apply(
     // so we put an information flow transition that turns requested OS services into low-level details
     tsldr_acrtreq_t req_acrt = {};
 
-    protocon_svc_req_t cursor;
-    const protocon_svc_t *svc_array = svcdb->array;
-    const uint8_t svc_num = svcdb->svc_num;
-    protocon_svc_t *curr_svc = NULL;
-
-    seL4_Word *svc_num_ptr = NULL;
-    unsigned char *svc_data_ptr = NULL;
-
-
-    tsldr_miscutil_memcpy(&cursor, plan->req, sizeof(cursor));
-
-    for (uint8_t i = 0; i < svc_num; ++i)
+    for (uint32_t i = 0;
+         i < plan->req->service_count;
+         ++i)
     {
-        curr_svc = &svc_array[i];
-        if (!service_installer_check_svc(curr_svc)) {
-            continue;
-        }
-        service_installer_apply_one(
-            curr_svc,
-            &cursor,
-            plan->pc_base
+        const protocon_svc_req_t *req = plan->req;
+        const protocon_svc_t *curr_svc =
+                        req->service_sources[i];
+
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "pc_base: %x, service vaddr: %x, datapath: %s\n",
+            (uintptr_t)(plan->pc_base),
+            (uintptr_t)(req->service_entries[i]->offset) + (uintptr_t)(req->payload_e_entry),
+            curr_svc->data_path
+        );
+
+
+        monitor_worker_func__patch_payload_by_ptr(
+            (void *)(plan->pc_base),
+            curr_svc->data_path,
+            (uintptr_t)(req->service_entries[i]->offset) + (uintptr_t)(req->payload_e_entry)
         );
         service_installer_append_acrtreq(&req_acrt, curr_svc);
     }
+
+    seL4_Word *svc_num_ptr = NULL;
+    unsigned char *svc_data_ptr = NULL;
 
     svc_num_ptr = (seL4_Word *)((char *)monitor_svcdb_base + 0x1000 * plan->pc_id);
     svc_data_ptr = (unsigned char*)(svc_num_ptr + 1);

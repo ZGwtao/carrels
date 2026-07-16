@@ -23,7 +23,7 @@ service_planner_can_satisfy_request(
 
 void
 service_planner_select_protocon(
-    const protocon_svc_req_t *req,
+    protocon_svc_req_t *req,
     deploy_plan_t *plan,
     const pc_state_t *protocon_states
 ) {
@@ -49,4 +49,24 @@ service_planner_select_protocon(
     }
 
     plan->req = req;
+
+    uint32_t cursor_service_num[SVC_TYPE_MAX_NUM];
+    uint32_t *avail_service_num = protocon_states[plan->pc_id].avail_service_per_type;
+
+    for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
+        cursor_service_num[i] = avail_service_num[i];
+    }
+
+    for (uint32_t i = 0; i < req->service_count; ++i) {
+        const protocon_svc_type_t type =
+                plan->req->service_entries[i]->type;
+        const protocon_svc_t **service_refs = 
+                protocon_states->avail_service_refs[type];
+        const uint32_t curr_service_index =
+                cursor_service_num[type] - 1;
+        const protocon_svc_t *service = service_refs[curr_service_index];
+
+        plan->req->service_sources[i] = service;
+    }
+
 }

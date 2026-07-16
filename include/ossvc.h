@@ -90,7 +90,8 @@ _Static_assert(sizeof(service_manifest_entry_t) == 20,
 typedef struct {
     uint32_t service_count;
     service_manifest_entry_t *service_entries[16];
-    protocon_svc_t *service_sources[16];
+    const protocon_svc_t *service_sources[16];
+    Elf64_Addr payload_e_entry;
 
     uint8_t num_svc_per_type[SVC_TYPE_MAX_NUM];
     seL4_Word data_per_svc_instance[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
@@ -207,13 +208,12 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 void service_installer_apply(
     const deploy_plan_t *plan,
-    uintptr_t monitor_svcdb_base,
-    const protocon_svcdb_t *svcdb
+    uintptr_t monitor_svcdb_base
 );
 
 
 void service_planner_select_protocon(
-    const protocon_svc_req_t *req,
+    protocon_svc_req_t *req,
     deploy_plan_t *plan,
     const pc_state_t *protocon_states
 );

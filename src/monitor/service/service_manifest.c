@@ -43,6 +43,7 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req)
             (unsigned long)entry->size
         );
     }
+    req->payload_e_entry = payload->header_payload->e_entry;
 }
 
 
