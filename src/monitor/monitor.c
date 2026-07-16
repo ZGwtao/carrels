@@ -20,23 +20,12 @@
 #include <tsldr_vm_layout.h>
 #include <monitor_vm_layout.h>
 
-// these memory regions are shared memory between
-//    -> the monitor (container monitor)
-//    -> the dynamic pds (protocon - proto containers)
-// the size of these memory regions are:
-//    -> PC_MONITOR_REGION_SIZE (for one dynamic pd)
-//
-#define PC_MONITOR_REGION_SIZE MONITOR_VM_LOADER_PROGRAM_SIZE
-#define PC_MONITOR_REGION_PROTOCON_ELF_BASE MONITOR_VM_LOADER_PROGRAM_BASE
-#define PC_MONITOR_REGION_TRAMPOLINE_ELF_BASE MONITOR_VM_TRAMPOLINE_IMAGE_BASE
-#define PC_MONITOR_REGION_CLIENT_PAYLOAD_BASE MONITOR_VM_CONTAINER_IMAGE_BASE
 
 // each elf file is of the same upper size limit
 #define ORC_MONITOR_REGION_SIZE (0x800000)
 // elf files from orchestrator as external files...
 // shared memory with the orchestrator PD
 #define ORC_MONITOR_REGION_PROTOCON_ELF_BASE (0x6000000)
-#define ORC_MONITOR_REGION_TRAMPOLINE_ELF_BASE (0x6800000)
 #define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
 
 uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
@@ -65,15 +54,6 @@ pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 #define SMALL_PAGE_SIZE     (0x1000)
 
-// this is the base address of the trusted loader context region for each dynamic PD (protocon)
-// this describes the information of all requested low-level access rights of a dynamic PD, which is the SUBSET of trusted loading metadata
-#define TSLDR_CONTEXT_BASE  MONITOR_VM_LOADER_CONTEXT_BASE
-#define TSLDR_CONTEXT_SIZE  MONITOR_VM_LOADER_CONTEXT_SIZE
-// this is the base address of the trusted loader metadata region for each dynamic PD (protocon)
-// the monitor PD will prepare the metadata for each dynamic PD in this region, and the dynamic PD will read the metadata from this region when it is loading
-// this describes the information of all low-level access rights of a dynamic PD, which will be used by the trusted loader to do the actual loading work
-#define TSLDR_METADATA_BASE MONITOR_VM_LOADER_METADATA_BASE
-#define TSLDR_METADATA_SIZE MONITOR_VM_LOADER_METADATA_SIZE
 
 seL4_Word pd_io_acl_rule = 0;
 
@@ -273,7 +253,7 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
 }
 
 
-void monitor_call_deploy_protocon_second_half(void)
+void monitor_call_deploy_second_half(void)
 {
     seL4_Error err = seL4_NoError;
     monitor_deploy_request_t *request = microkit_cothread_my_arg();
@@ -312,55 +292,43 @@ void monitor_call_deploy_protocon_second_half(void)
     monitor_finish_deploy_request();
 }
 
-seL4_MessageInfo_t monitor_call_deploy_protocon_first_half(seL4_Word num_req_pc)
-{
-    if (num_req_pc < MIN_REQ_PC_NUM || num_req_pc > MAX_REQ_PC_NUM) {
-        TSLDR_DBG_PRINT(
-            PROGNAME "Invalid requested PC count: %lu\n",
-            (unsigned long)num_req_pc
-        );
-        return microkit_msginfo_new(mon_InvalidReqPCNum, 0);
-    }
 
-    /*
-     * The orchestrator ELF buffers and deployment context are shared.
-     * Only one deployment request may be active at a time.
-     */
+static inline pc_monitor_Error
+monitor_reset_deploy_request(seL4_Word num_req_pc)
+{
     if (deploy_request_active) {
         TSLDR_DBG_PRINT(
             PROGNAME
             "Rejected deploy request: another deployment is still active\n"
         );
-        return microkit_msginfo_new(-1, 0);
+        return mon_FailToDeploy;
     }
-
-    TSLDR_DBG_PRINT(
-        PROGNAME "entry of monitor_call_deploy_protocon_first_half\n"
-    );
-
-    seL4_Word err;
-    tsldr_main_check_elf_integrity(
-        ORC_MONITOR_REGION_PROTOCON_ELF_BASE,
-        &err
-    );
-    if (err) {
-        TSLDR_DBG_PRINT(
-            PROGNAME "Integrity check failed for protocon elf\n"
-        );
-        monitor_main_notify_orchestrator();
-        return microkit_msginfo_new(err, 0);
-    }
-
     deploy_request.num_req_pc = (uint32_t)num_req_pc;
     req_pc_num = (uint32_t)num_req_pc;
     deploy_request_active = true;
+    return mon_NoError;
+}
 
-    TSLDR_DBG_PRINT(
-        PROGNAME "Integrity check passed for protocon elf\n"
-    );
 
+static inline pc_monitor_Error
+monitor_check_deploy_num(seL4_Word num_req_pc)
+{
+    if (num_req_pc < MIN_REQ_PC_NUM || num_req_pc > MAX_REQ_PC_NUM) {
+        TSLDR_DBG_PRINT(
+            PROGNAME "Invalid requested PC count: %d\n",
+            num_req_pc
+        );
+        return mon_InvalidReqPCNum;
+    }
+    return mon_NoError;
+}
+
+
+static inline pc_monitor_Error
+monitor_deploy_second_half(void)
+{
     if (microkit_cothread_spawn(
-            monitor_call_deploy_protocon_second_half,
+            monitor_call_deploy_second_half,
             &deploy_request
         ) == LIBMICROKITCO_NULL_HANDLE)
     {
@@ -369,11 +337,36 @@ seL4_MessageInfo_t monitor_call_deploy_protocon_first_half(seL4_Word num_req_pc)
             "cannot initialise monitor cothread for monitor call.\n"
         );
         monitor_finish_deploy_request();
-        return microkit_msginfo_new(mon_FailToInitCoroutine, 0);
+        return mon_FailToInitCoroutine;
+    }
+    return mon_NoError;
+}
+
+
+seL4_MessageInfo_t
+monitor_call_deploy_first_half(seL4_Word num_req_pc)
+{
+    pc_monitor_Error err = mon_NoError;
+
+    err = monitor_check_deploy_num(num_req_pc);
+    if (err != mon_NoError) {
+        goto fh_exit;
     }
 
+    err = monitor_reset_deploy_request(num_req_pc);
+    if (err != mon_NoError) {
+        goto fh_exit;
+    }
+
+    err = monitor_deploy_second_half();
+    if (err != mon_NoError) {
+        goto fh_exit;
+    }
+
+    /* let the filesystem coroutine execute */
     microkit_cothread_yield();
-    return microkit_msginfo_new(mon_NoError, 0);
+fh_exit:
+    return microkit_msginfo_new(err, 0);
 }
 
 
@@ -527,7 +520,7 @@ monitor_main_handle_pccall(microkit_channel ch)
     case PC_MONITOR_CALL_DEPLOY:
         TSLDR_DBG_PRINT(PROGNAME "Deploy an application to a dynamic PD\n");
         seL4_Word num_req_pc = microkit_mr_get(1);
-        ret = monitor_call_deploy_protocon_first_half(num_req_pc);
+        ret = monitor_call_deploy_first_half(num_req_pc);
         break;
     case PC_MONITOR_CALL_FLIP_ACL_RULE:
         pd_io_acl_rule = !pd_io_acl_rule;

@@ -29,6 +29,7 @@ typedef enum {
     mon_InvalidReqPCNum,
     mon_FailToInitCoroutine,
     mon_FailToInitStorage,
+    mon_FailToDeploy,
     mon_NoAvailPc,
 } pc_monitor_Error;
 
