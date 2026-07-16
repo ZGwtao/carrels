@@ -112,6 +112,7 @@ typedef struct {
     Elf64_Addr pc_entry;
     const protocon_svc_req_t *req;
     const protocon_svc_t *service_sources[16];
+    uintptr_t base_serialised_service;
 } deploy_plan_t;
 
 
@@ -133,6 +134,7 @@ void deploy_plan_reset(deploy_plan_t *p)
     p->pc_entry = 0x0;
     p->req = NULL;
     deploy_plan_memzero_services(p);
+    p->base_serialised_service = 0x0;
 }
 
 
@@ -215,10 +217,7 @@ void service_registry_create(const monitor_svcdb_t *svcdb_list, pc_state_t *prot
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 
-void service_installer_apply(
-    const deploy_plan_t *plan,
-    uintptr_t monitor_svcdb_base
-);
+void service_installer_apply(const deploy_plan_t *plan);
 
 
 void service_planner_select_protocon(

@@ -77,14 +77,6 @@ pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 seL4_Word pd_io_acl_rule = 0;
 
-// base of all shared os services metadata regions
-// the region is for all dynamic PDs, each dynamic PD has a piece between the monitor PD and the dynamic PD itself
-// we use it to store the information of OS services requested by the client program
-// we will encode the low-level access rights information of OS services requested
-// and put the serialised, encoded info into this region.
-// the dynamic PD can then read the OS svc information at high-level, while initialise the trusted loader
-// with the low-level information provided here...
-uintptr_t msvcdb_base = MONITOR_VM_OSSVC_METADATA_BASE;
 
 __attribute__((__section__(".monitor_svc_db"))) monitor_svcdb_t monitor_svc_db;
 
@@ -274,10 +266,7 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
 
     protocon_pre_instantiate(&plan, info);
 
-    service_installer_apply(
-        &plan,
-        (uintptr_t)(msvcdb_base)
-    );
+    service_installer_apply(&plan);
 
     protocon_start(&plan);
     return err;

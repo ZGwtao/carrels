@@ -2,6 +2,7 @@
 #include <ossvc.h>
 #include <protocon.h>
 #include <assert.h>
+#include <monitor_vm_layout.h>
 
 
 static inline bool
@@ -79,4 +80,10 @@ service_planner_select_protocon(
 
         assert(plan->service_sources[i] != NULL);
     }
+
+    plan->base_serialised_service =
+        monitor_vm_region_base(
+            &monitor_vm_layout.ossvc_metadata,
+            plan->pc_id
+        );
 }

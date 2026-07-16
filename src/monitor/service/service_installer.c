@@ -74,7 +74,7 @@ service_installer_append_acrtreq(tsldr_acrtreq_t *req_acrt, const protocon_svc_t
 }
 
 
-void service_installer_apply(const deploy_plan_t *plan, uintptr_t monitor_svcdb_base)
+void service_installer_apply(const deploy_plan_t *plan)
 {
     // the request variable, which should be filled out with the low-level access rights information
     // we use it to record the access rights of the required OS services (i.e., svcs from above)
@@ -111,7 +111,7 @@ void service_installer_apply(const deploy_plan_t *plan, uintptr_t monitor_svcdb_
     seL4_Word *svc_num_ptr = NULL;
     unsigned char *svc_data_ptr = NULL;
 
-    svc_num_ptr = (seL4_Word *)((char *)monitor_svcdb_base + 0x1000 * plan->pc_id);
+    svc_num_ptr = (seL4_Word *)(plan->base_serialised_service);
     svc_data_ptr = (unsigned char*)(svc_num_ptr + 1);
 
     *svc_num_ptr =
