@@ -1,6 +1,7 @@
 
 #include <ossvc.h>
 #include <protocon.h>
+#include <assert.h>
 
 
 static inline bool
@@ -59,14 +60,17 @@ service_planner_select_protocon(
 
     for (uint32_t i = 0; i < req->service_count; ++i) {
         const protocon_svc_type_t type =
-                plan->req->service_entries[i]->type;
-        const protocon_svc_t **service_refs = 
-                protocon_states->avail_service_refs[type];
+            req->service_entries[i]->type;
+
+        const pc_state_t *state =
+            &protocon_states[plan->pc_id];
+
         const uint32_t curr_service_index =
-                cursor_service_num[type] - 1;
-        const protocon_svc_t *service = service_refs[curr_service_index];
+            --cursor_service_num[type];
 
-        plan->req->service_sources[i] = service;
+        req->service_sources[i] =
+            state->avail_service_refs[type][curr_service_index];
+
+        assert(req->service_sources[i] != NULL);
     }
-
 }
