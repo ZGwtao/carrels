@@ -11,28 +11,6 @@ service_manifest_check_type(protocon_svc_type_t svc_type)
             (svc_type > SERVICE_DUMMY);
 }
 
-
-void service_manifest_parse(payload_info_t *info, protocon_svc_req_t *req)
-{
-    for (int i = 0; i < info->service_count; ++i) {
-        const service_manifest_entry_t *entry =
-                            &info->service_entries[i];
-        protocon_svc_type_t type = entry->type;
-        if (service_manifest_check_type(type) != true) {
-            TSLDR_DBG_PRINT(
-                "Unsupported service type: %d\n",
-                type
-            );
-            continue;
-        }
-        req->service_count_per_type[type] += 1;
-        req->service_entries[req->service_count] = entry;
-        req->service_count += 1;
-    }
-    req->payload_e_entry = info->header_payload->e_entry;
-}
-
-
 static inline seL4_Error
 service_manifest_check(service_manifest_header_t *header)
 {
@@ -73,7 +51,10 @@ service_manifest_retrieve_elf(service_manifest_header_t *header, uintptr_t base)
     return (uintptr_t)((unsigned char *)(base) + header->manifest_size);
 }
 
-seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
+/* ----------------  Public Below  ------------------- */
+
+seL4_Error
+service_manifest_header_parse(payload_info_t *info, uintptr_t base)
 {
     service_manifest_header_t *header_manifest = (service_manifest_header_t *)base;
     service_manifest_entry_t *entries_start = NULL;
@@ -125,3 +106,24 @@ seL4_Error payload_info_parse(payload_info_t *info, uintptr_t base)
 
     return seL4_NoError;
 }
+
+void service_manifest_parse(payload_info_t *info, protocon_svc_req_t *req)
+{
+    for (int i = 0; i < info->service_count; ++i) {
+        const service_manifest_entry_t *entry =
+                            &info->service_entries[i];
+        protocon_svc_type_t type = entry->type;
+        if (service_manifest_check_type(type) != true) {
+            TSLDR_DBG_PRINT(
+                "Unsupported service type: %d\n",
+                type
+            );
+            continue;
+        }
+        req->service_count_per_type[type] += 1;
+        req->service_entries[req->service_count] = entry;
+        req->service_count += 1;
+    }
+    req->payload_e_entry = info->header_payload->e_entry;
+}
+

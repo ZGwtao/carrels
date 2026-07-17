@@ -95,8 +95,8 @@ monitor_call_deploy_second_half(void)
         return;
     }
 
-    err = payload_info_parse(&payload_info,
-                             (__carrels_payload_start));
+    err = service_manifest_header_parse(&payload_info,
+                                        (__carrels_payload_start));
     if (err != seL4_NoError) {
         monitor_finish_deploy_request();
         return;
