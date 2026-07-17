@@ -23,6 +23,36 @@ service_planner_can_satisfy_request(
     return true;
 }
 
+
+static inline void
+service_planner_deploy_plan_init(
+    deploy_plan_t *plan,
+    const pc_state_t *state
+)
+{
+    assert(plan->req);
+    const protocon_svc_req_t *req = plan->req;
+    uint32_t cursor_service_num[SVC_TYPE_MAX_NUM];
+
+    for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
+        cursor_service_num[i] = state->avail_service_per_type[i];
+    }
+
+    for (uint32_t i = 0; i < req->service_count; ++i) {
+        const protocon_svc_type_t type =
+            req->service_entries[i]->type;
+
+        const uint32_t curr_service_index =
+            --cursor_service_num[type];
+
+        plan->service_sources[i] =
+            state->avail_service_refs[type][curr_service_index];
+
+        assert(plan->service_sources[i] != NULL);
+    }
+}
+
+
 void
 service_planner_select_protocon(
     const protocon_svc_req_t *req,
@@ -57,33 +87,13 @@ service_planner_select_protocon(
         return;
     }
     plan->req = req;
-
-    uint32_t cursor_service_num[SVC_TYPE_MAX_NUM];
-    uint32_t *avail_service_num = protocon_states[plan->pc_id].avail_service_per_type;
-
-    for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
-        cursor_service_num[i] = avail_service_num[i];
-    }
-
-    for (uint32_t i = 0; i < req->service_count; ++i) {
-        const protocon_svc_type_t type =
-            req->service_entries[i]->type;
-
-        const pc_state_t *state =
-            &protocon_states[plan->pc_id];
-
-        const uint32_t curr_service_index =
-            --cursor_service_num[type];
-
-        plan->service_sources[i] =
-            state->avail_service_refs[type][curr_service_index];
-
-        assert(plan->service_sources[i] != NULL);
-    }
-
     plan->base_serialised_service =
         monitor_vm_region_base(
             &monitor_vm_layout.ossvc_metadata,
             plan->pc_id
         );
+    service_planner_deploy_plan_init(
+        plan,
+        &protocon_states[plan->pc_id]
+    );
 }
