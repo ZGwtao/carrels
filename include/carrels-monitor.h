@@ -1,6 +1,9 @@
 #pragma once
 
 #include <libtrustedlo.h>
+#include <tsldr_vm_layout.h>
+#include <monitor_vm_layout.h>
+
 #include <carrels-services.h>
 #include <carrels-user.h>
 

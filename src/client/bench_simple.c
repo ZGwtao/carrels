@@ -8,7 +8,6 @@
 #include <lions/fs/helpers.h>
 
 #include <sddf/util/printf.h>
-#include <pc_config.h>
 #include <libtrustedlo.h>
 
 #define MONITOR_PPC_CHANNEL (15)

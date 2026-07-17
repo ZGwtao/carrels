@@ -1,20 +1,14 @@
 
-#include <microkit.h>
 #include <stdarg.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
-#include <libtrustedlo.h>
-
 #include <lions/fs/config.h>
 #include <pico_vfs.h>
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
-#include <pc_config.h>
 #include <forwarder.h>
 #include <pd_io_queue.h>
-#include <tsldr_vm_layout.h>
-#include <monitor_vm_layout.h>
 
 
 

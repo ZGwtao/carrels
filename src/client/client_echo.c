@@ -7,7 +7,6 @@
 #include <lions/fs/config.h>
 
 #include <sddf/util/printf.h>
-#include <pc_config.h>
 #include <libtrustedlo.h>
 #include <tsldr_vm_layout.h>
 

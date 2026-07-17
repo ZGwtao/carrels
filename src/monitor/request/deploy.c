@@ -2,8 +2,6 @@
 #include <assert.h>
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
-#include <monitor_vm_layout.h>
-#include <tsldr_vm_layout.h>
 
 
 uint32_t req_pc_num = 0;
