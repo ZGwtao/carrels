@@ -91,11 +91,15 @@ PC_BENCH_SIMPLE_OBJS := \
 	pc/client/early-init.o
 
 PC_MONITOR_OBJS := \
-	pc/monitor/monitor.o \
+	pc/monitor/entry.o \
+	pc/monitor/mcall.o \
 	pc/monitor/fault/fault.o \
 	pc/monitor/request/deploy.o \
 	pc/monitor/request/query.o \
 	pc/monitor/request/resume.o \
+	pc/monitor/request/stop.o \
+	pc/monitor/request/support.o \
+	pc/monitor/request/suspend.o \
 	pc/monitor/forwarder.o \
 	pc/monitor/service/service_installer.o \
 	pc/monitor/service/service_manifest.o \

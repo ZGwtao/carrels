@@ -34,10 +34,6 @@ typedef enum {
 } pc_monitor_Error;
 
 
-
-seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch);
-
-
 static inline void monitor_main_notify_orchestrator()
 {
     microkit_notify(PC_MONITOR_ORCHESTRATOR_CHANNEL);

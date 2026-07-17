@@ -1,9 +1,8 @@
 
 #include <assert.h>
-#include <ossvc.h>
+#include <mcall.h>
 #include <libtrustedlo.h>
 #include <libmicrokitco.h>
-#include <deploy.h>
 #include <payload.h>
 #include <monitor_vm_layout.h>
 #include <tsldr_vm_layout.h>

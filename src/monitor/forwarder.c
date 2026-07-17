@@ -2,7 +2,7 @@
 #include <sddf/util/printf.h>
 #include <ossvc.h>
 
-extern int pd_io_acl_rule;
+extern seL4_Word pd_io_acl_rule;
 
 static pd_io_link_t client_links[PD_IO_CLIENT_COUNT];
 
