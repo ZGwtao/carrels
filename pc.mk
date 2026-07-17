@@ -100,7 +100,7 @@ PC_MONITOR_OBJS := \
 	pc/monitor/request/stop.o \
 	pc/monitor/request/support.o \
 	pc/monitor/request/suspend.o \
-	pc/monitor/forwarder.o \
+	pc/monitor/io/forwarder.o \
 	pc/monitor/service/service_installer.o \
 	pc/monitor/service/service_manifest.o \
 	pc/monitor/service/service_planner.o \
@@ -173,7 +173,7 @@ vpath util/%.c $(PC_SRC_DIR)/src
 vpath monitor/%.c $(PC_SRC_DIR)/src
 vpath monitor/service/%.c $(PC_SRC_DIR)/src
 vpath monitor/fault/%.c $(PC_SRC_DIR)/src
-vpath monitor/lifecycle/%.c $(PC_SRC_DIR)/src
+vpath monitor/io/%.c $(PC_SRC_DIR)/src
 vpath monitor/request/%.c $(PC_SRC_DIR)/src
 vpath orchestrator/%.c $(PC_SRC_DIR)/src
 
