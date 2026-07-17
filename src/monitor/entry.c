@@ -8,15 +8,10 @@
 
 #include <lions/fs/config.h>
 #include <pico_vfs.h>
-#include <ossvc.h>
+#include <carrels-monitor.h>
 #include <libmicrokitco.h>
 #include <pc_config.h>
-#include <protocon.h>
-#include <monitor.h>
-#include <fault.h>
-#include <mcall.h>
 #include <forwarder.h>
-#include <payload.h>
 #include <pd_io_queue.h>
 #include <tsldr_vm_layout.h>
 #include <monitor_vm_layout.h>
@@ -107,7 +102,7 @@ monitor_main_init_system(void)
         "failed to spawn thread for storage initialisation.\n"
     );
 
-    monitor_deploy_refresh_request();
+    // monitor_deploy_refresh_request();
 
     monitor_init_all_client_links();
 }

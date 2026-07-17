@@ -1,10 +1,7 @@
 #pragma once
 
 #include <microkit.h>
-#include <monitor.h>
-
-
-#define ORC_MONITOR_REGION_SIZE (0x800000)
+#include <pcmcall/error.h>
 
 
 seL4_MessageInfo_t

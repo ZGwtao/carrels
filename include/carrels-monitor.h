@@ -1,16 +1,40 @@
 #pragma once
 
-#define SVC_TYPE_MAX_NUM (8)
-#define PC_CHILD_PER_MONITOR_MAX_NUM (16)
-#define SVC_PER_TYPE_MAX_NUM (8)
+#include <libtrustedlo.h>
+#include <carrels-services.h>
+#include <carrels-user.h>
+
+#include <monitor/mcall.h>
+#include <monitor/fault.h>
+#include <monitor/payload.h>
+
 
 #define PROGNAME "[@monitor] "
 
-#include <service/service-desc.h>
-#include <service/manifest.h>
-#include <service/registry.h>
+#define ORC_MONITOR_REGION_SIZE (0x800000)
 
-#include <libtrustedlo.h>
+
+
+// maximum 8 os services instances per OS service type
+#define PC_SVC_PER_PD_MAX_NUM (8)
+// maximum 8 os service types
+#define PC_SVC_TYPE_MAX_NUM (8)
+
+typedef int protocon_svc_type_t;
+enum {
+    SERVICE_DUMMY = -1,
+    SERVICE_FILE_SYSTEM = 0,
+    SERVICE_DEVICE_SERIAL,
+    SERVICE_DEVICE_ETHERNET,
+    SERVICE_DEVICE_TIMER,
+    SERVICE_DEVICE_I2C,
+    SERVICE_RESERVED,
+};
+_Static_assert(sizeof(protocon_svc_type_t) == sizeof(int),
+               "protocon_svc_type_t must be int");
+
+
+#define PC_CHILD_PER_MONITOR_MAX_NUM (16)
 
 typedef uint8_t protocon_lifecycle_state_t;
 enum {
@@ -136,6 +160,30 @@ protocon_state_memzero_context(uint32_t pc_id)
 #define SET_PROTOCON_AS_AVAILABLE(C) \
     do { protocon_state_set_lifecycle_state(C, PROTOCON_PASSIVE); } while (0);
 
+#define PC_MONITOR_ORCHESTRATOR_CHANNEL (15)
+#define PC_MONITOR_PROTOCON_BASE_CHANNEL (24)
+
+#ifndef PC_CHILD_PER_MONITOR_MAX_NUM
+#define PC_CHILD_PER_MONITOR_MAX_NUM (16)
+#endif
+
+#define INVALID_PC_ID (0xffc)
+
+static inline void monitor_main_notify_orchestrator()
+{
+    microkit_notify(PC_MONITOR_ORCHESTRATOR_CHANNEL);
+}
+
+static inline int
+monitor_main_get_cid_from_channel(microkit_channel ch)
+{
+    if (ch < PC_MONITOR_PROTOCON_BASE_CHANNEL ||
+        ch >= (PC_MONITOR_PROTOCON_BASE_CHANNEL + PC_CHILD_PER_MONITOR_MAX_NUM))
+    {
+        return (INVALID_PC_ID);
+    }
+    return ch - PC_MONITOR_PROTOCON_BASE_CHANNEL;
+}
 
 
 seL4_Error service_manifest_header_parse(payload_info_t *info, uintptr_t base);

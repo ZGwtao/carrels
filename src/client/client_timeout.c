@@ -7,7 +7,6 @@
 
 #include <sddf/util/printf.h>
 #include <pc_config.h>
-#include <protocon.h>
 #include <libtrustedlo.h>
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;

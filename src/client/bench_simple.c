@@ -9,7 +9,6 @@
 
 #include <sddf/util/printf.h>
 #include <pc_config.h>
-#include <protocon.h>
 #include <libtrustedlo.h>
 
 #define MONITOR_PPC_CHANNEL (15)

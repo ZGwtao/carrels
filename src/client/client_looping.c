@@ -8,7 +8,6 @@
 
 #include <sddf/util/printf.h>
 #include <pc_config.h>
-#include <protocon.h>
 #include <libtrustedlo.h>
 
 #include "pd_io_queue.h"
@@ -42,6 +41,8 @@ typedef struct {
     uint64_t _unused;
     bool avail;
 } neighbours_t;
+
+#define PC_CHILD_PER_MONITOR_MAX_NUM (16)
 
 neighbours_t neighbours[PC_CHILD_PER_MONITOR_MAX_NUM];
 sddf_channel timer_channel;

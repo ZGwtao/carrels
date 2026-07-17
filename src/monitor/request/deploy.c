@@ -1,9 +1,7 @@
 
 #include <assert.h>
-#include <mcall.h>
-#include <libtrustedlo.h>
+#include <carrels-monitor.h>
 #include <libmicrokitco.h>
-#include <payload.h>
 #include <monitor_vm_layout.h>
 #include <tsldr_vm_layout.h>
 
@@ -27,6 +25,21 @@ monitor_reset_deploy_request(seL4_Word num_req_pc)
     req_pc_num = (uint32_t)num_req_pc;
     deploy_request_active = true;
     return mon_NoError;
+}
+
+static inline void
+monitor_deploy_refresh_request(void)
+{
+    req_pc_num = 0;
+    deploy_request.num_req_pc = 0;
+    deploy_request_active = false;
+}
+
+static inline void
+monitor_finish_deploy_request(void)
+{
+    monitor_deploy_refresh_request();
+    monitor_main_notify_orchestrator();
 }
 
 
@@ -136,6 +149,63 @@ monitor_deploy_second_half(void)
 }
 
 
+static inline void
+protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
+{
+    uintptr_t dest =
+        monitor_vm_region_base(
+            &monitor_vm_layout.container_image,
+            plan->pc_id
+        );
+    plan->pc_base = dest;
+    assert(plan->pc_base != 0x0);
+
+    plan->pc_entry =
+        (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
+    assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
+
+    protocon_load_payload(
+        (uintptr_t)(plan->pc_base),
+        (uintptr_t)(payload->header_payload),
+        (uint64_t)(payload->elf_payload_size)
+    );
+}
+
+
+static inline void
+protocon_start(deploy_plan_t *plan)
+{
+    tsldr_main_monitor_init_mdinfo(
+        (tsldr_mdinfodb_t *)microkit_trusted_loading_info,
+        plan->pc_id,
+        (void *)monitor_vm_region_base(
+            &monitor_vm_layout.loader_metadata,
+            plan->pc_id
+        )
+    );
+
+    tsldr_miscutil_memcpy(
+        (char *)monitor_vm_region_base(
+            &monitor_vm_layout.loader_context,
+            plan->pc_id
+        ),
+        protocon_state_retrieve_context(plan->pc_id),
+        sizeof(tsldr_context_t)
+    );
+
+    tsldr_main_monitor_privilege_pd(plan->pc_id);
+
+    SET_PROTOCON_AS_INSTANTIATED(plan->pc_id)
+
+    microkit_pd_restart(plan->pc_id, plan->pc_entry);
+    TSLDR_DBG_PRINT(
+        PROGNAME
+        "Started child PD at entrypoint address: %x\n",
+        plan->pc_entry
+    );
+}
+
+
 seL4_MessageInfo_t
 monitor_call_deploy_first_half(seL4_Word num_req_pc)
 {
@@ -188,59 +258,3 @@ pc_monitor_Error protocon_deploy(payload_info_t *info)
     protocon_start(&plan);
     return err;
 }
-
-
-void protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
-{
-    uintptr_t dest =
-        monitor_vm_region_base(
-            &monitor_vm_layout.container_image,
-            plan->pc_id
-        );
-    plan->pc_base = dest;
-    assert(plan->pc_base != 0x0);
-
-    plan->pc_entry =
-        (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
-    assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
-
-    protocon_load_payload(
-        (uintptr_t)(plan->pc_base),
-        (uintptr_t)(payload->header_payload),
-        (uint64_t)(payload->elf_payload_size)
-    );
-}
-
-
-void protocon_start(deploy_plan_t *plan)
-{
-    tsldr_main_monitor_init_mdinfo(
-        (tsldr_mdinfodb_t *)microkit_trusted_loading_info,
-        plan->pc_id,
-        (void *)monitor_vm_region_base(
-            &monitor_vm_layout.loader_metadata,
-            plan->pc_id
-        )
-    );
-
-    tsldr_miscutil_memcpy(
-        (char *)monitor_vm_region_base(
-            &monitor_vm_layout.loader_context,
-            plan->pc_id
-        ),
-        protocon_state_retrieve_context(plan->pc_id),
-        sizeof(tsldr_context_t)
-    );
-
-    tsldr_main_monitor_privilege_pd(plan->pc_id);
-
-    SET_PROTOCON_AS_INSTANTIATED(plan->pc_id)
-
-    microkit_pd_restart(plan->pc_id, plan->pc_entry);
-    TSLDR_DBG_PRINT(
-        PROGNAME
-        "Started child PD at entrypoint address: %x\n",
-        plan->pc_entry
-    );
-}
-
