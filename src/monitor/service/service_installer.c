@@ -2,8 +2,6 @@
 #include <carrels-monitor.h>
 #include <libtrustedlo.h>
 
-#include <lions/fs/config.h>
-#include <pico_vfs.h>
 
 static inline void
 service_installer_payload_add_service(const void *elf_base, const char data_file[], uintptr_t vaddr)

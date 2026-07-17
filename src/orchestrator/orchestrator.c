@@ -15,7 +15,7 @@
 #include <libtrustedlo.h>
 #include <libmicrokitco.h>
 #include <lions/fs/config.h>
-#include <pico_vfs.h>
+#include <ioutils/pico_vfs.h>
 #include <carrels-user.h>
 #include <misc.h>
 

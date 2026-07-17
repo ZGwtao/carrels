@@ -9,7 +9,7 @@
 #include <sddf/util/printf.h>
 #include <libtrustedlo.h>
 
-#include "pd_io_queue.h"
+#include <ioutils/pd_io_queue.h>
 
 #define MONITOR_PPC_CHANNEL          15
 #define MONITOR_NOTIFICATION_CHANNEL 16

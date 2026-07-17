@@ -7,6 +7,9 @@
 #include <carrels-services.h>
 #include <carrels-user.h>
 
+#include <ioutils/pico_vfs.h>
+#include <ioutils/forwarder.h>
+
 #include <monitor/mcall.h>
 #include <monitor/fault.h>
 #include <monitor/payload.h>

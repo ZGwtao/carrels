@@ -1,7 +1,7 @@
 #pragma once
 
 #include <microkit.h>
-#include <pd_io_queue.h>
+#include <ioutils/pd_io_queue.h>
 
 
 #define PD_IO_CLIENT_COUNT              4u

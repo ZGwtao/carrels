@@ -10,7 +10,7 @@
 #include <libtrustedlo.h>
 #include <tsldr_vm_layout.h>
 
-#include "pd_io_queue.h"
+#include <ioutils/pd_io_queue.h>
 
 #define MONITOR_PPC_CHANNEL          15
 #define MONITOR_NOTIFICATION_CHANNEL 16

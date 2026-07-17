@@ -4,11 +4,8 @@
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 #include <lions/fs/config.h>
-#include <pico_vfs.h>
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
-#include <forwarder.h>
-#include <pd_io_queue.h>
 
 
 
