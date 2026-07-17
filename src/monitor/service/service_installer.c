@@ -6,7 +6,8 @@
 #include <lions/fs/config.h>
 #include <pico_vfs.h>
 
-void monitor_worker_func__patch_payload_by_ptr(const void *elf_base, const char data_file[], uintptr_t vaddr)
+static inline void
+service_installer_payload_add_service(const void *elf_base, const char data_file[], uintptr_t vaddr)
 {
     int err = 0;
     seL4_Word target_sh = tsldr_miscutil_fetch_elf_section_with_vaddr(elf_base, vaddr, NULL);
@@ -74,6 +75,31 @@ service_installer_append_acrtreq(tsldr_acrtreq_t *req_acrt, const protocon_svc_t
 }
 
 
+static inline void
+service_installer_initialise_AcRtReqHeader(
+    void *header_base,
+    const tsldr_acrtreq_t *req
+)
+{
+    tsldr_acrtreq_header_t *header = (tsldr_acrtreq_header_t *)(header_base);
+
+    header->total_num = 
+                req->num_req_notifications + \
+                req->num_req_ppcs + \
+                req->num_req_ioports + \
+                req->num_req_mappings + \
+                req->num_req_irqs;
+
+    header->serialised_offset = sizeof(tsldr_acrtreq_header_t);
+
+    tsldr_main_monitor_encode_required_rights(
+        (char *)(header_base) + header->serialised_offset,
+        req
+    );
+}
+
+
+
 void service_installer_apply(const deploy_plan_t *plan)
 {
     // the request variable, which should be filled out with the low-level access rights information
@@ -100,7 +126,7 @@ void service_installer_apply(const deploy_plan_t *plan)
         );
 
 
-        monitor_worker_func__patch_payload_by_ptr(
+        service_installer_payload_add_service(
             (void *)(plan->pc_base),
             curr_svc->data_path,
             (uintptr_t)(req->service_entries[i]->offset) + (uintptr_t)(req->payload_e_entry)
@@ -108,18 +134,8 @@ void service_installer_apply(const deploy_plan_t *plan)
         service_installer_append_acrtreq(&req_acrt, curr_svc);
     }
 
-    seL4_Word *svc_num_ptr = NULL;
-    unsigned char *svc_data_ptr = NULL;
-
-    svc_num_ptr = (seL4_Word *)(plan->base_serialised_service);
-    svc_data_ptr = (unsigned char*)(svc_num_ptr + 1);
-
-    *svc_num_ptr =
-            req_acrt.num_req_notifications + \
-            req_acrt.num_req_ppcs + \
-            req_acrt.num_req_ioports + \
-            req_acrt.num_req_mappings + \
-        req_acrt.num_req_irqs;
-
-    tsldr_main_monitor_encode_required_rights(svc_data_ptr, &req_acrt);
+    service_installer_initialise_AcRtReqHeader(
+        (char *)(plan->base_serialised_service),
+        &req_acrt
+    );
 }
