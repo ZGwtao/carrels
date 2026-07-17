@@ -211,6 +211,17 @@ protocon_state_memzero_context(uint32_t pc_id)
     );
 }
 
+
+#define SET_PROTOCON_AS_INSTANTIATED(C) \
+    do { protocon_state_set_lifecycle_state(C, PROTOCON_ACTIVE); } while (0);
+
+#define SET_PROTOCON_AS_HANG(C) \
+    do { protocon_state_set_lifecycle_state(C, PROTOCON_HANG); } while (0);
+
+#define SET_PROTOCON_AS_AVAILABLE(C) \
+    do { protocon_state_set_lifecycle_state(C, PROTOCON_PASSIVE); } while (0);
+
+
 void service_registry_create(const monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states);
 
 

@@ -92,7 +92,10 @@ PC_BENCH_SIMPLE_OBJS := \
 
 PC_MONITOR_OBJS := \
 	pc/monitor/monitor.o \
-	pc/monitor/fault.o \
+	pc/monitor/fault/fault.o \
+	pc/monitor/request/deploy.o \
+	pc/monitor/request/query.o \
+	pc/monitor/request/resume.o \
 	pc/monitor/forwarder.o \
 	pc/monitor/service/service_installer.o \
 	pc/monitor/service/service_manifest.o \
@@ -165,6 +168,9 @@ vpath client/%.c $(PC_SRC_DIR)/src
 vpath util/%.c $(PC_SRC_DIR)/src
 vpath monitor/%.c $(PC_SRC_DIR)/src
 vpath monitor/service/%.c $(PC_SRC_DIR)/src
+vpath monitor/fault/%.c $(PC_SRC_DIR)/src
+vpath monitor/lifecycle/%.c $(PC_SRC_DIR)/src
+vpath monitor/request/%.c $(PC_SRC_DIR)/src
 vpath orchestrator/%.c $(PC_SRC_DIR)/src
 
 pc/%.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS)
