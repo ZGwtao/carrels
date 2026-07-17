@@ -1,4 +1,3 @@
-
 #include <stdarg.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
@@ -6,8 +5,6 @@
 #include <lions/fs/config.h>
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
-
-
 
 __attribute__((__section__(".serial_client_config")))
 serial_client_config_t serial_config;
@@ -33,70 +30,10 @@ pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 #define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
 uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
 
-
 seL4_Word pd_io_acl_rule = 0;
-
 
 __attribute__((__section__(".monitor_svc_db")))
 monitor_svcdb_t monitor_svc_db;
-
-
-
-void monitor_main_init_storage(void)
-{
-    TSLDR_DBG_PRINT(PROGNAME "(fs mount) start fs initialisation\n");
-    fs_cmpl_t completion;
-    int err = fs_command_blocking(&completion, (fs_cmd_t){ .type = FS_CMD_INITIALISE });
-    if (err || completion.status != FS_STATUS_SUCCESS) {
-        TSLDR_DBG_PRINT(PROGNAME "Failed to mount\n");
-        microkit_internal_crash(-1);
-    }
-    TSLDR_DBG_PRINT(PROGNAME "(fs mount) finished fs initialisation\n");
-}
-
-
-static inline void
-monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
-{
-    if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
-        TSLDR_DBG_PRINT(err_msg);
-        while(1);
-    }
-    microkit_cothread_yield();
-}
-
-static inline void
-monitor_main_init_protocon_states(uint32_t pc_num)
-{
-    for (uint32_t i = 0; i < pc_num; ++i) {
-        protocon_states[i].pc_id = i;
-        protocon_state_memzero_services(i);
-        protocon_state_memzero_context(i);
-        SET_PROTOCON_AS_AVAILABLE(i);
-    }
-    service_registry_create(&monitor_svc_db, protocon_states);
-}
-
-static inline void
-monitor_main_init_system(void)
-{
-    /* init all protocon and states */
-    monitor_main_init_protocon_states(PC_CHILD_PER_MONITOR_MAX_NUM);
-
-    for (uint32_t i = 0; i < 4; ++i) {
-        monitor_main_load_trustedlo(i);
-    }
-
-    (void) monitor_main_cothread_spawn(
-        monitor_main_init_storage,
-        NULL,
-        "failed to spawn thread for storage initialisation.\n"
-    );
-
-    // monitor_deploy_refresh_request();
-
-    monitor_init_all_client_links();
-}
 
 
 void init(void)
