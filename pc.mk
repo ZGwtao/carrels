@@ -43,6 +43,7 @@ BM_UK_MAKE_ARGS := \
 	UK_ROOT=$(BM_UNIKRAFT_DIR) \
 	UK_APP=$(BM_UK_APP_DIR) \
 	UK_BUILD=$(BM_UK_BUILD_DIR) \
+	LIONSOS=$(LIONSOS) \
 	SDDF=$(SDDF) \
 	LIBMICROKITCO_PATH=$(LIBMICROKITCO_PATH) \
 	LIBTRUSTEDLO_PATH=$(PC_LIBTRUSTEDLO_DIR) \
@@ -274,3 +275,47 @@ unikraft.img: unikraft.elf $(PC_UNIKRAFT_MANIFEST) \
 		-o $@
 
 -include $(PC_OBJS:.o=.d)
+
+
+DOCKER_IMAGE ?= template-pd-manifest-env:local
+CARRELS_DIR := $(CURDIR)
+
+.PHONY: docker-env
+docker-env:
+	@docker image inspect "$(DOCKER_IMAGE)" >/dev/null 2>&1 || { \
+		echo "Docker image not found: $(DOCKER_IMAGE)"; \
+		echo "Build it from template-pd-manifest first."; \
+		exit 1; \
+	}
+
+.PHONY: docker-run
+docker-run: docker-env
+	docker run --rm -it \
+		--user "$$(id -u):$$(id -g)" \
+		-e HOME=/tmp/carrels-home \
+		-v "$(CARRELS_DIR):$(CARRELS_DIR)" \
+		-w "$(CARRELS_DIR)" \
+		"$(DOCKER_IMAGE)" \
+		/bin/bash
+
+.PHONY: docker-check
+docker-check: docker-env
+	docker run --rm \
+		--user "$$(id -u):$$(id -g)" \
+		-e HOME=/tmp/carrels-home \
+		-v "$(CARRELS_DIR):$(CARRELS_DIR)" \
+		-w "$(CARRELS_DIR)" \
+		"$(DOCKER_IMAGE)" \
+		/bin/bash -c '\
+			set -eu; \
+			echo "PWD=$$PWD"; \
+			echo "MICROKIT_SDK=$$MICROKIT_SDK"; \
+			echo "LIONSOS=$$LIONSOS"; \
+			python --version; \
+			python -c "import sdfgen"; \
+			python -c "from elftools.elf.elffile import ELFFile"; \
+			command -v lex; \
+			test -d "$$MICROKIT_SDK"; \
+			test -d "$$LIONSOS"; \
+			echo "carrels environment check passed" \
+		'
