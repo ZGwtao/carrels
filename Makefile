@@ -17,6 +17,7 @@ DOCKER_RUN := docker run --rm -it \
 .PHONY: help
 help:
 	@echo "Available targets:"
+	@echo "  make init           Initialise all git submodules"
 	@echo "  make image          Pull the environment image from GHCR"
 	@echo "  make shell          Open an ephemeral development shell"
 	@echo "  make dev            Open/reuse a persistent container for dev"
@@ -27,6 +28,7 @@ help:
 	@echo "  make dev-reset      Remove the persistent container"
 	@echo "  make clean          Remove the build directories"
 
+.PHONY: init
 init:
 	git submodule update --init --recursive
 
@@ -37,11 +39,11 @@ image:
 	docker tag $(REMOTE_IMAGE) $(IMAGE)
 
 .PHONY: shell
-shell: init
+shell:
 	$(DOCKER_RUN) /bin/bash
 
 .PHONY: dev
-dev: init
+dev:
 	@if docker container inspect $(CONTAINER_NAME) >/dev/null 2>&1; then \
 		docker start --attach --interactive $(CONTAINER_NAME); \
 	else \
@@ -73,7 +75,7 @@ check:
 		'
 
 .PHONY: build
-build: init
+build:
 	$(DOCKER_RUN) \
 		/bin/bash -lc '$(MAKE) -C examples/simple'
 
@@ -87,14 +89,15 @@ dev-reset:
 
 .PHONY: clean
 clean:
-	rm -rf examples/simple/build
+	$(DOCKER_RUN) \
+		/bin/bash -lc 'rm -rf examples/simple/build'
 
 .PHONY: qemu
-qemu: init
+qemu:
 	$(DOCKER_RUN) \
 		/bin/bash -lc '$(MAKE) -C examples/simple qemu'
 
 .PHONY: qemu-clean
-qemu-clean: init
+qemu-clean:
 	$(DOCKER_RUN) \
 		/bin/bash -lc 'rm -rf examples/simple/build; $(MAKE) -C examples/simple qemu'
