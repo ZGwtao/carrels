@@ -57,7 +57,11 @@ def load_vm_layout(path: str, module_name: str) -> dict[str, dict[str, int]]:
             raise ValueError(
                 f"VM_REGIONS[{index}] is missing {error.args[0]!r}"
             ) from error
-        if not isinstance(name, str) or not isinstance(base, int) or not isinstance(size, int):
+        if (
+            not isinstance(name, str)
+            or not isinstance(base, int)
+            or not isinstance(size, int)
+        ):
             raise TypeError(
                 f"VM_REGIONS[{index}] must contain string name and integer base/size"
             )
@@ -94,14 +98,30 @@ def connect_protocon_with_monitor(
 ):
     name_prefix = monitor.name + "/" + pc.name + "/"
 
-    container_elf = MemoryRegion(sdf, name_prefix + "container/elf", vm_region("CONTAINER_IMAGE")["size"])
-    trampoline_elf = MemoryRegion(sdf, name_prefix + "trampoline/elf", vm_region("TRAMPOLINE_IMAGE")["size"])
-    trampoline_exec = MemoryRegion(sdf, name_prefix + "trampoline/exec", vm_region("TRAMPOLINE_PROGRAM")["size"])
-    tsldr_exec = MemoryRegion(sdf, name_prefix + "tsldr/exec", vm_region("LOADER_PROGRAM")["size"])
-    tsldr_data = MemoryRegion(sdf, name_prefix + "tsldr/data", vm_region("LOADER_METADATA")["size"])
-    ossvc_data = MemoryRegion(sdf, name_prefix + "ossvc/data", vm_region("OSSVC_METADATA")["size"])
-    tsldr_context = MemoryRegion(sdf, name_prefix + "tsldr/context", vm_region("LOADER_CONTEXT")["size"])
-    trampoline_args = MemoryRegion(sdf, name_prefix + "tsldr/trampoline/args", vm_region("TRAMPOLINE_ARGS")["size"])
+    container_elf = MemoryRegion(
+        sdf, name_prefix + "container/elf", vm_region("CONTAINER_IMAGE")["size"]
+    )
+    trampoline_elf = MemoryRegion(
+        sdf, name_prefix + "trampoline/elf", vm_region("TRAMPOLINE_IMAGE")["size"]
+    )
+    trampoline_exec = MemoryRegion(
+        sdf, name_prefix + "trampoline/exec", vm_region("TRAMPOLINE_PROGRAM")["size"]
+    )
+    tsldr_exec = MemoryRegion(
+        sdf, name_prefix + "tsldr/exec", vm_region("LOADER_PROGRAM")["size"]
+    )
+    tsldr_data = MemoryRegion(
+        sdf, name_prefix + "tsldr/data", vm_region("LOADER_METADATA")["size"]
+    )
+    ossvc_data = MemoryRegion(
+        sdf, name_prefix + "ossvc/data", vm_region("OSSVC_METADATA")["size"]
+    )
+    tsldr_context = MemoryRegion(
+        sdf, name_prefix + "tsldr/context", vm_region("LOADER_CONTEXT")["size"]
+    )
+    trampoline_args = MemoryRegion(
+        sdf, name_prefix + "tsldr/trampoline/args", vm_region("TRAMPOLINE_ARGS")["size"]
+    )
 
     sdf.add_mr(container_elf)
     sdf.add_mr(trampoline_elf)
@@ -112,33 +132,143 @@ def connect_protocon_with_monitor(
     sdf.add_mr(tsldr_context)
     sdf.add_mr(trampoline_args)
 
-    monitor.add_map(Map(tsldr_context, monitor_region_base("LOADER_CONTEXT", cid), perms="rw", cached="true"))
-    monitor.add_map(Map(ossvc_data, monitor_region_base("OSSVC_METADATA", cid), perms="rw", cached="true"))
-    monitor.add_map(Map(tsldr_data, monitor_region_base("LOADER_METADATA", cid), perms="rw", cached="true"))
-    monitor.add_map(Map(tsldr_exec, monitor_region_base("LOADER_PROGRAM", cid), perms="rw", cached="true"))
-    monitor.add_map(Map(trampoline_elf, monitor_region_base("TRAMPOLINE_IMAGE", cid), perms="rw", cached="true"))
-    monitor.add_map(Map(container_elf, monitor_region_base("CONTAINER_IMAGE", cid), perms="rw", cached="true"))
+    monitor.add_map(
+        Map(
+            tsldr_context,
+            monitor_region_base("LOADER_CONTEXT", cid),
+            perms="rw",
+            cached="true",
+        )
+    )
+    monitor.add_map(
+        Map(
+            ossvc_data,
+            monitor_region_base("OSSVC_METADATA", cid),
+            perms="rw",
+            cached="true",
+        )
+    )
+    monitor.add_map(
+        Map(
+            tsldr_data,
+            monitor_region_base("LOADER_METADATA", cid),
+            perms="rw",
+            cached="true",
+        )
+    )
+    monitor.add_map(
+        Map(
+            tsldr_exec,
+            monitor_region_base("LOADER_PROGRAM", cid),
+            perms="rw",
+            cached="true",
+        )
+    )
+    monitor.add_map(
+        Map(
+            trampoline_elf,
+            monitor_region_base("TRAMPOLINE_IMAGE", cid),
+            perms="rw",
+            cached="true",
+        )
+    )
+    monitor.add_map(
+        Map(
+            container_elf,
+            monitor_region_base("CONTAINER_IMAGE", cid),
+            perms="rw",
+            cached="true",
+        )
+    )
 
-    pc.add_map(Map(tsldr_exec, vm_region("LOADER_PROGRAM")["base"], perms="rwx", cached="true"))
-    pc.add_map(Map(tsldr_data, vm_region("LOADER_METADATA")["base"], perms="rw", cached="true"))
-    pc.add_map(Map(ossvc_data, vm_region("OSSVC_METADATA")["base"], perms="rw", cached="true"))
-    pc.add_map(Map(trampoline_args, vm_region("TRAMPOLINE_ARGS")["base"], perms="rw", cached="true"))
-    pc.add_map(Map(tsldr_context, vm_region("LOADER_CONTEXT")["base"], perms="rw", cached="true"))
-    pc.add_map(Map(trampoline_elf, vm_region("TRAMPOLINE_IMAGE")["base"], perms="rwx", cached="true"))
-    pc.add_map(Map(trampoline_exec, vm_region("TRAMPOLINE_PROGRAM")["base"], perms="rwx", cached="true"))
-    pc.add_map(Map(container_elf, vm_region("CONTAINER_IMAGE")["base"], perms="rw", cached="true"))
+    pc.add_map(
+        Map(tsldr_exec, vm_region("LOADER_PROGRAM")["base"], perms="rwx", cached="true")
+    )
+    pc.add_map(
+        Map(tsldr_data, vm_region("LOADER_METADATA")["base"], perms="rw", cached="true")
+    )
+    pc.add_map(
+        Map(ossvc_data, vm_region("OSSVC_METADATA")["base"], perms="rw", cached="true")
+    )
+    pc.add_map(
+        Map(
+            trampoline_args,
+            vm_region("TRAMPOLINE_ARGS")["base"],
+            perms="rw",
+            cached="true",
+        )
+    )
+    pc.add_map(
+        Map(
+            tsldr_context,
+            vm_region("LOADER_CONTEXT")["base"],
+            perms="rw",
+            cached="true",
+        )
+    )
+    pc.add_map(
+        Map(
+            trampoline_elf,
+            vm_region("TRAMPOLINE_IMAGE")["base"],
+            perms="rwx",
+            cached="true",
+        )
+    )
+    pc.add_map(
+        Map(
+            trampoline_exec,
+            vm_region("TRAMPOLINE_PROGRAM")["base"],
+            perms="rwx",
+            cached="true",
+        )
+    )
+    pc.add_map(
+        Map(
+            container_elf,
+            vm_region("CONTAINER_IMAGE")["base"],
+            perms="rw",
+            cached="true",
+        )
+    )
 
-    trampoline_stack = MemoryRegion(sdf, name_prefix + "trampoline/stack", vm_region("TRAMPOLINE_STACK")["size"])
-    container_stack = MemoryRegion(sdf, name_prefix + "container/stack", vm_region("CONTAINER_STACK")["size"])
-    container_exec = MemoryRegion(sdf, name_prefix + "container/exec", vm_region("CONTAINER_PROGRAM")["size"])
+    trampoline_stack = MemoryRegion(
+        sdf, name_prefix + "trampoline/stack", vm_region("TRAMPOLINE_STACK")["size"]
+    )
+    container_stack = MemoryRegion(
+        sdf, name_prefix + "container/stack", vm_region("CONTAINER_STACK")["size"]
+    )
+    container_exec = MemoryRegion(
+        sdf, name_prefix + "container/exec", vm_region("CONTAINER_PROGRAM")["size"]
+    )
 
     sdf.add_mr(trampoline_stack)
     sdf.add_mr(container_stack)
     sdf.add_mr(container_exec)
 
-    pc.add_map(Map(trampoline_stack, vm_region("TRAMPOLINE_STACK")["base"], perms="rw", cached="true"))
-    pc.add_map(Map(container_stack, vm_region("CONTAINER_STACK")["base"], perms="rw", cached="true"))
-    pc.add_map(Map(container_exec, vm_region("CONTAINER_PROGRAM")["base"], perms="rwx", cached="true"))
+    pc.add_map(
+        Map(
+            trampoline_stack,
+            vm_region("TRAMPOLINE_STACK")["base"],
+            perms="rw",
+            cached="true",
+        )
+    )
+    pc.add_map(
+        Map(
+            container_stack,
+            vm_region("CONTAINER_STACK")["base"],
+            perms="rw",
+            cached="true",
+        )
+    )
+    pc.add_map(
+        Map(
+            container_exec,
+            vm_region("CONTAINER_PROGRAM")["base"],
+            perms="rwx",
+            cached="true",
+        )
+    )
 
     sdf.add_channel(Channel(a=monitor, b=pc, a_id=(24 + cid), b_id=15, pp_b=True))
     sdf.add_channel(Channel(a=monitor, b=pc, a_id=(40 + cid), b_id=16))
@@ -216,19 +346,22 @@ def connect_protocon_with_monitor(
             cached="false",
         )
     )
-    
-    uk_boot_stack = MemoryRegion(sdf, name_prefix + "uk_boot_stack", (0x1000 * (1 << 4)))
+
+    uk_boot_stack = MemoryRegion(
+        sdf, name_prefix + "uk_boot_stack", (0x1000 * (1 << 4))
+    )
     uk_boot_heap = MemoryRegion(sdf, name_prefix + "uk_boot_heap", (0x1000 * (1 << 10)))
 
     sdf.add_mr(uk_boot_stack)
     sdf.add_mr(uk_boot_heap)
 
-    pc.add_map(Map(uk_boot_stack, 0xff008000, perms="rw", cached="true"))
-    pc.add_map(Map(uk_boot_heap, 0xff018000, perms="rw", cached="true"))
+    pc.add_map(Map(uk_boot_stack, 0xFF008000, perms="rw", cached="true"))
+    pc.add_map(Map(uk_boot_heap, 0xFF018000, perms="rw", cached="true"))
+
 
 def connect_orchestrator_with_monitor(
     monitor: SystemDescription.ProtectionDomain,
-    orchestrator: SystemDescription.ProtectionDomain
+    orchestrator: SystemDescription.ProtectionDomain,
 ):
     name_prefix = monitor.name + "/" + orchestrator.name + "/"
 
@@ -347,7 +480,9 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     connect_protocon_with_monitor(pd_monitor, protocon2, 2)
     connect_protocon_with_monitor(pd_monitor, protocon3, 3)
 
-    pd_fs_orchestrator = ProtectionDomain("orchestrator_fs", "orchestrator_fs.elf", priority=96)
+    pd_fs_orchestrator = ProtectionDomain(
+        "orchestrator_fs", "orchestrator_fs.elf", priority=96
+    )
     pd_fs_monitor = ProtectionDomain("monitor_fs", "monitor_fs.elf", priority=96)
     pd_fs_sp0 = ProtectionDomain("protocon0_fs", "protocon0_fs.elf", priority=96)
     pd_fs_sp1 = ProtectionDomain("protocon1_fs", "protocon1_fs.elf", priority=96)
@@ -419,26 +554,18 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         "orchestrator_fs.elf", "fs_server_config", "fs_server_orchestrator_fs"
     )
 
-    update_elf_section(
-        "monitor_fs.elf", "blk_client_config", "blk_client_monitor_fs"
-    )
-    update_elf_section(
-        "monitor_fs.elf", "fs_server_config", "fs_server_monitor_fs"
-    )
+    update_elf_section("monitor_fs.elf", "blk_client_config", "blk_client_monitor_fs")
+    update_elf_section("monitor_fs.elf", "fs_server_config", "fs_server_monitor_fs")
 
     update_elf_section(
         "protocon0_fs.elf", "blk_client_config", "blk_client_protocon0_fs"
     )
-    update_elf_section(
-        "protocon0_fs.elf", "fs_server_config", "fs_server_protocon0_fs"
-    )
+    update_elf_section("protocon0_fs.elf", "fs_server_config", "fs_server_protocon0_fs")
 
     update_elf_section(
         "protocon1_fs.elf", "blk_client_config", "blk_client_protocon1_fs"
     )
-    update_elf_section(
-        "protocon1_fs.elf", "fs_server_config", "fs_server_protocon1_fs"
-    )
+    update_elf_section("protocon1_fs.elf", "fs_server_config", "fs_server_protocon1_fs")
 
     with open(f"{output_dir}/{sdf_path}", "w+") as f:
         f.write(sdf.render())
@@ -471,9 +598,7 @@ if __name__ == "__main__":
     vm_layout = load_vm_layout(args.vm_layout, "libtrustedlo_vm_layout")
 
     global monitor_vm_layout
-    monitor_vm_layout = load_vm_layout(
-        args.monitor_vm_layout, "monitor_vm_layout"
-    )
+    monitor_vm_layout = load_vm_layout(args.monitor_vm_layout, "monitor_vm_layout")
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
