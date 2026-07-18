@@ -1,10 +1,11 @@
 
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
+#include <assert.h>
 
 
 static inline void
-monitor_main_init_storage(void)
+ca_monitor_init_storage(void)
 {
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) start fs initialisation\n");
     fs_cmpl_t completion;
@@ -18,7 +19,7 @@ monitor_main_init_storage(void)
 
 
 static inline void
-monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
+ca_monitor_init_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
 {
     if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(err_msg);
@@ -27,34 +28,80 @@ monitor_main_cothread_spawn(const client_entry_t client_entry, void *arg, char e
     microkit_cothread_yield();
 }
 
-static inline void
-monitor_main_init_protocon_states(uint32_t pc_num)
+static inline pc_monitor_Error
+ca_monitor_init_validate_pc_count(size_t pc_count)
 {
-    for (uint32_t i = 0; i < pc_num; ++i) {
+    if (pc_count > PC_CHILD_PER_MONITOR_MAX_NUM) {
+        return mon_InvalidReqPCNum;
+    }
+
+    TSLDR_DBG_PRINT(
+        PROGNAME
+        "Number of available PCs recorded from svcdb: %d\n",
+        pc_count
+    );
+    return mon_NoError;
+}
+
+
+static inline void
+ca_monitor_init_get_pcnum(const monitor_svcdb_t *svcdb_list, ca_monitor_bootinfo_t *info)
+{
+    uint64_t n = svcdb_list->len;
+    if (ca_monitor_init_validate_pc_count(n) != mon_NoError) {
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "Invalid PC count: %d; maximum supported count is %d\n",
+            n,
+            (PC_CHILD_PER_MONITOR_MAX_NUM)
+        );
+        while(mon_InvalidReqPCNum);
+    }
+    info->num_pc = n;
+    assert(info->num_pc <= PC_CHILD_PER_MONITOR_MAX_NUM);
+}
+
+
+static inline void
+ca_monitor_init_protocon_states(uint64_t pc_num)
+{
+    for (uint64_t i = 0; i < pc_num; ++i) {
         protocon_states[i].pc_id = i;
         protocon_state_memzero_services(i);
         protocon_state_memzero_context(i);
+        monitor_main_load_trustedlo(i);
         SET_PROTOCON_AS_AVAILABLE(i);
     }
-    service_registry_create(&monitor_svc_db, protocon_states);
+
+    service_registry_create(
+        &monitor_svc_db,
+        protocon_states,
+        pc_num
+    );
 }
 
-void monitor_main_init_system(void)
+
+/* ----------------  Public Below  ------------------- */
+
+void
+ca_monitor_init_system(void *binfo)
 {
+    assert(binfo);
+    ca_monitor_bootinfo_t *bootinfo =
+                    (ca_monitor_bootinfo_t *)(binfo);
+
+    ca_monitor_init_get_pcnum(&monitor_svc_db, bootinfo);
+
     /* init all protocon and states */
-    monitor_main_init_protocon_states(PC_CHILD_PER_MONITOR_MAX_NUM);
+    ca_monitor_init_protocon_states(bootinfo->num_pc);
 
-    for (uint32_t i = 0; i < 4; ++i) {
-        monitor_main_load_trustedlo(i);
-    }
-
-    (void) monitor_main_cothread_spawn(
-        monitor_main_init_storage,
+    (void) ca_monitor_init_cothread_spawn(
+        ca_monitor_init_storage,
         NULL,
         "failed to spawn thread for storage initialisation.\n"
     );
 
     // monitor_deploy_refresh_request();
 
-    monitor_init_all_client_links();
+    monitor_init_all_client_links(bootinfo->num_pc);
 }

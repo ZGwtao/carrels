@@ -24,7 +24,7 @@ static char monitor_costack1[0x10000];
 static char monitor_costack2[0x10000];
 static void blocking_wait(microkit_channel ch) { microkit_cothread_wait_on_channel(ch); }
 
-
+ca_monitor_bootinfo_t ca_bootinfo;
 pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 #define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
@@ -62,7 +62,7 @@ void init(void)
     stack_ptrs_arg_array_t costacks = { (uintptr_t) monitor_costack1, (uintptr_t) monitor_costack2 };
     microkit_cothread_init(&co_controller_mem, 0x10000, costacks);
 
-    monitor_main_init_system();
+    ca_monitor_init_system(&ca_bootinfo);
 }
 
 seL4_MessageInfo_t

@@ -5,4 +5,4 @@
 extern monitor_svcdb_t monitor_svc_db;
 
 
-void monitor_main_init_system(void);
+void ca_monitor_init_system(void *binfo);

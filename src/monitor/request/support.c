@@ -6,7 +6,7 @@
 seL4_MessageInfo_t
 monitor_call_backup_protocon_loading_context(microkit_channel ch)
 {
-    int cid = monitor_main_get_cid_from_channel(ch);
+    int cid = monitor_get_pcid_from_ch(ch);
 
     tsldr_context_t *context = \
         (tsldr_context_t *)monitor_vm_region_base(&monitor_vm_layout.loader_context, cid);

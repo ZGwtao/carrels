@@ -21,7 +21,7 @@
 #define PD_IO_CLIENT_RX_DATA_OFFSET     0x10C000u
 
 
-void monitor_init_all_client_links(void);
+void monitor_init_all_client_links(uint64_t pc_num);
 
 
 void monitor_handle_client_payload(uint32_t sender_cid);

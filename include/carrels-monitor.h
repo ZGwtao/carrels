@@ -84,6 +84,14 @@ void deploy_plan_reset(deploy_plan_t *p)
 }
 
 
+typedef struct {
+
+    uint64_t num_pc;
+
+} ca_monitor_bootinfo_t;
+
+extern ca_monitor_bootinfo_t ca_bootinfo;
+
 typedef struct pc_state {
     uint32_t pc_id;
     tsldr_context_t context;
@@ -182,7 +190,7 @@ static inline void monitor_main_notify_orchestrator()
 }
 
 static inline int
-monitor_main_get_cid_from_channel(microkit_channel ch)
+monitor_get_pcid_from_ch(microkit_channel ch)
 {
     if (ch < PC_MONITOR_PROTOCON_BASE_CHANNEL ||
         ch >= (PC_MONITOR_PROTOCON_BASE_CHANNEL + PC_CHILD_PER_MONITOR_MAX_NUM))
@@ -200,7 +208,7 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 
 
-void service_registry_create(const monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states);
+void service_registry_create(const monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states, uint64_t pc_num);
 
 
 void service_planner_select_protocon(

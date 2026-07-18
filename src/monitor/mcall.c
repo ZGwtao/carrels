@@ -21,7 +21,7 @@ monitor_main_handle_pccall(microkit_channel ch)
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
     case PC_MONITOR_CALL_BACKUP_CONTEXT:
-        TSLDR_DBG_PRINT(PROGNAME "Backing up trusted loading context for dynamic PD with ID: %d\n", monitor_main_get_cid_from_channel(ch));
+        TSLDR_DBG_PRINT(PROGNAME "Backing up trusted loading context for dynamic PD with ID: %d\n", monitor_get_pcid_from_ch(ch));
         ret = monitor_call_backup_protocon_loading_context(ch);
         break;
     case PC_MONITOR_CALL_TERMINATE:
@@ -51,7 +51,7 @@ monitor_main_handle_pccall(microkit_channel ch)
     case PC_MONITOR_CALL_TERMINATE_EXT: {
         seL4_Word target_pd_id = seL4_GetMR(1);
         if (ch >= 24) {
-            target_pd_id = monitor_main_get_cid_from_channel(ch);
+            target_pd_id = monitor_get_pcid_from_ch(ch);
         }
         TSLDR_DBG_PRINT(PROGNAME "Terminate dynamic PD with ID: %d\n", target_pd_id);
         ret = monitor_call_stop_and_restore_protocon(target_pd_id);

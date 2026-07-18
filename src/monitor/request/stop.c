@@ -16,7 +16,7 @@ seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch)
 
 seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch)
 {
-    int cid = monitor_main_get_cid_from_channel(ch);
+    int cid = monitor_get_pcid_from_ch(ch);
     if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", ch);
     } else {

@@ -57,9 +57,9 @@ static void monitor_init_client_link(uint32_t cid)
     }
 }
 
-void monitor_init_all_client_links(void)
+void monitor_init_all_client_links(uint64_t pc_num)
 {
-    for (uint32_t cid = 0; cid < PD_IO_CLIENT_COUNT; cid++) {
+    for (uint32_t cid = 0; cid < pc_num; cid++) {
         monitor_init_client_link(cid);
     }
 }

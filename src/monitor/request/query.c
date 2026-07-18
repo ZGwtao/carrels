@@ -52,7 +52,7 @@ monitor_call_query_protocons(microkit_channel ch)
     // FIXME: should not hardcode the number of pc to list
     monitor_main_list_protocon_states(4);
 
-    seL4_Word self_id = monitor_main_get_cid_from_channel(ch);
+    seL4_Word self_id = monitor_get_pcid_from_ch(ch);
     seL4_Word bitmap = 0;
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
         if ((protocon_state_check_lifecycle_state(i, PROTOCON_ACTIVE) ||
@@ -62,7 +62,7 @@ monitor_call_query_protocons(microkit_channel ch)
     }
     seL4_MessageInfo_t ret = microkit_msginfo_new(mon_NoError, 2);
     microkit_mr_set(0, bitmap);
-    microkit_mr_set(1, monitor_main_get_cid_from_channel(ch));
+    microkit_mr_set(1, monitor_get_pcid_from_ch(ch));
     if (bitmap == 0) {
         sddf_printf("No dynamic PDs are currently available for communication\n");
     }

@@ -10,7 +10,7 @@ seL4_MessageInfo_t monitor_call_hang_protocon(microkit_channel ch)
         return microkit_msginfo_new(mon_InvalidPCId, 0);
     }
     int cid_to_check = target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL;
-    int cid = monitor_main_get_cid_from_channel(cid_to_check);
+    int cid = monitor_get_pcid_from_ch(cid_to_check);
     if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to restore given with ch: %d\n", cid_to_check);
     } else {
