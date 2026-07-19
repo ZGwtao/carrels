@@ -8,10 +8,10 @@ monitor_call_backup_protocon_loading_context(microkit_channel ch)
 {
     int cid = monitor_get_pcid_from_ch(ch);
 
-    tsldr_context_t *context = \
-        (tsldr_context_t *)monitor_vm_region_base(&monitor_vm_layout.loader_context, cid);
+    trustedlo_ctxt_t *ctxt = \
+        (trustedlo_ctxt_t *)monitor_vm_region_base(&monitor_vm_layout.loader_context, cid);
 
-    tsldr_miscutil_memcpy(protocon_state_retrieve_context(cid), context, sizeof(tsldr_context_t));
+    tsldr_miscutil_memcpy(protocon_state_retrieve_context(cid), ctxt, sizeof(trustedlo_ctxt_t));
 
     return microkit_msginfo_new(mon_NoError, 0);
 }

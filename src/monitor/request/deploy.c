@@ -188,7 +188,7 @@ protocon_start(deploy_plan_t *plan)
             plan->pc_id
         ),
         protocon_state_retrieve_context(plan->pc_id),
-        sizeof(tsldr_context_t)
+        sizeof(trustedlo_ctxt_t)
     );
 
     tsldr_main_monitor_privilege_pd(plan->pc_id);

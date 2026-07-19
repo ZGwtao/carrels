@@ -94,7 +94,7 @@ extern ca_monitor_bootinfo_t ca_bootinfo;
 
 typedef struct pc_state {
     uint32_t pc_id;
-    tsldr_context_t context;
+    trustedlo_ctxt_t context;
     protocon_lifecycle_state_t life_cycle_state;
     uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
     const protocon_svc_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
@@ -104,7 +104,7 @@ typedef struct pc_state {
 extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 
-static inline tsldr_context_t *
+static inline trustedlo_ctxt_t *
 protocon_state_retrieve_context(uint32_t pc_id)
 {
     if (pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
@@ -161,7 +161,7 @@ protocon_state_memzero_context(uint32_t pc_id)
     tsldr_miscutil_memset(
         &state->context,
         0,
-        sizeof(tsldr_context_t)
+        sizeof(trustedlo_ctxt_t)
     );
 }
 
