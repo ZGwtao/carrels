@@ -35,7 +35,7 @@ service_installer_check_svc(const protocon_svc_t *svc)
 }
 
 static inline void
-service_installer_append_acrtreq(tsldr_acrtreq_t *req_acrt, const protocon_svc_t *svc)
+service_installer_append_acrtreq(trustedlo_xrtreq_t *xrt_req_list, const protocon_svc_t *svc)
 {
     // maximumlly, we allow each OS svc to have at most:
     //  - 4 notifications
@@ -48,50 +48,50 @@ service_installer_append_acrtreq(tsldr_acrtreq_t *req_acrt, const protocon_svc_t
         if (svc->ppcs[i] >= MICROKIT_MAX_CHANNELS) {
             continue;
         }
-        seL4_Word ppc = req_acrt->num_req_ppcs;
-        req_acrt->ppcs[ppc] = (seL4_Word)svc->ppcs[i];
-        req_acrt->num_req_ppcs++;
+        seL4_Word ppc = xrt_req_list->num_req_ppcs;
+        xrt_req_list->ppcs[ppc] = (seL4_Word)svc->ppcs[i];
+        xrt_req_list->num_req_ppcs++;
     }
     for (int i = 0; i < 4; ++i) {
         if (svc->notifications[i] >= MICROKIT_MAX_CHANNELS) {
             continue;
         }
-        seL4_Word ntfn = req_acrt->num_req_notifications;
-        req_acrt->notifications[ntfn] = (seL4_Word)svc->notifications[i];
-        req_acrt->num_req_notifications++;
+        seL4_Word ntfn = xrt_req_list->num_req_notifications;
+        xrt_req_list->notifications[ntfn] = (seL4_Word)svc->notifications[i];
+        xrt_req_list->num_req_notifications++;
     }
     /* TODO: irq, and x86ioports... */
     for (int i = 0; i < 4; ++i) {
         if (!svc->mappings[i].vaddr) {
             continue;
         }
-        seL4_Word mapping = req_acrt->num_req_mappings;
-        req_acrt->mappings[mapping] = (seL4_Word)svc->mappings[i].vaddr;
-        req_acrt->num_req_mappings++;
+        seL4_Word mapping = xrt_req_list->num_req_mappings;
+        xrt_req_list->mappings[mapping] = (seL4_Word)svc->mappings[i].vaddr;
+        xrt_req_list->num_req_mappings++;
     }
 }
 
 
 static inline void
 service_installer_initialise_AcRtReqHeader(
-    void *header_base,
-    const tsldr_acrtreq_t *req
+    void *xrt_req_header,
+    const trustedlo_xrtreq_t *xrt_req_list
 )
 {
-    tsldr_acrtreq_header_t *header = (tsldr_acrtreq_header_t *)(header_base);
+    trustedlo_xrtreq_header_t *header = (trustedlo_xrtreq_header_t *)(xrt_req_header);
 
     header->total_num = 
-                req->num_req_notifications + \
-                req->num_req_ppcs + \
-                req->num_req_ioports + \
-                req->num_req_mappings + \
-                req->num_req_irqs;
+                xrt_req_list->num_req_notifications + \
+                xrt_req_list->num_req_ppcs + \
+                xrt_req_list->num_req_ioports + \
+                xrt_req_list->num_req_mappings + \
+                xrt_req_list->num_req_irqs;
 
-    header->serialised_offset = sizeof(tsldr_acrtreq_header_t);
+    header->serialised_offset = sizeof(trustedlo_xrtreq_header_t);
 
     tsldr_main_monitor_encode_required_rights(
-        (char *)(header_base) + header->serialised_offset,
-        req
+        (char *)(header) + header->serialised_offset,
+        xrt_req_list
     );
 }
 
@@ -104,7 +104,7 @@ void service_installer_apply(const deploy_plan_t *plan)
     // we will then send this thing to the trusted loading functions for actual trusted loading
     // the reason we need it is that the trusted loader does not handle high-level information
     // so we put an information flow transition that turns requested OS services into low-level details
-    tsldr_acrtreq_t req_acrt = {};
+    trustedlo_xrtreq_t xrt_req_list = {};
 
     for (uint32_t i = 0;
          i < plan->req->service_count;
@@ -128,11 +128,11 @@ void service_installer_apply(const deploy_plan_t *plan)
             curr_svc->data_path,
             (uintptr_t)(req->service_entries[i]->offset) + (uintptr_t)(req->payload_e_entry)
         );
-        service_installer_append_acrtreq(&req_acrt, curr_svc);
+        service_installer_append_acrtreq(&xrt_req_list, curr_svc);
     }
 
     service_installer_initialise_AcRtReqHeader(
         (char *)(plan->base_serialised_service),
-        &req_acrt
+        &xrt_req_list
     );
 }
