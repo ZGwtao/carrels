@@ -173,8 +173,8 @@ protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
 static inline void
 protocon_start(deploy_plan_t *plan)
 {
-    tsldr_main_monitor_init_mdinfo(
-        (tsldr_mdinfodb_t *)microkit_trusted_loading_info,
+    mktxlo_prepare_txlo_info(
+        (txlo_monitor_t *)microkit_trusted_loading_info,
         plan->pc_id,
         (void *)monitor_vm_region_base(
             &monitor_vm_layout.loader_metadata,
@@ -191,7 +191,7 @@ protocon_start(deploy_plan_t *plan)
         sizeof(trustedlo_ctxt_t)
     );
 
-    tsldr_main_monitor_privilege_pd(plan->pc_id);
+    mktxlo_privilege_template_pd(plan->pc_id);
 
     SET_PROTOCON_AS_INSTANTIATED(plan->pc_id)
 

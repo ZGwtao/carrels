@@ -89,7 +89,7 @@ service_installer_initialise_AcRtReqHeader(
 
     header->serialised_offset = sizeof(trustedlo_xrtreq_header_t);
 
-    tsldr_main_monitor_encode_required_rights(
+    mktxlo_prepare_xrt_req_list(
         (char *)(header) + header->serialised_offset,
         xrt_req_list
     );
