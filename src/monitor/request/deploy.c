@@ -182,14 +182,17 @@ protocon_start(deploy_plan_t *plan)
         )
     );
 
+    trustedlo_ctxt_t *ctxt = (trustedlo_ctxt_t *)monitor_vm_region_base(
+                                    &monitor_vm_layout.loader_context,
+                                    plan->pc_id
+                                );
     tsldr_miscutil_memcpy(
-        (char *)monitor_vm_region_base(
-            &monitor_vm_layout.loader_context,
-            plan->pc_id
-        ),
+        ctxt,
         protocon_state_retrieve_context(plan->pc_id),
         sizeof(trustedlo_ctxt_t)
     );
+    ctxt->txlo_monitor_init_field.channel = (10 + 64 + 15);
+    ctxt->txlo_monitor_init_field.call_id = PC_MONITOR_CALL_BACKUP_CONTEXT;
 
     mktxlo_privilege_template_pd(plan->pc_id);
 
