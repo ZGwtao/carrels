@@ -171,17 +171,27 @@ protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
 
 
 static inline void
-protocon_start(deploy_plan_t *plan)
+protocon_init_txlo_info(const deploy_plan_t *plan)
 {
-    mktxlo_prepare_txlo_info(
-        (txlo_monitor_t *)microkit_trusted_loading_info,
-        plan->pc_id,
-        (void *)monitor_vm_region_base(
-            &monitor_vm_layout.loader_metadata,
-            plan->pc_id
-        )
-    );
+    const txlo_monitor_t *monitor = (const txlo_monitor_t *)(microkit_trusted_loading_info);
 
+    txlo_info_t *dest = (txlo_info_t *)(monitor_vm_region_base(
+                            &monitor_vm_layout.loader_metadata,
+                            plan->pc_id
+                        ));
+    txlo_info_t *src = &monitor->tplet_pd_txlo_info_list[plan->pc_id];
+
+    tsldr_miscutil_memset(dest, 0, sizeof(txlo_info_t));
+    tsldr_miscutil_memcpy(dest, src, sizeof(txlo_info_t));
+
+    dest->init = true;
+}
+
+
+static inline void
+protocon_init_txlo_context(const deploy_plan_t *plan)
+{
+    /* todo: make sure by default the context is memzero-ed. */
     trustedlo_ctxt_t *ctxt = (trustedlo_ctxt_t *)monitor_vm_region_base(
                                     &monitor_vm_layout.loader_context,
                                     plan->pc_id
@@ -191,8 +201,22 @@ protocon_start(deploy_plan_t *plan)
         protocon_state_retrieve_context(plan->pc_id),
         sizeof(trustedlo_ctxt_t)
     );
+    /* make sure txlo context initialises for only one time. */
+    if (ctxt->txlo_monitor_init_field.switch_count
+        >= TXLO_CTXT_MAX_SWITCH_CNT) {
+        ctxt->txlo_monitor_init_field.switch_count = 1;
+    }
+    ctxt->txlo_monitor_init_field.child_id = plan->pc_id;
     ctxt->txlo_monitor_init_field.channel = (10 + 64 + 15);
     ctxt->txlo_monitor_init_field.call_id = PC_MONITOR_CALL_BACKUP_CONTEXT;
+}
+
+
+static inline void
+protocon_start(deploy_plan_t *plan)
+{
+    protocon_init_txlo_info(plan);
+    protocon_init_txlo_context(plan);
 
     mktxlo_privilege_template_pd(plan->pc_id);
 
