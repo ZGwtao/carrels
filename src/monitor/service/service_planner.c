@@ -34,7 +34,7 @@ service_planner_deploy_plan_init(
     uint32_t cursor_service_num[SVC_TYPE_MAX_NUM];
 
     for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
-        cursor_service_num[i] = state->avail_service_per_type[i];
+        cursor_service_num[i] = state->resource_quota.avail_service_per_type[i];
     }
 
     for (uint32_t i = 0; i < req->service_count; ++i) {
@@ -45,7 +45,7 @@ service_planner_deploy_plan_init(
             --cursor_service_num[type];
 
         plan->service_sources[i] =
-            state->avail_service_refs[type][curr_service_index];
+            state->resource_quota.avail_service_refs[type][curr_service_index];
 
         assert(plan->service_sources[i] != NULL);
     }
@@ -71,7 +71,7 @@ service_planner_select_protocon(
 
         if (!service_planner_can_satisfy_request(
                 req,
-                protocon_states[pc_id].avail_service_per_type)) {
+                protocon_states[pc_id].resource_quota.avail_service_per_type)) {
             continue;
         }
 

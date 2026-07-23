@@ -94,10 +94,15 @@ extern ca_monitor_bootinfo_t ca_bootinfo;
 
 typedef struct pc_state {
     uint32_t pc_id;
-    trustedlo_ctxt_t context;
+    struct {
+        trustedlo_ctxt_t context;
+    } resource_alloc_state;
     protocon_lifecycle_state_t life_cycle_state;
-    uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
-    const protocon_svc_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
+    struct {
+        uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
+        const protocon_svc_t *
+                avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
+    } resource_quota;
 } pc_state_t;
 
 
@@ -114,7 +119,7 @@ protocon_state_retrieve_context(uint32_t pc_id)
         );
         return NULL;
     }
-    return &(protocon_states[pc_id].context);
+    return &(protocon_states[pc_id].resource_alloc_state.context);
 }
 
 static inline void
@@ -146,11 +151,11 @@ protocon_state_memzero_services(uint32_t pc_id)
 
     for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
         tsldr_miscutil_memset(
-            state->avail_service_refs[i],
+            state->resource_quota.avail_service_refs[i],
             0,
             (SVC_PER_TYPE_MAX_NUM) * sizeof(protocon_svc_t *)
         );
-        state->avail_service_per_type[i] = 0;
+        state->resource_quota.avail_service_per_type[i] = 0;
     }
 }
 
@@ -159,7 +164,7 @@ protocon_state_memzero_context(uint32_t pc_id)
 {
     pc_state_t *state = &protocon_states[pc_id];
     tsldr_miscutil_memset(
-        &state->context,
+        &state->resource_alloc_state.context,
         0,
         sizeof(trustedlo_ctxt_t)
     );

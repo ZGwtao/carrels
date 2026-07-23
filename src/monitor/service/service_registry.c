@@ -29,7 +29,7 @@ service_registry_register_protocon_services(
         }
 
         const uint32_t service_index =
-            state->avail_service_per_type[type];
+            state->resource_quota.avail_service_per_type[type];
 
         if (service_index >= SVC_PER_TYPE_MAX_NUM) {
             TSLDR_DBG_PRINT(
@@ -41,8 +41,8 @@ service_registry_register_protocon_services(
             continue;
         }
 
-        state->avail_service_refs[type][service_index] = service;
-        state->avail_service_per_type[type] = service_index + 1;
+        state->resource_quota.avail_service_refs[type][service_index] = service;
+        state->resource_quota.avail_service_per_type[type] = service_index + 1;
     }
 }
 
