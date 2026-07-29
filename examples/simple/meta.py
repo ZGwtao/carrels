@@ -470,15 +470,27 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     protocon2 = ProtectionDomain("protocon2", priority=53)
     protocon3 = ProtectionDomain("protocon3", priority=53)
 
+    protocon4 = ProtectionDomain("protocon4", priority=53)
+    protocon5 = ProtectionDomain("protocon5", priority=53)
+    # protocon6 = ProtectionDomain("protocon6", priority=53)
+
     pd_monitor.add_child_pd(protocon0, child_id=0)
     pd_monitor.add_child_pd(protocon1, child_id=1)
     pd_monitor.add_child_pd(protocon2, child_id=2)
     pd_monitor.add_child_pd(protocon3, child_id=3)
 
+    pd_monitor.add_child_pd(protocon4, child_id=4)
+    pd_monitor.add_child_pd(protocon5, child_id=5)
+    # pd_monitor.add_child_pd(protocon6, child_id=6)
+
     connect_protocon_with_monitor(pd_monitor, protocon0, 0)
     connect_protocon_with_monitor(pd_monitor, protocon1, 1)
     connect_protocon_with_monitor(pd_monitor, protocon2, 2)
     connect_protocon_with_monitor(pd_monitor, protocon3, 3)
+
+    connect_protocon_with_monitor(pd_monitor, protocon4, 4)
+    connect_protocon_with_monitor(pd_monitor, protocon5, 5)
+    # connect_protocon_with_monitor(pd_monitor, protocon6, 6)
 
     pd_fs_orchestrator = ProtectionDomain(
         "orchestrator_fs", "orchestrator_fs.elf", priority=96

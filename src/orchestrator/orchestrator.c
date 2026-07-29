@@ -52,7 +52,7 @@ char *fs_share;
 bool fs_init;
 
 #define MIN_REQ_PC_NUM 1U
-#define MAX_REQ_PC_NUM 4U
+#define MAX_REQ_PC_NUM 16U
 
 uint32_t req_pc_num = MIN_REQ_PC_NUM;
 
@@ -194,8 +194,14 @@ void load_elf_payload(void)
     info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
     error = microkit_msginfo_get_label(info);
     if (error != seL4_NoError) {
-        microkit_internal_crash(error);
+        TSLDR_DBG_PRINT(
+            PROGNAME
+            "call %d fail with error id: %d\n",
+            PC_MONITOR_CALL_DEPLOY,
+            error
+        );
     }
+    shell_output(&shell, "orche@>$ ");
 }
 
 static int cmd_start(int argc, const char *const *argv)
@@ -222,7 +228,7 @@ static int cmd_start(int argc, const char *const *argv)
             requested_pc_num < MIN_REQ_PC_NUM ||
             requested_pc_num > MAX_REQ_PC_NUM) {
             sddf_printf(
-                "pc_num must be an integer from %u to %u\r\n",
+                "pc_num must be an integer from %d to %d\r\n",
                 MIN_REQ_PC_NUM,
                 MAX_REQ_PC_NUM
             );

@@ -40,8 +40,8 @@ monitor_main_list_protocon_states(uint32_t num_protocons)
 seL4_MessageInfo_t
 monitor_call_list_protocons(void)
 {
-    // FIXME: should not hardcode the number of pc to list
-    monitor_main_list_protocon_states(4);
+    monitor_main_list_protocon_states(ca_bootinfo.num_pc);
+
     return microkit_msginfo_new(mon_NoError, 0);
 }
 
@@ -49,8 +49,7 @@ monitor_call_list_protocons(void)
 seL4_MessageInfo_t
 monitor_call_query_protocons(microkit_channel ch)
 {
-    // FIXME: should not hardcode the number of pc to list
-    monitor_main_list_protocon_states(4);
+    monitor_main_list_protocon_states(ca_bootinfo.num_pc);
 
     seL4_Word self_id = monitor_get_pcid_from_ch(ch);
     seL4_Word bitmap = 0;

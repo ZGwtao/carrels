@@ -61,7 +61,7 @@ protocon_load_payload(uintptr_t dest, uintptr_t src, uint64_t size)
 static inline pc_monitor_Error
 monitor_check_deploy_num(seL4_Word num_req_pc)
 {
-    if (num_req_pc < MIN_REQ_PC_NUM || num_req_pc > MAX_REQ_PC_NUM) {
+    if (num_req_pc < 1 || num_req_pc > ca_bootinfo.num_pc) {
         TSLDR_DBG_PRINT(
             PROGNAME "Invalid requested PC count: %d\n",
             num_req_pc
@@ -97,11 +97,7 @@ monitor_call_deploy_second_half(void)
 
     TSLDR_DBG_PRINT(PROGNAME "entry of monitor_call_deploy_protocon_second_half\n");
 
-    if (num_req_pc < MIN_REQ_PC_NUM || num_req_pc > MAX_REQ_PC_NUM) {
-        TSLDR_DBG_PRINT(
-            PROGNAME "Invalid active deployment request count: %u\n",
-            num_req_pc
-        );
+    if (monitor_check_deploy_num(num_req_pc) != mon_NoError) {
         monitor_finish_deploy_request();
         return;
     }

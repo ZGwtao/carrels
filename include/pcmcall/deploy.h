@@ -4,9 +4,6 @@
 #include <pcmcall/error.h>
 
 
-#define MIN_REQ_PC_NUM 1U
-#define MAX_REQ_PC_NUM 4U
-
 typedef struct {
     uint32_t num_req_pc;
 } monitor_deploy_request_t;

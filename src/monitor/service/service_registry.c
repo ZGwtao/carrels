@@ -75,7 +75,6 @@ service_registry_create(
     uint64_t pc_num
 )
 {
-    assert(pc_num == svcdb_list->len);
     service_registry_validate_pc_count(pc_num);
 
     for (uint64_t pc_id = 0; pc_id < pc_num; ++pc_id) {

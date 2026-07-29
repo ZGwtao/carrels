@@ -29,7 +29,7 @@ ca_monitor_init_cothread_spawn(const client_entry_t client_entry, void *arg, cha
 }
 
 static inline pc_monitor_Error
-ca_monitor_init_validate_pc_count(size_t pc_count)
+ca_monitor_init_validate_pc_count(uint8_t pc_count)
 {
     if (pc_count > PC_CHILD_PER_MONITOR_MAX_NUM) {
         return mon_InvalidReqPCNum;
@@ -45,9 +45,9 @@ ca_monitor_init_validate_pc_count(size_t pc_count)
 
 
 static inline void
-ca_monitor_init_get_pcnum(const monitor_svcdb_t *svcdb_list, ca_monitor_bootinfo_t *info)
+ca_monitor_init_get_pcnum(const txlo_monitor_t *monitor, ca_monitor_bootinfo_t *info)
 {
-    uint64_t n = svcdb_list->len;
+    uint8_t n = monitor->avails;
     if (ca_monitor_init_validate_pc_count(n) != mon_NoError) {
         TSLDR_DBG_PRINT(
             PROGNAME
@@ -90,7 +90,12 @@ ca_monitor_init_system(void *binfo)
     ca_monitor_bootinfo_t *bootinfo =
                     (ca_monitor_bootinfo_t *)(binfo);
 
-    ca_monitor_init_get_pcnum(&monitor_svc_db, bootinfo);
+    ca_monitor_init_get_pcnum(
+        (const txlo_monitor_t *)(
+            microkit_trusted_loading_info
+        ),
+        bootinfo
+    );
 
     /* init all protocon and states */
     ca_monitor_init_protocon_states(bootinfo->num_pc);
