@@ -63,38 +63,18 @@ static inline size_t pd_io_queue_bytes(uint32_t capacity)
            (size_t)capacity * sizeof(pd_io_buffer_desc_t);
 }
 
-static inline uint32_t pd_io_load_relaxed(const uint32_t *p)
-{
-    return __atomic_load_n(p, __ATOMIC_RELAXED);
-}
-
-static inline uint32_t pd_io_load_acquire(const uint32_t *p)
-{
-    return __atomic_load_n(p, __ATOMIC_ACQUIRE);
-}
-
-static inline void pd_io_store_relaxed(uint32_t *p, uint32_t value)
-{
-    __atomic_store_n(p, value, __ATOMIC_RELAXED);
-}
-
-static inline void pd_io_store_release(uint32_t *p, uint32_t value)
-{
-    __atomic_store_n(p, value, __ATOMIC_RELEASE);
-}
-
 static inline void pd_io_queue_reset(pd_io_queue_t *queue)
 {
-    pd_io_store_relaxed(&queue->head, 0);
-    pd_io_store_relaxed(&queue->tail, 0);
-    pd_io_store_relaxed(&queue->reserved0, 0);
-    pd_io_store_release(&queue->reserved1, 0);
+    queue->head = 0;
+    queue->tail = 0;
+    queue->reserved0 = 0;
+    queue->reserved1 = 0;
 }
 
 static inline uint32_t pd_io_queue_length(const pd_io_queue_t *queue)
 {
-    uint32_t head = pd_io_load_acquire(&queue->head);
-    uint32_t tail = pd_io_load_acquire(&queue->tail);
+    uint32_t head = queue->head;
+    uint32_t tail = queue->tail;
     return tail - head;
 }
 
@@ -116,15 +96,15 @@ static inline int pd_io_queue_enqueue(pd_io_queue_t *queue,
                                       uint32_t capacity,
                                       pd_io_buffer_desc_t desc)
 {
-    uint32_t tail = pd_io_load_relaxed(&queue->tail);
-    uint32_t head = pd_io_load_acquire(&queue->head);
+    uint32_t tail = queue->tail;
+    uint32_t head = queue->head;
 
     if ((tail - head) >= capacity) {
         return PD_IO_QUEUE_FULL;
     }
 
     queue->buffers[tail % capacity] = desc;
-    pd_io_store_release(&queue->tail, tail + 1);
+    queue->tail = tail + 1;
     return PD_IO_QUEUE_OK;
 }
 
@@ -135,15 +115,15 @@ static inline int pd_io_queue_dequeue(pd_io_queue_t *queue,
                                       uint32_t capacity,
                                       pd_io_buffer_desc_t *desc)
 {
-    uint32_t head = pd_io_load_relaxed(&queue->head);
-    uint32_t tail = pd_io_load_acquire(&queue->tail);
+    uint32_t head = queue->head;
+    uint32_t tail = queue->tail;
 
     if (head == tail) {
         return PD_IO_QUEUE_EMPTY;
     }
 
     *desc = queue->buffers[head % capacity];
-    pd_io_store_release(&queue->head, head + 1);
+    queue->head = head + 1;
     return PD_IO_QUEUE_OK;
 }
 
