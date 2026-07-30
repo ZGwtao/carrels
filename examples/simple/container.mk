@@ -40,7 +40,7 @@ all: ${IMAGE_FILE}
 
 include ${SDDF}/tools/make/board/common.mk
 
-METAPROGRAM := $(CONTAINER_DIR)/meta.py
+METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
 FAT := $(LIONSOS)/components/fs/fat
 
