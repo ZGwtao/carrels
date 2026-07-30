@@ -13,7 +13,8 @@ from board import BOARDS
 
 from elf import elftools
 from vspace import VSpace
-from monitor import CarrelsContainerEngine
+from engine import CarrelsContainerEngine
+from infra import CarrelsContainerInfra as Infra
 
 assert (
     version("sdfgen").split(".")[1] == "29" or version("sdfgen").split(".")[1] == "33"
@@ -51,47 +52,22 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     )
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
 
-    pd_orchestrator = PD(
-        "orchestrator", "orchestrator.elf", priority=60, stack_size=0x10000
-    )
-    # noted that the 'is_monitor' feature is enabled for container monitor, which needs sdfgen support
-    pd_monitor = PD(
-        "container_monitor",
-        "monitor.elf",
-        priority=64,
-        stack_size=0x10000,
-        is_monitor=True,
-    )
-
-    m = CarrelsContainerEngine(
+    container_infra = Infra(
         sdf=sdf,
-        engine=pd_monitor,
-        orchestrator=pd_orchestrator,
         layout_txlo=layout_txlo,
         layout_monitor=layout_monitor,
-        cid_limit=6
+        client_limit=16,
     )
-    m.connect_orchestrator()
+    container_infra.connect_orchestrator()
+    protocons = container_infra.add_clients(6)
+    pd_orchestrator = container_infra.pd_orchestrator
+    pd_engine = container_infra.pd_engine
 
     serial_system.add_client(pd_orchestrator)
-    serial_system.add_client(pd_monitor)
+    serial_system.add_client(pd_engine)
 
     if board.name == "maaxboard":
         timer_system.add_client(blk_driver)
-
-    protocon0 = PD("protocon0", priority=53)
-    protocon1 = PD("protocon1", priority=53)
-    protocon2 = PD("protocon2", priority=53)
-    protocon3 = PD("protocon3", priority=53)
-    protocon4 = PD("protocon4", priority=53)
-    protocon5 = PD("protocon5", priority=53)
-
-    cid0 = m.add_client(protocon0)
-    cid1 = m.add_client(protocon1)
-    cid2 = m.add_client(protocon2)
-    cid3 = m.add_client(protocon3)
-    cid4 = m.add_client(protocon4)
-    cid5 = m.add_client(protocon5)
 
     pd_fs_orchestrator = PD(
         "orchestrator_fs", "orchestrator_fs.elf", priority=96
@@ -104,24 +80,18 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         sdf, pd_fs_orchestrator, pd_orchestrator, blk=blk_system, partition=0
     )
     monitor_fs = LionsOs.FileSystem.Fat(
-        sdf, pd_fs_monitor, pd_monitor, blk=blk_system, partition=1
+        sdf, pd_fs_monitor, pd_engine, blk=blk_system, partition=1
     )
     protocon0_fs = LionsOs.FileSystem.Fat(
-        sdf, pd_fs_sp0, protocon0, blk=blk_system, partition=2
+        sdf, pd_fs_sp0, protocons[0], blk=blk_system, partition=2
     )
     protocon1_fs = LionsOs.FileSystem.Fat(
-        sdf, pd_fs_sp1, protocon1, blk=blk_system, partition=3
+        sdf, pd_fs_sp1, protocons[1], blk=blk_system, partition=3
     )
 
-    serial_system.add_client(protocon0, optional=True)
-    serial_system.add_client(protocon1, optional=True)
-    serial_system.add_client(protocon2, optional=True)
-    serial_system.add_client(protocon3, optional=True)
-
-    timer_system.add_client(protocon0, optional=True)
-    timer_system.add_client(protocon1, optional=True)
-    timer_system.add_client(protocon2, optional=True)
-    timer_system.add_client(protocon3, optional=True)
+    for pc in container_infra.protocons:
+        serial_system.add_client(pc, optional=True)
+        timer_system.add_client(pc, optional=True)
 
     pds = [
         serial_driver,
@@ -132,7 +102,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         timer_driver,
         blk_driver,
         blk_virt,
-        pd_monitor,
+        pd_engine,
         pd_fs_monitor,
         pd_fs_sp0,
         pd_fs_sp1,

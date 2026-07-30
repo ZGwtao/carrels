@@ -17,12 +17,16 @@ COPY_TABLE = [
     ("serial_client_protocon1.data", 2),
     ("serial_client_protocon2.data", 2),
     ("serial_client_protocon3.data", 2),
+    ("serial_client_protocon4.data", 2),
+    ("serial_client_protocon5.data", 2),
     ("fs_client_protocon0.data", 2),
     ("fs_client_protocon1.data", 2),
     ("timer_client_protocon0.data", 2),
     ("timer_client_protocon1.data", 2),
     ("timer_client_protocon2.data", 2),
     ("timer_client_protocon3.data", 2),
+    ("timer_client_protocon4.data", 2),
+    ("timer_client_protocon5.data", 2),
 ]
 
 
