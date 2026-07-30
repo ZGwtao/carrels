@@ -59,7 +59,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         client_limit=16,
     )
     container_infra.connect_orchestrator()
-    protocons = container_infra.add_clients(6)
+    protocons = container_infra.add_clients(8)
     pd_orchestrator = container_infra.pd_orchestrator
     pd_engine = container_infra.pd_engine
 

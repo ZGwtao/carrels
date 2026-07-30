@@ -18,6 +18,7 @@ fs_queue_t *fs_command_queue;
 fs_queue_t *fs_completion_queue;
 char *fs_share;
 
+#define MKCO_STACK_SIZE (0x10000)
 // these are the craziest thing for microkit cothreads
 co_control_t co_controller_mem;
 static char monitor_costack1[0x10000];
@@ -59,8 +60,11 @@ void init(void)
     fs_completion_queue = fs_config.server.completion_queue.vaddr;
     fs_share = fs_config.server.share.vaddr;
 
+    tsldr_miscutil_memset((char *)monitor_costack1, 0, MKCO_STACK_SIZE);
+    tsldr_miscutil_memset((char *)monitor_costack2, 0, MKCO_STACK_SIZE);
+
     stack_ptrs_arg_array_t costacks = { (uintptr_t) monitor_costack1, (uintptr_t) monitor_costack2 };
-    microkit_cothread_init(&co_controller_mem, 0x10000, costacks);
+    microkit_cothread_init(&co_controller_mem, MKCO_STACK_SIZE, costacks);
 
     ca_monitor_init_system(&ca_bootinfo);
 }

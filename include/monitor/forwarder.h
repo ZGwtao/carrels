@@ -4,7 +4,7 @@
 #include <ioutils/pd_io_queue.h>
 
 
-#define PD_IO_CLIENT_COUNT              4u
+#define PD_IO_CLIENT_COUNT              16u
 #define PD_IO_MONITOR_NOTIFY_BASE       40u
 #define PD_IO_MONITOR_SLOT_BASE         0x80000000u
 #define PD_IO_MONITOR_SLOT_SIZE         0x00400000u
