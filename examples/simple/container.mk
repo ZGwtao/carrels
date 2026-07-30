@@ -126,11 +126,13 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 		--config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) $(RAMDISK_INITIALISER)
+	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
+		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
 qemu_disk:
 	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 4 512 16777216 GPT
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) $(RAMDISK_INITIALISER)
+	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
+		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
 qemu: ${IMAGE_FILE} qemu_disk refresh-ramdisk
 	$(QEMU) -machine virt,virtualization=on \
