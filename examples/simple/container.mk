@@ -144,8 +144,7 @@ qemu: ${IMAGE_FILE} qemu_disk refresh-ramdisk
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors \
 		-drive file=qemu_disk,if=none,format=raw,id=hd \
-		-device virtio-blk-device,drive=hd
+		$(QEMU_BLK_ARGS)
 
 ${SDDF}/tools/make/board/common.mk ${SDDF_MAKEFILES} ${CARRELS}/dep/sddf/include &:
 	cd $(CARRELS); git submodule update --init dep/sddf
-
