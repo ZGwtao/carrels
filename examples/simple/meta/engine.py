@@ -94,7 +94,7 @@ class CarrelsContainerEngine:
 
     def setup_mr_txlo(self, pc: PD, cid: int):
         txlo_xrt_ceiling = self.create_txlo_mr(pc.name, "LOADER_METADATA")
-        txlo_xrt_request = self.create_txlo_mr(pc.name, "OSSVC_METADATA")
+        txlo_xrt_request = self.create_txlo_mr(pc.name, "TXLO_XRT_REQ")
         txlo_context = self.create_txlo_mr(pc.name, "LOADER_CONTEXT")
         txlo_exec = self.create_txlo_mr(pc.name, "LOADER_PROGRAM")
         self.sdf.add_mr(txlo_xrt_ceiling)
@@ -102,11 +102,11 @@ class CarrelsContainerEngine:
         self.sdf.add_mr(txlo_context)
         self.sdf.add_mr(txlo_exec)
         self.engine.add_map(self.create_map_monitor_mr_with_idx(txlo_xrt_ceiling, "LOADER_METADATA", cid))
-        self.engine.add_map(self.create_map_monitor_mr_with_idx(txlo_xrt_request, "OSSVC_METADATA", cid))
+        self.engine.add_map(self.create_map_monitor_mr_with_idx(txlo_xrt_request, "TXLO_XRT_REQ", cid))
         self.engine.add_map(self.create_map_monitor_mr_with_idx(txlo_context, "LOADER_CONTEXT", cid))
         self.engine.add_map(self.create_map_monitor_mr_with_idx(txlo_exec, "LOADER_PROGRAM", cid))
         pc.add_map(self.create_map_txlo_data_mr(txlo_xrt_ceiling, "LOADER_METADATA"))
-        pc.add_map(self.create_map_txlo_data_mr(txlo_xrt_request, "OSSVC_METADATA"))
+        pc.add_map(self.create_map_txlo_data_mr(txlo_xrt_request, "TXLO_XRT_REQ"))
         pc.add_map(self.create_map_txlo_data_mr(txlo_context, "LOADER_CONTEXT"))
         pc.add_map(self.create_map_txlo_exec_mr(txlo_exec, "LOADER_PROGRAM"))
 

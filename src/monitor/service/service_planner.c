@@ -88,7 +88,7 @@ service_planner_select_protocon(
     plan->req = req;
     plan->base_serialised_service =
         monitor_vm_region_base(
-            &monitor_vm_layout.ossvc_metadata,
+            &monitor_vm_layout.txlo_xrt_req,
             plan->pc_id
         );
     service_planner_deploy_plan_init(
