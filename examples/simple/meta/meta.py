@@ -42,6 +42,17 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     if board.name == "maaxboard":
         timer_system.add_client(blk_driver)
 
+    pds = [
+        serial_driver,
+        serial_virt_tx,
+        serial_virt_rx,
+        timer_driver,
+        blk_driver,
+        blk_virt,
+    ]
+    for pd in pds:
+        sdf.add_pd(pd)
+
 
     container_infra = Infra(
         sdf=sdf,
@@ -53,6 +64,15 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     protocons = container_infra.add_clients(16)
     pd_orchestrator = container_infra.pd_orchestrator
     pd_engine = container_infra.pd_engine
+
+    pds = [
+        pd_engine,
+        pd_orchestrator,
+        # template pds are not included...
+    ]
+    for pd in pds:
+        sdf.add_pd(pd)
+
 
     serial_system.add_client(pd_orchestrator)
     serial_system.add_client(pd_engine)
@@ -72,18 +92,35 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     protocon1_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_protocon1, protocons[1], blk=blk_system, partition=3)
 
     pds = [
-        serial_driver,
-        serial_virt_tx,
-        serial_virt_rx,
-        timer_driver,
-        blk_driver,
-        blk_virt,
-        pd_engine,
-        pd_orchestrator,
         pd_fs_engine,
         pd_fs_orchestrator,
         pd_fs_protocon0,
         pd_fs_protocon1,
+    ]
+    for pd in pds:
+        sdf.add_pd(pd)
+
+    # Net subsystem
+    net_node = dtb.node(board.ethernet)
+    assert net_node is not None
+
+    eth_driver = PD("eth_driver", "eth_driver.elf",
+                    priority=101, budget=100, period=400)
+    net_virt_tx = PD("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
+    net_virt_rx = PD("net_virt_rx", "network_virt_rx.elf", priority=99)
+    vswitch = PD("net_vswitch", "network_vswitch.elf", priority=98)
+    net_system = Sddf.Net(sdf, net_node, eth_driver, net_virt_tx, net_virt_rx, vswitch=vswitch)
+    client0_net_copier = PD(
+        "client0_net_copier", "network_copy0.elf", priority=97, budget=20000)
+
+    net_system.add_client_with_copier(pd_engine, client0_net_copier, vswitch=True)
+
+    pds = [
+        eth_driver,
+        net_virt_rx,
+        net_virt_tx,
+        client0_net_copier,
+        vswitch,
     ]
     for pd in pds:
         sdf.add_pd(pd)
@@ -102,6 +139,9 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     assert timer_system.serialise_config(output_dir)
     assert blk_system.connect()
     assert blk_system.serialise_config(output_dir)
+
+    assert net_system.connect()
+    assert net_system.serialise_config(output_dir)
 
     # generate all LionsOS services descriptors for engines.
     assert sdf.generate_svc(output_dir)

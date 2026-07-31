@@ -3,6 +3,10 @@
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 #include <lions/fs/config.h>
+#include <sddf/network/queue.h>
+#include <sddf/network/config.h>
+#include <sddf/network/util.h>
+#include <sddf/network/vswitch.h>
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
 
@@ -10,6 +14,8 @@ __attribute__((__section__(".serial_client_config")))
 serial_client_config_t serial_config;
 __attribute__((__section__(".fs_client_config")))
 fs_client_config_t fs_config;
+__attribute__((__section__(".net_client_config")))
+net_client_config_t net_config;
 
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
@@ -17,6 +23,9 @@ serial_queue_handle_t serial_tx_queue_handle;
 fs_queue_t *fs_command_queue;
 fs_queue_t *fs_completion_queue;
 char *fs_share;
+
+net_queue_handle_t net_rx_queue;
+net_queue_handle_t net_tx_queue;
 
 #define MKCO_STACK_SIZE (0x10000)
 // these are the craziest thing for microkit cothreads
@@ -59,6 +68,13 @@ void init(void)
     fs_command_queue = fs_config.server.command_queue.vaddr;
     fs_completion_queue = fs_config.server.completion_queue.vaddr;
     fs_share = fs_config.server.share.vaddr;
+
+    assert(net_config_check_magic(&net_config));
+    net_queue_init(&net_rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
+                   net_config.rx.num_buffers);
+    net_queue_init(&net_tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
+                   net_config.tx.num_buffers);
+    net_buffers_init(&net_tx_queue, 0);
 
     tsldr_miscutil_memset((char *)monitor_costack1, 0, MKCO_STACK_SIZE);
     tsldr_miscutil_memset((char *)monitor_costack2, 0, MKCO_STACK_SIZE);
