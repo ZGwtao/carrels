@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 
-class elftools:
+class Elftools:
     def __init__(self, objcopy: str):
         self.objcopy = objcopy
 
