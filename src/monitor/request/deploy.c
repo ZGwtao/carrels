@@ -169,7 +169,8 @@ protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
 static inline void
 protocon_init_txlo_info(const deploy_plan_t *plan)
 {
-    const txlo_monitor_t *monitor = (const txlo_monitor_t *)(microkit_trusted_loading_info);
+    const txlo_monitor_t *monitor = (const txlo_monitor_t *)(NULL);
+    // const txlo_monitor_t *monitor = (const txlo_monitor_t *)(microkit_trusted_loading_info);
 
     txlo_info_t *dest = (txlo_info_t *)(monitor_vm_region_base(
                             &monitor_vm_layout.loader_metadata,

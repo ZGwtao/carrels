@@ -69,6 +69,15 @@ class CarrelsContainerEngine:
     def create_map_txlo_exec_mr(self, mr: MR, mr_name: str) -> MAP:
         return self.create_map_exec(mr, self.layout_txlo.base(mr_name))
 
+    def setup_boot_regions(self):
+        prefix = f"{self.engine.name}/"
+        svc_buffer = MR(self.sdf, name=prefix + "svc_buffer", size=0x10000)
+        dlg_buffer = MR(self.sdf, name=prefix + "dlg_buffer", size=0x10000)
+        self.sdf.add_mr(svc_buffer)
+        self.sdf.add_mr(dlg_buffer)
+        self.engine.add_map(self.create_map_cached_data(svc_buffer, 0xaaaaa00000))
+        self.engine.add_map(self.create_map_cached_data(dlg_buffer, 0xaaaaa10000))
+
     def setup_mr_images(self, pc: PD, cid: int):
         container_elf = self.create_txlo_mr(pc.name, "CONTAINER_IMAGE")
         trampoline_elf = self.create_txlo_mr(pc.name, "TRAMPOLINE_IMAGE")

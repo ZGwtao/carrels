@@ -15,7 +15,6 @@ IMAGES := \
 	client_faulting.img \
 	client_timeout.img \
 	bench_simple.img \
-	unikraft.img \
 	trampoline.elf \
 	protocon.elf \
 	serial_driver.elf \
@@ -23,6 +22,7 @@ IMAGES := \
 	serial_virt_tx.elf \
 	blk_virt.elf \
 	blk_driver.elf
+# 	unikraft.img \
 
 SUPPORTED_BOARDS:= \
 	qemu_virt_aarch64 \
@@ -136,7 +136,6 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
-	$(OBJCOPY) --update-section .monitor_svc_db=container_monitor.svc monitor.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) \

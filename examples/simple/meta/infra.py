@@ -37,7 +37,7 @@ class CarrelsContainerInfra:
             "monitor.elf",
             priority=64,
             stack_size=0x10000,
-            is_monitor=True,
+            delegatee=True,
         )
 
         self.engine = Engine(
@@ -48,6 +48,7 @@ class CarrelsContainerInfra:
             layout_monitor=self.layout_monitor,
             cid_limit=self.client_limit,
         )
+        self.engine.setup_boot_regions()
 
         self.protocons: list[PD] = []
 
@@ -69,10 +70,7 @@ class CarrelsContainerInfra:
         if name is None:
             name = f"protocon{index}"
 
-        client = PD(
-            name,
-            priority=priority,
-        )
+        client = PD(name, priority=priority, template=True, sym_emit=True, allow_delegation=True)
 
         self.engine.add_client(client)
         self.protocons.append(client)

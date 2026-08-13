@@ -3,6 +3,11 @@
 #include <sel4/sel4.h>
 #include <elf.h>
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
 typedef struct __attribute__((packed)) {
     uint64_t magic;
     uint32_t service_count;
@@ -38,3 +43,85 @@ typedef struct {
     Elf64_Addr payload_e_entry;
 } protocon_svc_req_t;
 
+
+
+
+#define SVC_MAX_SERVICES 64
+#define SVC_HEADER_SIZE 20
+#define SVC_SERVICE_HEADER_SIZE 22
+#define SVC_RESOURCE_SIZE 9
+#define SVC_VERSION 1
+
+typedef struct __attribute__((packed)) {
+    uint8_t kind;
+    uint64_t value;
+} svc_resource_t;
+
+typedef struct __attribute__((packed)) {
+    uint32_t record_size;
+    uint64_t pd_id;
+    uint8_t service_id;
+    uint8_t service_type;
+    uint32_t resource_count;
+    uint32_t path_len;
+} svc_service_t;
+
+typedef struct {
+    uint16_t version;
+    uint32_t service_count;
+    uint32_t total_size;
+    const svc_service_t *services[SVC_MAX_SERVICES];
+} svc_t;
+
+static inline uint16_t svc_read_u16(const uint8_t *p)
+{
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static inline uint32_t svc_read_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static inline const svc_resource_t *svc_service_resource(const svc_service_t *service, uint32_t index)
+{
+    if (index >= service->resource_count) return NULL;
+    return (const svc_resource_t *)((const uint8_t *)service + SVC_SERVICE_HEADER_SIZE + index * SVC_RESOURCE_SIZE);
+}
+
+static inline const char *svc_service_path(const svc_service_t *service)
+{
+    return (const char *)service + SVC_SERVICE_HEADER_SIZE + service->resource_count * SVC_RESOURCE_SIZE;
+}
+
+static inline bool svc_parse(const void *base, svc_t *svc)
+{
+    const uint8_t *start = base;
+    const uint8_t *p = start;
+    static const uint8_t magic[8] = { 'O', 'S', 'S', 'v', 'c', 0, 0, 0 };
+
+    if (memcmp(p, magic, sizeof(magic)) != 0) return false;
+
+    svc->version = svc_read_u16(p + 8);
+    svc->service_count = svc_read_u32(p + 12);
+    svc->total_size = svc_read_u32(p + 16);
+    if (svc->version != SVC_VERSION || svc->service_count > SVC_MAX_SERVICES || svc->total_size < SVC_HEADER_SIZE) return false;
+
+    p += SVC_HEADER_SIZE;
+
+    for (uint32_t i = 0; i < svc->service_count; i++) {
+        if (p + SVC_SERVICE_HEADER_SIZE > start + svc->total_size) return false;
+
+        uint32_t record_size = svc_read_u32(p);
+        uint32_t resource_count = svc_read_u32(p + 14);
+        uint32_t path_len = svc_read_u32(p + 18);
+        uint32_t expected_size = SVC_SERVICE_HEADER_SIZE + resource_count * SVC_RESOURCE_SIZE + path_len;
+
+        if (record_size != expected_size || p + record_size > start + svc->total_size) return false;
+
+        svc->services[i] = (const svc_service_t *)p;
+        p += record_size;
+    }
+
+    return p == start + svc->total_size;
+}

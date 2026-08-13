@@ -61,7 +61,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         client_limit=16,
     )
     container_infra.connect_orchestrator()
-    protocons = container_infra.add_clients(16)
+    protocons = container_infra.add_clients(2)
     pd_orchestrator = container_infra.pd_orchestrator
     pd_engine = container_infra.pd_engine
 
@@ -77,7 +77,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     serial_system.add_client(pd_orchestrator)
     serial_system.add_client(pd_engine)
 
-    for pc in container_infra.protocons:
+    for pc in protocons:
         serial_system.add_client(pc, optional=True)
         timer_system.add_client(pc, optional=True)
 
@@ -86,16 +86,9 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     engine_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_engine, pd_engine, blk=blk_system, partition=1)
     orchestrator_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_orchestrator, pd_orchestrator, blk=blk_system, partition=0)
 
-    pd_fs_protocon0 = PD("protocon0_fs", "protocon0_fs.elf", priority=96)
-    pd_fs_protocon1 = PD("protocon1_fs", "protocon1_fs.elf", priority=96)
-    protocon0_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_protocon0, protocons[0], blk=blk_system, partition=2)
-    protocon1_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_protocon1, protocons[1], blk=blk_system, partition=3)
-
     pds = [
         pd_fs_engine,
         pd_fs_orchestrator,
-        pd_fs_protocon0,
-        pd_fs_protocon1,
     ]
     for pd in pds:
         sdf.add_pd(pd)
@@ -125,10 +118,6 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     for pd in pds:
         sdf.add_pd(pd)
 
-    assert protocon0_fs.connect(optional=True)
-    assert protocon0_fs.serialise_config(output_dir)
-    assert protocon1_fs.connect(optional=True)
-    assert protocon1_fs.serialise_config(output_dir)
     assert orchestrator_fs.connect()
     assert orchestrator_fs.serialise_config(output_dir)
     assert engine_fs.connect()
@@ -144,24 +133,16 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     assert net_system.serialise_config(output_dir)
 
     # generate all LionsOS services descriptors for engines.
-    assert sdf.generate_svc(output_dir)
+    assert sdf.gensvc(output_dir)
 
     elf.copy_elf("fat", "orchestrator_fs", None)
     elf.copy_elf("fat", "engine_fs", None)
-    elf.copy_elf("fat", "protocon0_fs", None)
-    elf.copy_elf("fat", "protocon1_fs", None)
 
     elf.update_elf_section("orchestrator_fs.elf", "blk_client_config", "blk_client_orchestrator_fs")
     elf.update_elf_section("orchestrator_fs.elf", "fs_server_config", "fs_server_orchestrator_fs")
 
     elf.update_elf_section("engine_fs.elf", "blk_client_config", "blk_client_engine_fs")
     elf.update_elf_section("engine_fs.elf", "fs_server_config", "fs_server_engine_fs")
-
-    elf.update_elf_section("protocon0_fs.elf", "blk_client_config", "blk_client_protocon0_fs")
-    elf.update_elf_section("protocon0_fs.elf", "fs_server_config", "fs_server_protocon0_fs")
-
-    elf.update_elf_section("protocon1_fs.elf", "blk_client_config", "blk_client_protocon1_fs")
-    elf.update_elf_section("protocon1_fs.elf", "fs_server_config", "fs_server_protocon1_fs")
 
     with open(f"{output_dir}/{sdf_path}", "w+") as f:
         f.write(sdf.render())

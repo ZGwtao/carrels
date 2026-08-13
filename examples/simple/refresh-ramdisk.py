@@ -14,7 +14,9 @@ STATIC_COPY_TABLE = [
     ("client_echo.img", 1),
     ("client_looping.img", 1),
     ("bench_simple.img", 1),
-    ("unikraft.img", 1),
+    ("container_monitor.svc", 2),
+    ("build/delegation/container_monitor.dlg", 2),
+    # ("unikraft.img", 1),
 ]
 
 
