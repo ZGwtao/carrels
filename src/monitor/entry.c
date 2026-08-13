@@ -42,9 +42,6 @@ uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOA
 
 seL4_Word pd_io_acl_rule = 0;
 
-__attribute__((__section__(".monitor_svc_db")))
-monitor_svcdb_t monitor_svc_db;
-
 
 void init(void)
 {

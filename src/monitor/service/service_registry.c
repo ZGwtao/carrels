@@ -70,13 +70,16 @@ service_registry_validate_pc_count(size_t pc_count)
 
 void
 service_registry_create(
-    const monitor_svcdb_t *svcdb_list,
+    const svc_t *svcdb_list,
     pc_state_t *protocon_states,
     uint64_t pc_num
 )
 {
+    if (!svcdb_list) {
+        return;
+    }
     service_registry_validate_pc_count(pc_num);
-
+#if 0
     for (uint64_t pc_id = 0; pc_id < pc_num; ++pc_id) {
         service_registry_register_protocon_services(
             &svcdb_list->list[pc_id],
@@ -84,4 +87,5 @@ service_registry_create(
             protocon_states
         );
     }
+#endif
 }

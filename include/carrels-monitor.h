@@ -14,7 +14,7 @@
 #include <monitor/mcall.h>
 #include <monitor/minit.h>
 #include <monitor/payload.h>
-
+#include <monitor/delegation.h>
 
 #define PROGNAME "[@monitor] "
 
