@@ -72,5 +72,6 @@ void service_planner_select_protocon(const protocon_svc_req_t *req,
     plan->req = req;
     plan->base_serialised_service =
         monitor_vm_region_base(&monitor_vm_layout.txlo_xrt_req, plan->pc_id);
+
     service_planner_deploy_plan_init(plan, &protocon_states[plan->pc_id]);
 }
