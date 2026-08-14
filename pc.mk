@@ -1,4 +1,6 @@
-
+# SPDX-FileCopyrightText: 2026 UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
 
 PC_SRC_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 PC_CONFIG_DIR := $(PC_SRC_DIR)/config

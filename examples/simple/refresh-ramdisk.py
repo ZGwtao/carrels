@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# SPDX-FileCopyrightText: 2026 UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
 from pathlib import Path
 
 import subprocess

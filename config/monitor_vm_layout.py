@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
 PAGE_SIZE = 0x1000
 
 LOADER_CONTEXT_BASE = 0x0FF40000

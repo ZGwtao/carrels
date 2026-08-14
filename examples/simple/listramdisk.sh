@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: 2026 UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
 # Usage: ./listramdisk.sh [disk_image]
 
 set -euo pipefail

@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <microkit.h>
 
 #include <sddf/timer/client.h>

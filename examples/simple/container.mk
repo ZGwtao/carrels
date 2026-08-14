@@ -1,8 +1,8 @@
-#
 # Copyright 2025, UNSW
+# SPDX-FileCopyrightText: 2026 UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
-#
+
 IMAGES := \
 	timer_driver.elf \
 	eth_driver.elf network_vswitch.elf \
