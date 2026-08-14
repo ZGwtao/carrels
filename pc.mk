@@ -321,3 +321,11 @@ docker-check: docker-env
 			test -d "$$LIONSOS"; \
 			echo "carrels environment check passed" \
 		'
+
+CLANG_TIDY ?= clang-tidy
+TIDY_FILES := $(shell find $(PC_SRC_DIR)/src \
+	-type f -name '*.c' -print)
+
+.PHONY: tidy
+tidy: $(CONTAINER_LIBC_LIB) $(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
+	$(CLANG_TIDY) $(TIDY_FILES) -- $(CFLAGS) $(PC_CFLAGS)
