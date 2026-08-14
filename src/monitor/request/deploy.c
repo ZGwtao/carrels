@@ -12,16 +12,16 @@ uint32_t req_pc_num = 0;
 bool deploy_request_active = false;
 monitor_deploy_request_t deploy_request;
 
-static inline pc_monitor_Error monitor_reset_deploy_request(seL4_Word num_req_pc)
+static inline pc_monitor_error monitor_reset_deploy_request(seL4_Word num_req_pc)
 {
     if (deploy_request_active) {
         TSLDR_DBG_PRINT(PROGNAME "Rejected deploy request: another deployment is still active\n");
-        return mon_FailToDeploy;
+        return MON_FAIL_TO_DEPLOY;
     }
     deploy_request.num_req_pc = (uint32_t)num_req_pc;
     req_pc_num = (uint32_t)num_req_pc;
     deploy_request_active = true;
-    return mon_NoError;
+    return MON_NO_ERROR;
 }
 
 static inline void monitor_deploy_refresh_request(void)
@@ -43,35 +43,35 @@ static inline void protocon_load_payload(uintptr_t dest, uintptr_t src, uint64_t
     TSLDR_DBG_PRINT(PROGNAME "src: %x, dest: %x, size: %d\n", src, dest, size);
 }
 
-static inline pc_monitor_Error monitor_check_deploy_num(seL4_Word num_req_pc)
+static inline pc_monitor_error monitor_check_deploy_num(seL4_Word num_req_pc)
 {
     if (num_req_pc < 1 || num_req_pc > ca_bootinfo.num_pc) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid requested PC count: %d\n", num_req_pc);
-        return mon_InvalidReqPCNum;
+        return MON_INVALID_REQ_PC_NUM;
     }
-    return mon_NoError;
+    return MON_NO_ERROR;
 }
 
-static inline pc_monitor_Error protocon_deploy_plan_check(deploy_plan_t *plan)
+static inline pc_monitor_error protocon_deploy_plan_check(deploy_plan_t *plan)
 {
     if (plan->pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM || plan->pc_id < 0) {
         TSLDR_DBG_PRINT(PROGNAME "Failed to find suitable container for payload\n");
-        return mon_NoAvailPc;
+        return MON_NO_AVAIL_PC;
     }
     TSLDR_DBG_PRINT(PROGNAME "cid available: %d\n", plan->pc_id);
-    return mon_NoError;
+    return MON_NO_ERROR;
 }
 
 static inline void monitor_call_deploy_second_half(void)
 {
-    seL4_Error err = seL4_NoError;
+    seL4_Error err;
     monitor_deploy_request_t *request = microkit_cothread_my_arg();
     payload_info_t payload_info = {0};
     uint32_t num_req_pc = request->num_req_pc;
 
     TSLDR_DBG_PRINT(PROGNAME "entry of monitor_call_deploy_protocon_second_half\n");
 
-    if (monitor_check_deploy_num(num_req_pc) != mon_NoError) {
+    if (monitor_check_deploy_num(num_req_pc) != MON_NO_ERROR) {
         monitor_finish_deploy_request();
         return;
     }
@@ -83,7 +83,7 @@ static inline void monitor_call_deploy_second_half(void)
     }
 
     for (uint32_t i = 0; i < num_req_pc; ++i) {
-        if (protocon_deploy(&payload_info) != mon_NoError) {
+        if (protocon_deploy(&payload_info) != MON_NO_ERROR) {
             TSLDR_DBG_PRINT(PROGNAME "Failed to deploy container\n");
             break;
         }
@@ -92,15 +92,15 @@ static inline void monitor_call_deploy_second_half(void)
     monitor_finish_deploy_request();
 }
 
-static inline pc_monitor_Error monitor_deploy_second_half(void)
+static inline pc_monitor_error monitor_deploy_second_half(void)
 {
     if (microkit_cothread_spawn(monitor_call_deploy_second_half, &deploy_request) ==
         LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(PROGNAME "cannot initialise monitor cothread for monitor call.\n");
         monitor_finish_deploy_request();
-        return mon_FailToInitCoroutine;
+        return MON_FAIL_TO_INIT_COROUTINE;
     }
-    return mon_NoError;
+    return MON_NO_ERROR;
 }
 
 static inline void protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
@@ -157,20 +157,18 @@ static inline void protocon_start(deploy_plan_t *plan)
 
 seL4_MessageInfo_t monitor_call_deploy_first_half(seL4_Word num_req_pc)
 {
-    pc_monitor_Error err = mon_NoError;
-
-    err = monitor_check_deploy_num(num_req_pc);
-    if (err != mon_NoError) {
+    pc_monitor_error err = monitor_check_deploy_num(num_req_pc);
+    if (err != MON_NO_ERROR) {
         goto fh_exit;
     }
 
     err = monitor_reset_deploy_request(num_req_pc);
-    if (err != mon_NoError) {
+    if (err != MON_NO_ERROR) {
         goto fh_exit;
     }
 
     err = monitor_deploy_second_half();
-    if (err != mon_NoError) {
+    if (err != MON_NO_ERROR) {
         goto fh_exit;
     }
 
@@ -180,18 +178,18 @@ fh_exit:
     return microkit_msginfo_new(err, 0);
 }
 
-pc_monitor_Error protocon_deploy(payload_info_t *info)
+pc_monitor_error protocon_deploy(payload_info_t *info)
 {
     deploy_plan_t plan = {0};
     protocon_svc_req_t req = {0};
-    pc_monitor_Error err = mon_NoError;
+    pc_monitor_error err;
 
     (void)service_manifest_parse(info, &req);
 
     (void)service_planner_select_protocon(&req, &plan, protocon_states);
 
     err = protocon_deploy_plan_check(&plan);
-    if (err != mon_NoError) {
+    if (err != MON_NO_ERROR) {
         return err;
     }
 

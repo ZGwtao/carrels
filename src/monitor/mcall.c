@@ -53,7 +53,7 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         ret = monitor_call_query_protocons(ch);
         break;
     case PC_MONITOR_CALL_TERMINATE_EXT: {
-        seL4_Word target_pd_id = seL4_GetMR(1);
+        microkit_channel target_pd_id = seL4_GetMR(1);
         if (ch >= 24) {
             target_pd_id = monitor_get_pcid_from_ch(ch);
         }

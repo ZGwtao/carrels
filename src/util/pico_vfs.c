@@ -19,8 +19,9 @@ static uint64_t openfile(const char fname[])
     if (err != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "failed to allocate buffer to open file");
         // halt...
-        while (1)
+        while (1) {
             ;
+        }
     }
 
     uint64_t path_len = strlen(fname) + 1;
@@ -65,8 +66,9 @@ static uint64_t readfile(void *dest, uint64_t size, uint64_t fd, uint64_t pos)
     if (err != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "failed to allocate buffer to read file");
         // halt...
-        while (1)
+        while (1) {
             ;
+        }
     }
 
     fs_cmpl_t completion;

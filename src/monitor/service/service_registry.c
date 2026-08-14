@@ -16,8 +16,9 @@
 
 void service_registry_create(const svc_t *svcdb_list, pc_state_t *protocon_states, uint64_t pc_num)
 {
-    if (!svcdb_list)
+    if (!svcdb_list) {
         return;
+    }
 
     for (uint32_t i = 0; i < svcdb_list->service_count; ++i) {
         const svc_service_t *service = svcdb_list->services[i];

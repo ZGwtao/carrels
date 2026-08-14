@@ -7,8 +7,6 @@
 #include <sddf/util/printf.h>
 #include <carrels-monitor.h>
 
-extern seL4_Word pd_io_acl_rule;
-
 static pd_io_link_t client_links[PD_IO_CLIENT_COUNT];
 
 static void monitor_init_client_link(uint32_t cid)

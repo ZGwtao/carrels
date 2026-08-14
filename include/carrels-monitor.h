@@ -176,7 +176,7 @@ static inline void monitor_main_notify_orchestrator()
     microkit_notify(PC_MONITOR_ORCHESTRATOR_CHANNEL);
 }
 
-static inline int monitor_get_pcid_from_ch(microkit_channel ch)
+static inline microkit_channel monitor_get_pcid_from_ch(microkit_channel ch)
 {
     if (ch < PC_MONITOR_PROTOCON_BASE_CHANNEL ||
         ch >= (PC_MONITOR_PROTOCON_BASE_CHANNEL + PC_CHILD_PER_MONITOR_MAX_NUM)) {
