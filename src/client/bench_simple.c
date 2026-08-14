@@ -18,17 +18,12 @@
 
 #define MONITOR_PPC_CHANNEL (15)
 
-
-__attribute__((__section__(".serial_client_config")))
-serial_client_config_t serial_config;
-__attribute__((__section__(".timer_client_config")))
-timer_client_config_t timer_config;
-__attribute__((__section__(".fs_client_config")))
-fs_client_config_t fs_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
 
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
-
 
 sddf_channel timer_channel;
 
@@ -62,13 +57,13 @@ void init(void)
     sddf_printf("bench_simple: point of exit\n");
 
     microkit_mr_set(0, 6);
-    microkit_msginfo info =
-        microkit_ppcall(MONITOR_PPC_CHANNEL,
-                        microkit_msginfo_new(0, 1));
+    microkit_msginfo info = microkit_ppcall(MONITOR_PPC_CHANNEL, microkit_msginfo_new(0, 1));
     seL4_Error error = microkit_msginfo_get_label(info);
     if (error != seL4_NoError) {
         microkit_internal_crash(error);
     }
 }
 
-void notified(microkit_channel ch) {}
+void notified(microkit_channel ch)
+{
+}

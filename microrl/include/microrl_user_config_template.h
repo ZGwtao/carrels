@@ -24,9 +24,8 @@ extern "C" {
  * here settings you want to change values
  */
 
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif  /* MICRORL_HDR_USER_CONFIG_H */
+#endif /* MICRORL_HDR_USER_CONFIG_H */

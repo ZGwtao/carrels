@@ -12,7 +12,6 @@
 
 #define PROGNAME "  => [@picovfs] "
 
-
 static uint64_t openfile(const char fname[])
 {
     ptrdiff_t buffer;
@@ -20,36 +19,38 @@ static uint64_t openfile(const char fname[])
     if (err != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "failed to allocate buffer to open file");
         // halt...
-        while (1);
+        while (1)
+            ;
     }
 
     uint64_t path_len = strlen(fname) + 1;
     memcpy(fs_buffer_ptr(buffer), fname, path_len);
 
     fs_cmpl_t completion;
-    fs_command_blocking(&completion, (fs_cmd_t){
-        .type = FS_CMD_FILE_OPEN,
-        .params.file_open = {
-            .path.offset = buffer,
-            .path.size = path_len,
-            .flags = 0 & (0 | FS_OPEN_FLAGS_CREATE),
-        }
-    });
+    fs_command_blocking(&completion,
+                        (fs_cmd_t){.type = FS_CMD_FILE_OPEN,
+                                   .params.file_open = {
+                                       .path.offset = buffer,
+                                       .path.size = path_len,
+                                       .flags = 0 & (0 | FS_OPEN_FLAGS_CREATE),
+                                   }});
     fs_buffer_free(buffer);
     if (completion.status != FS_STATUS_SUCCESS) {
         return -1;
     }
     uint64_t fd = completion.data.file_open.fd;
 
-    fs_command_blocking(&completion, (fs_cmd_t){
-        .type = FS_CMD_FILE_SIZE,
-        .params.file_size.fd = fd,
-    });
+    fs_command_blocking(&completion,
+                        (fs_cmd_t){
+                            .type = FS_CMD_FILE_SIZE,
+                            .params.file_size.fd = fd,
+                        });
     if (completion.status != FS_STATUS_SUCCESS) {
-        fs_command_blocking(&completion, (fs_cmd_t){
-            .type = FS_CMD_FILE_CLOSE,
-            .params.file_close.fd = fd,
-        });
+        fs_command_blocking(&completion,
+                            (fs_cmd_t){
+                                .type = FS_CMD_FILE_CLOSE,
+                                .params.file_close.fd = fd,
+                            });
         fs_buffer_free(buffer);
         TSLDR_DBG_PRINT(PROGNAME "failed to size file");
         return -1;
@@ -64,19 +65,19 @@ static uint64_t readfile(void *dest, uint64_t size, uint64_t fd, uint64_t pos)
     if (err != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "failed to allocate buffer to read file");
         // halt...
-        while (1);
+        while (1)
+            ;
     }
 
     fs_cmpl_t completion;
-    err = fs_command_blocking(&completion, (fs_cmd_t){
-        .type = FS_CMD_FILE_READ,
-        .params.file_read = {
-            .fd = fd,
-            .offset = pos,
-            .buf.offset = read_buffer,
-            .buf.size = size,
-        }
-    });
+    err = fs_command_blocking(&completion,
+                              (fs_cmd_t){.type = FS_CMD_FILE_READ,
+                                         .params.file_read = {
+                                             .fd = fd,
+                                             .offset = pos,
+                                             .buf.offset = read_buffer,
+                                             .buf.size = size,
+                                         }});
     if (err || completion.status != FS_STATUS_SUCCESS) {
         fs_buffer_free(read_buffer);
         TSLDR_DBG_PRINT(PROGNAME "failed to read file");
@@ -92,12 +93,12 @@ static uint64_t readfile(void *dest, uint64_t size, uint64_t fd, uint64_t pos)
 static void closefile(uint64_t fd)
 {
     fs_cmpl_t completion;
-    fs_command_blocking(&completion, (fs_cmd_t){
-        .type = FS_CMD_FILE_CLOSE,
-        .params.file_close.fd = fd,
-    });
+    fs_command_blocking(&completion,
+                        (fs_cmd_t){
+                            .type = FS_CMD_FILE_CLOSE,
+                            .params.file_close.fd = fd,
+                        });
 }
-
 
 uint64_t pico_vfs_readfile2buf(void *buf, const char *path, int *err)
 {

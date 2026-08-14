@@ -7,7 +7,8 @@
 
 #pragma once
 
-// The number of worker thread, if changes are needed, initialisation of the thread pool must be changes as well
+// The number of worker thread, if changes are needed, initialisation of the thread pool must be
+// changes as well
 #define PC_WORKER_THREAD_NUM 2
 
 #define PC_THREAD_NUM (PC_WORKER_THREAD_NUM + 1)

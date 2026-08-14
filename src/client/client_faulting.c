@@ -18,18 +18,22 @@ __attribute__((__section__(".serial_client_config"))) serial_client_config_t ser
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
 
-
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
-
 
 void init(void)
 {
     assert(serial_config_check_magic(&serial_config));
     if (serial_config.rx.queue.vaddr != NULL) {
-        serial_queue_init(&serial_rx_queue_handle, serial_config.rx.queue.vaddr, serial_config.rx.data.size, serial_config.rx.data.vaddr);
+        serial_queue_init(&serial_rx_queue_handle,
+                          serial_config.rx.queue.vaddr,
+                          serial_config.rx.data.size,
+                          serial_config.rx.data.vaddr);
     }
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+    serial_queue_init(&serial_tx_queue_handle,
+                      serial_config.tx.queue.vaddr,
+                      serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
     sddf_printf("Hello from client_faulting!\n");

@@ -28,8 +28,6 @@
 
 #define ORC_MONITOR_REGION_SIZE (0x800000)
 
-
-
 // maximum 8 os services instances per OS service type
 #define PC_SVC_PER_PD_MAX_NUM (8)
 // maximum 8 os service types
@@ -45,9 +43,7 @@ enum {
     SERVICE_DEVICE_I2C,
     SERVICE_RESERVED,
 };
-_Static_assert(sizeof(protocon_svc_type_t) == sizeof(int),
-               "protocon_svc_type_t must be int");
-
+_Static_assert(sizeof(protocon_svc_type_t) == sizeof(int), "protocon_svc_type_t must be int");
 
 #define PC_CHILD_PER_MONITOR_MAX_NUM (16)
 
@@ -69,19 +65,12 @@ typedef struct {
     uintptr_t base_serialised_service;
 } deploy_plan_t;
 
-
-static inline void
-deploy_plan_memzero_services(deploy_plan_t *p)
+static inline void deploy_plan_memzero_services(deploy_plan_t *p)
 {
-    memset(
-        p->service_sources,
-        0,
-        sizeof(svc_service_t *)
-    );
+    memset(p->service_sources, 0, sizeof(svc_service_t *));
 }
 
-static inline
-void deploy_plan_reset(deploy_plan_t *p)
+static inline void deploy_plan_reset(deploy_plan_t *p)
 {
     p->pc_id = PC_CHILD_PER_MONITOR_MAX_NUM;
     p->pc_base = 0x0;
@@ -91,11 +80,9 @@ void deploy_plan_reset(deploy_plan_t *p)
     p->base_serialised_service = 0x0;
 }
 
-
 extern dlg_header_t dlg;
 
 typedef struct {
-
     uint64_t num_pc;
 
 } ca_monitor_bootinfo_t;
@@ -110,85 +97,70 @@ typedef struct pc_state {
     protocon_lifecycle_state_t life_cycle_state;
     struct {
         uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
-        const svc_service_t *
-                avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
+        const svc_service_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
     } resource_quota;
 } pc_state_t;
 
-
 extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
-
-static inline trustedlo_ctxt_t *
-protocon_state_retrieve_context(uint32_t pc_id)
+static inline trustedlo_ctxt_t *protocon_state_retrieve_context(uint32_t pc_id)
 {
     if (pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
-        TSLDR_DBG_PRINT(
-            PROGNAME
-            "Invalid cid given for retrieving context from protocon_states\n"
-        );
+        TSLDR_DBG_PRINT(PROGNAME "Invalid cid given for retrieving context from protocon_states\n");
         return NULL;
     }
     return &(protocon_states[pc_id].resource_alloc_state.context);
 }
 
-static inline void
-protocon_state_set_lifecycle_state(
-    uint32_t pc_id,
-    protocon_lifecycle_state_t state
-) {
+static inline void protocon_state_set_lifecycle_state(uint32_t pc_id,
+                                                      protocon_lifecycle_state_t state)
+{
     protocon_states[pc_id].life_cycle_state = state;
 }
 
-static inline protocon_lifecycle_state_t
-protocon_state_get_lifecycle_state(uint32_t pc_id)
+static inline protocon_lifecycle_state_t protocon_state_get_lifecycle_state(uint32_t pc_id)
 {
     return protocon_states[pc_id].life_cycle_state;
 }
 
-static inline bool
-protocon_state_check_lifecycle_state(
-    uint32_t pc_id,
-    protocon_lifecycle_state_t state
-) {
+static inline bool protocon_state_check_lifecycle_state(uint32_t pc_id,
+                                                        protocon_lifecycle_state_t state)
+{
     return protocon_state_get_lifecycle_state(pc_id) == state;
 }
 
-static inline void
-protocon_state_memzero_services(uint32_t pc_id)
+static inline void protocon_state_memzero_services(uint32_t pc_id)
 {
     pc_state_t *state = &protocon_states[pc_id];
 
     for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
-        memset(
-            state->resource_quota.avail_service_refs[i],
-            0,
-            (SVC_PER_TYPE_MAX_NUM) * sizeof(svc_service_t *)
-        );
+        memset(state->resource_quota.avail_service_refs[i],
+               0,
+               (SVC_PER_TYPE_MAX_NUM) * sizeof(svc_service_t *));
         state->resource_quota.avail_service_per_type[i] = 0;
     }
 }
 
-static inline void
-protocon_state_memzero_context(uint32_t pc_id)
+static inline void protocon_state_memzero_context(uint32_t pc_id)
 {
     pc_state_t *state = &protocon_states[pc_id];
-    memset(
-        &state->resource_alloc_state.context,
-        0,
-        sizeof(trustedlo_ctxt_t)
-    );
+    memset(&state->resource_alloc_state.context, 0, sizeof(trustedlo_ctxt_t));
 }
 
+#define SET_PROTOCON_AS_INSTANTIATED(C)                                                            \
+    do {                                                                                           \
+        protocon_state_set_lifecycle_state(C, PROTOCON_ACTIVE);                                    \
+    } while (0);
 
-#define SET_PROTOCON_AS_INSTANTIATED(C) \
-    do { protocon_state_set_lifecycle_state(C, PROTOCON_ACTIVE); } while (0);
+#define SET_PROTOCON_AS_HANG(C)                                                                    \
+    do {                                                                                           \
+        protocon_state_set_lifecycle_state(C, PROTOCON_HANG);                                      \
+    } while (0);
 
-#define SET_PROTOCON_AS_HANG(C) \
-    do { protocon_state_set_lifecycle_state(C, PROTOCON_HANG); } while (0);
-
-#define SET_PROTOCON_AS_AVAILABLE(C) \
-    do { protocon_state_set_lifecycle_state(C, PROTOCON_PASSIVE); } while (0);
+#define SET_PROTOCON_AS_AVAILABLE(C)                                                               \
+    do {                                                                                           \
+        protocon_state_set_lifecycle_state(C, PROTOCON_PASSIVE);                                   \
+    } while (0);
 
 #define PC_MONITOR_ORCHESTRATOR_CHANNEL (15)
 #define PC_MONITOR_PROTOCON_BASE_CHANNEL (24)
@@ -204,33 +176,23 @@ static inline void monitor_main_notify_orchestrator()
     microkit_notify(PC_MONITOR_ORCHESTRATOR_CHANNEL);
 }
 
-static inline int
-monitor_get_pcid_from_ch(microkit_channel ch)
+static inline int monitor_get_pcid_from_ch(microkit_channel ch)
 {
     if (ch < PC_MONITOR_PROTOCON_BASE_CHANNEL ||
-        ch >= (PC_MONITOR_PROTOCON_BASE_CHANNEL + PC_CHILD_PER_MONITOR_MAX_NUM))
-    {
+        ch >= (PC_MONITOR_PROTOCON_BASE_CHANNEL + PC_CHILD_PER_MONITOR_MAX_NUM)) {
         return (INVALID_PC_ID);
     }
     return ch - PC_MONITOR_PROTOCON_BASE_CHANNEL;
 }
 
-
 seL4_Error service_manifest_header_parse(payload_info_t *info, uintptr_t base);
-
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
-
-
 void service_registry_create(const svc_t *svcdb_list, pc_state_t *protocon_states, uint64_t pc_num);
 
-
-void service_planner_select_protocon(
-    const protocon_svc_req_t *req,
-    deploy_plan_t *plan,
-    const pc_state_t *protocon_states
-);
-
+void service_planner_select_protocon(const protocon_svc_req_t *req,
+                                     deploy_plan_t *plan,
+                                     const pc_state_t *protocon_states);
 
 void service_installer_apply(const deploy_plan_t *plan);

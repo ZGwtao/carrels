@@ -17,27 +17,23 @@
 
 #include <ioutils/pd_io_queue.h>
 
-#define MONITOR_PPC_CHANNEL          15
+#define MONITOR_PPC_CHANNEL 15
 #define MONITOR_NOTIFICATION_CHANNEL 16
 
-#define PD_IO_CAPACITY                 512u
-#define PD_IO_BUFFER_SIZE              2048u
+#define PD_IO_CAPACITY 512u
+#define PD_IO_BUFFER_SIZE 2048u
 
-#define CLIENT_RX_FREE_ADDR          0x04800000u
-#define CLIENT_TX_FREE_ADDR          0x04803000u
-#define CLIENT_RX_ACTIVE_ADDR        0x04806000u
-#define CLIENT_TX_ACTIVE_ADDR        0x04809000u
-#define CLIENT_RX_DATA_ADDR          0x0480C000u
-#define CLIENT_TX_DATA_ADDR          0x0490C000u
-#define CLIENT_DATA_SIZE             (PD_IO_CAPACITY * PD_IO_BUFFER_SIZE)
+#define CLIENT_RX_FREE_ADDR 0x04800000u
+#define CLIENT_TX_FREE_ADDR 0x04803000u
+#define CLIENT_RX_ACTIVE_ADDR 0x04806000u
+#define CLIENT_TX_ACTIVE_ADDR 0x04809000u
+#define CLIENT_RX_DATA_ADDR 0x0480C000u
+#define CLIENT_TX_DATA_ADDR 0x0490C000u
+#define CLIENT_DATA_SIZE (PD_IO_CAPACITY * PD_IO_BUFFER_SIZE)
 
-__attribute__((__section__(".serial_client_config")))
-serial_client_config_t serial_config;
-__attribute__((__section__(".timer_client_config")))
-timer_client_config_t timer_config;
-__attribute__((__section__(".fs_client_config")))
-fs_client_config_t fs_config;
-
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
 
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
@@ -62,34 +58,28 @@ static void init_monitor_link(void)
      * The monitor owns shared queue reset/fill. The client only constructs
      * local handles over the already-initialised shared memory.
      */
-    pd_io_direction_init(
-        &monitor_link.rx,
-        (pd_io_queue_t *)CLIENT_RX_FREE_ADDR,
-        (pd_io_queue_t *)CLIENT_RX_ACTIVE_ADDR,
-        (void *)CLIENT_RX_DATA_ADDR,
-        CLIENT_DATA_SIZE,
-        PD_IO_CAPACITY,
-        PD_IO_BUFFER_SIZE
-    );
+    pd_io_direction_init(&monitor_link.rx,
+                         (pd_io_queue_t *)CLIENT_RX_FREE_ADDR,
+                         (pd_io_queue_t *)CLIENT_RX_ACTIVE_ADDR,
+                         (void *)CLIENT_RX_DATA_ADDR,
+                         CLIENT_DATA_SIZE,
+                         PD_IO_CAPACITY,
+                         PD_IO_BUFFER_SIZE);
 
-    pd_io_direction_init(
-        &monitor_link.tx,
-        (pd_io_queue_t *)CLIENT_TX_FREE_ADDR,
-        (pd_io_queue_t *)CLIENT_TX_ACTIVE_ADDR,
-        (void *)CLIENT_TX_DATA_ADDR,
-        CLIENT_DATA_SIZE,
-        PD_IO_CAPACITY,
-        PD_IO_BUFFER_SIZE
-    );
+    pd_io_direction_init(&monitor_link.tx,
+                         (pd_io_queue_t *)CLIENT_TX_FREE_ADDR,
+                         (pd_io_queue_t *)CLIENT_TX_ACTIVE_ADDR,
+                         (void *)CLIENT_TX_DATA_ADDR,
+                         CLIENT_DATA_SIZE,
+                         PD_IO_CAPACITY,
+                         PD_IO_BUFFER_SIZE);
 }
 
 static void send_ping(void)
 {
     static const char ping[] = "ping from client";
 
-    int err = pd_io_direction_send_raw(&monitor_link.tx,
-                                       ping,
-                                       (uint32_t)sizeof(ping));
+    int err = pd_io_direction_send_raw(&monitor_link.tx, ping, (uint32_t)sizeof(ping));
     if (err != PD_IO_QUEUE_OK) {
         sddf_printf("CLIENT|ERROR: send ping failed: %d\n", err);
         return;
@@ -105,10 +95,8 @@ static void drain_monitor_messages(void)
     uint32_t payload_len;
 
     for (;;) {
-        int err = pd_io_direction_receive_raw(&monitor_link.rx,
-                                              payload,
-                                              sizeof(payload),
-                                              &payload_len);
+        int err =
+            pd_io_direction_receive_raw(&monitor_link.rx, payload, sizeof(payload), &payload_len);
         if (err == PD_IO_QUEUE_EMPTY) {
             break;
         }
@@ -122,9 +110,7 @@ static void drain_monitor_messages(void)
         } else {
             payload[payload_len - 1] = '\0';
         }
-        sddf_printf("CLIENT|INFO: received %u bytes: %s\n",
-                    payload_len,
-                    payload);
+        sddf_printf("CLIENT|INFO: received %u bytes: %s\n", payload_len, payload);
     }
 }
 
@@ -152,9 +138,7 @@ void init(void)
     timer_channel = timer_config.driver_id;
 
     microkit_mr_set(0, 10);
-    microkit_msginfo info =
-        microkit_ppcall(MONITOR_PPC_CHANNEL,
-                        microkit_msginfo_new(0, 1));
+    microkit_msginfo info = microkit_ppcall(MONITOR_PPC_CHANNEL, microkit_msginfo_new(0, 1));
     seL4_Error error = microkit_msginfo_get_label(info);
     if (error != seL4_NoError) {
         microkit_internal_crash(error);

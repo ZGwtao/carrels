@@ -7,9 +7,7 @@
 #include <carrels-monitor.h>
 #include <libtrustedlo.h>
 
-
-seL4_MessageInfo_t
-monitor_main_handle_pccall(microkit_channel ch)
+seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
 {
     /* get the first word of the message */
     seL4_Word call_id = microkit_mr_get(0);
@@ -26,7 +24,8 @@ monitor_main_handle_pccall(microkit_channel ch)
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
     case PC_MONITOR_CALL_BACKUP_CONTEXT:
-        TSLDR_DBG_PRINT(PROGNAME "Backing up trusted loading context for dynamic PD with ID: %d\n", monitor_get_pcid_from_ch(ch));
+        TSLDR_DBG_PRINT(PROGNAME "Backing up trusted loading context for dynamic PD with ID: %d\n",
+                        monitor_get_pcid_from_ch(ch));
         ret = monitor_call_backup_protocon_loading_context(ch);
         break;
     case PC_MONITOR_CALL_TERMINATE:

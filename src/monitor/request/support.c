@@ -7,12 +7,11 @@
 #include <carrels-monitor.h>
 #include <monitor_vm_layout.h>
 
-seL4_MessageInfo_t
-monitor_call_backup_protocon_loading_context(microkit_channel ch)
+seL4_MessageInfo_t monitor_call_backup_protocon_loading_context(microkit_channel ch)
 {
     int cid = monitor_get_pcid_from_ch(ch);
 
-    trustedlo_ctxt_t *ctxt = \
+    trustedlo_ctxt_t *ctxt =
         (trustedlo_ctxt_t *)monitor_vm_region_base(&monitor_vm_layout.loader_context, cid);
 
     memcpy(protocon_state_retrieve_context(cid), ctxt, sizeof(trustedlo_ctxt_t));
@@ -20,15 +19,11 @@ monitor_call_backup_protocon_loading_context(microkit_channel ch)
     return microkit_msginfo_new(mon_NoError, 0);
 }
 
-
 void monitor_main_load_trustedlo(uint32_t cid)
 {
-    uintptr_t protocon_base =
-            monitor_vm_region_base(&monitor_vm_layout.loader_program, cid);
-    uintptr_t trampoline_base =
-            monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
-    uintptr_t payload_base =
-            monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
+    uintptr_t protocon_base = monitor_vm_region_base(&monitor_vm_layout.loader_program, cid);
+    uintptr_t trampoline_base = monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
+    uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
 
     size_t protocon_size = monitor_protocon_capacity();
     size_t trampoline_size = monitor_trampoline_capacity();
@@ -36,17 +31,9 @@ void monitor_main_load_trustedlo(uint32_t cid)
     memset((void *)protocon_base, 0, protocon_size);
     memset((void *)trampoline_base, 0, trampoline_size);
 
-    tsldr_miscutil_load_elf(
-        (void*)protocon_base,
-        (const Elf64_Ehdr *)(__carrels_protocon_start)
-    );
-    memcpy(
-        (void*)trampoline_base,
-        (const char *)(__carrels_trampoline_start),
-        trampoline_size
-    );
+    tsldr_miscutil_load_elf((void *)protocon_base, (const Elf64_Ehdr *)(__carrels_protocon_start));
+    memcpy((void *)trampoline_base, (const char *)(__carrels_trampoline_start), trampoline_size);
 
     /* clean up client payload region entirely. */
     memcpy((void *)payload_base, 0, ORC_MONITOR_REGION_SIZE);
 }
-

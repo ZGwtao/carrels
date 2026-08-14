@@ -11,11 +11,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#define PD_IO_QUEUE_OK          0
-#define PD_IO_QUEUE_EMPTY      -1
-#define PD_IO_QUEUE_FULL       -2
-#define PD_IO_QUEUE_TOO_LARGE  -3
-#define PD_IO_QUEUE_BAD_DESC   -4
+#define PD_IO_QUEUE_OK 0
+#define PD_IO_QUEUE_EMPTY -1
+#define PD_IO_QUEUE_FULL -2
+#define PD_IO_QUEUE_TOO_LARGE -3
+#define PD_IO_QUEUE_BAD_DESC -4
 #define PD_IO_QUEUE_BAD_HEADER -5
 
 typedef struct pd_io_buffer_desc {
@@ -48,10 +48,8 @@ typedef struct pd_io_link {
     pd_io_direction_t tx;
 } pd_io_link_t;
 
-_Static_assert(sizeof(pd_io_buffer_desc_t) == 16,
-               "pd_io_buffer_desc_t layout changed");
-_Static_assert(sizeof(pd_io_queue_t) == 16,
-               "pd_io_queue_t header layout changed");
+_Static_assert(sizeof(pd_io_buffer_desc_t) == 16, "pd_io_buffer_desc_t layout changed");
+_Static_assert(sizeof(pd_io_queue_t) == 16, "pd_io_queue_t header layout changed");
 
 typedef struct {
     uint8_t source;
@@ -59,13 +57,11 @@ typedef struct {
     uint16_t payload_size;
 } pd_io_header_t;
 
-_Static_assert(sizeof(pd_io_header_t) == 4,
-               "pd_io_header_t layout changed");
+_Static_assert(sizeof(pd_io_header_t) == 4, "pd_io_header_t layout changed");
 
 static inline size_t pd_io_queue_bytes(uint32_t capacity)
 {
-    return sizeof(pd_io_queue_t) +
-           (size_t)capacity * sizeof(pd_io_buffer_desc_t);
+    return sizeof(pd_io_queue_t) + (size_t)capacity * sizeof(pd_io_buffer_desc_t);
 }
 
 static inline void pd_io_queue_reset(pd_io_queue_t *queue)
@@ -88,8 +84,7 @@ static inline bool pd_io_queue_empty(const pd_io_queue_t *queue)
     return pd_io_queue_length(queue) == 0;
 }
 
-static inline bool pd_io_queue_full(const pd_io_queue_t *queue,
-                                    uint32_t capacity)
+static inline bool pd_io_queue_full(const pd_io_queue_t *queue, uint32_t capacity)
 {
     return pd_io_queue_length(queue) >= capacity;
 }
@@ -97,9 +92,8 @@ static inline bool pd_io_queue_full(const pd_io_queue_t *queue,
 /*
  * Called only by the queue's producer.
  */
-static inline int pd_io_queue_enqueue(pd_io_queue_t *queue,
-                                      uint32_t capacity,
-                                      pd_io_buffer_desc_t desc)
+static inline int
+pd_io_queue_enqueue(pd_io_queue_t *queue, uint32_t capacity, pd_io_buffer_desc_t desc)
 {
     uint32_t tail = queue->tail;
     uint32_t head = queue->head;
@@ -116,9 +110,8 @@ static inline int pd_io_queue_enqueue(pd_io_queue_t *queue,
 /*
  * Called only by the queue's consumer.
  */
-static inline int pd_io_queue_dequeue(pd_io_queue_t *queue,
-                                      uint32_t capacity,
-                                      pd_io_buffer_desc_t *desc)
+static inline int
+pd_io_queue_dequeue(pd_io_queue_t *queue, uint32_t capacity, pd_io_buffer_desc_t *desc)
 {
     uint32_t head = queue->head;
     uint32_t tail = queue->tail;
@@ -154,10 +147,8 @@ static inline void pd_io_direction_init(pd_io_direction_t *direction,
  */
 static inline int pd_io_direction_reset_and_fill(pd_io_direction_t *direction)
 {
-    if (direction->capacity == 0 ||
-        direction->buffer_size == 0 ||
-        (size_t)direction->capacity * direction->buffer_size >
-            direction->data_size) {
+    if (direction->capacity == 0 || direction->buffer_size == 0 ||
+        (size_t)direction->capacity * direction->buffer_size > direction->data_size) {
         return PD_IO_QUEUE_BAD_DESC;
     }
 
@@ -171,9 +162,7 @@ static inline int pd_io_direction_reset_and_fill(pd_io_direction_t *direction)
             .reserved = 0,
         };
 
-        int err = pd_io_queue_enqueue(direction->free,
-                                    direction->capacity,
-                                    desc);
+        int err = pd_io_queue_enqueue(direction->free, direction->capacity, desc);
         if (err != PD_IO_QUEUE_OK) {
             return err;
         }
@@ -202,15 +191,12 @@ static inline bool pd_io_desc_valid(const pd_io_direction_t *direction,
  * This helper assumes that the caller has already dequeued the descriptor
  * from the active queue or free queue and currently owns it.
  */
-static inline int pd_io_direction_recycle(pd_io_direction_t *direction,
-                                          pd_io_buffer_desc_t desc)
+static inline int pd_io_direction_recycle(pd_io_direction_t *direction, pd_io_buffer_desc_t desc)
 {
     desc.len = 0;
     desc.reserved = 0;
 
-    return pd_io_queue_enqueue(direction->free,
-                               direction->capacity,
-                               desc);
+    return pd_io_queue_enqueue(direction->free, direction->capacity, desc);
 }
 
 /*
@@ -220,9 +206,8 @@ static inline int pd_io_direction_recycle(pd_io_direction_t *direction,
  * The caller should notify the peer after this function returns
  * PD_IO_QUEUE_OK.
  */
-static inline int pd_io_direction_send_raw(pd_io_direction_t *direction,
-                                           const void *payload,
-                                           uint32_t payload_len)
+static inline int
+pd_io_direction_send_raw(pd_io_direction_t *direction, const void *payload, uint32_t payload_len)
 {
     if (payload_len > direction->buffer_size) {
         return PD_IO_QUEUE_TOO_LARGE;
@@ -233,9 +218,7 @@ static inline int pd_io_direction_send_raw(pd_io_direction_t *direction,
     }
 
     pd_io_buffer_desc_t desc;
-    int err = pd_io_queue_dequeue(direction->free,
-                                  direction->capacity,
-                                  &desc);
+    int err = pd_io_queue_dequeue(direction->free, direction->capacity, &desc);
     if (err != PD_IO_QUEUE_OK) {
         return err;
     }
@@ -249,14 +232,10 @@ static inline int pd_io_direction_send_raw(pd_io_direction_t *direction,
     }
 
     if (payload_len != 0) {
-        memcpy(direction->data + (size_t)desc.offset,
-               payload,
-               payload_len);
+        memcpy(direction->data + (size_t)desc.offset, payload, payload_len);
     }
 
-    err = pd_io_queue_enqueue(direction->active,
-                              direction->capacity,
-                              desc);
+    err = pd_io_queue_enqueue(direction->active, direction->capacity, desc);
     if (err != PD_IO_QUEUE_OK) {
         (void)pd_io_direction_recycle(direction, desc);
         return err;
@@ -290,15 +269,12 @@ static inline int pd_io_direction_send(pd_io_direction_t *direction,
 
     const uint32_t header_len = (uint32_t)sizeof(pd_io_header_t);
 
-    if (header_len > direction->buffer_size ||
-        payload_len > direction->buffer_size - header_len) {
+    if (header_len > direction->buffer_size || payload_len > direction->buffer_size - header_len) {
         return PD_IO_QUEUE_TOO_LARGE;
     }
 
     pd_io_buffer_desc_t desc;
-    int err = pd_io_queue_dequeue(direction->free,
-                                  direction->capacity,
-                                  &desc);
+    int err = pd_io_queue_dequeue(direction->free, direction->capacity, &desc);
     if (err != PD_IO_QUEUE_OK) {
         return err;
     }
@@ -317,8 +293,7 @@ static inline int pd_io_direction_send(pd_io_direction_t *direction,
         .payload_size = (uint16_t)payload_len,
     };
 
-    uint8_t *buffer =
-        direction->data + (size_t)desc.offset;
+    uint8_t *buffer = direction->data + (size_t)desc.offset;
 
     /*
      * Use memcpy rather than casting buffer to pd_io_header_t *.
@@ -327,14 +302,10 @@ static inline int pd_io_direction_send(pd_io_direction_t *direction,
     memcpy(buffer, &header, sizeof(header));
 
     if (payload_len != 0) {
-        memcpy(buffer + sizeof(header),
-               payload,
-               payload_len);
+        memcpy(buffer + sizeof(header), payload, payload_len);
     }
 
-    err = pd_io_queue_enqueue(direction->active,
-                              direction->capacity,
-                              desc);
+    err = pd_io_queue_enqueue(direction->active, direction->capacity, desc);
     if (err != PD_IO_QUEUE_OK) {
         (void)pd_io_direction_recycle(direction, desc);
         return err;
@@ -346,20 +317,17 @@ static inline int pd_io_direction_send(pd_io_direction_t *direction,
 /*
  * Consume one unframed message, copy it out, and recycle its descriptor.
  */
-static inline int pd_io_direction_receive_raw(
-    pd_io_direction_t *direction,
-    void *payload_out,
-    uint32_t payload_capacity,
-    uint32_t *payload_len_out)
+static inline int pd_io_direction_receive_raw(pd_io_direction_t *direction,
+                                              void *payload_out,
+                                              uint32_t payload_capacity,
+                                              uint32_t *payload_len_out)
 {
     if (payload_len_out == NULL) {
         return PD_IO_QUEUE_BAD_DESC;
     }
 
     pd_io_buffer_desc_t desc;
-    int err = pd_io_queue_dequeue(direction->active,
-                                  direction->capacity,
-                                  &desc);
+    int err = pd_io_queue_dequeue(direction->active, direction->capacity, &desc);
     if (err != PD_IO_QUEUE_OK) {
         return err;
     }
@@ -380,9 +348,7 @@ static inline int pd_io_direction_receive_raw(
     }
 
     if (desc.len != 0) {
-        memcpy(payload_out,
-               direction->data + (size_t)desc.offset,
-               desc.len);
+        memcpy(payload_out, direction->data + (size_t)desc.offset, desc.len);
     }
 
     *payload_len_out = desc.len;
@@ -399,21 +365,18 @@ static inline int pd_io_direction_receive_raw(
  * The header is copied into header_out and only the payload bytes are copied
  * into payload_out.
  */
-static inline int pd_io_direction_receive(
-    pd_io_direction_t *direction,
-    pd_io_header_t *header_out,
-    void *payload_out,
-    uint32_t payload_capacity,
-    uint32_t *payload_len_out)
+static inline int pd_io_direction_receive(pd_io_direction_t *direction,
+                                          pd_io_header_t *header_out,
+                                          void *payload_out,
+                                          uint32_t payload_capacity,
+                                          uint32_t *payload_len_out)
 {
     if (header_out == NULL || payload_len_out == NULL) {
         return PD_IO_QUEUE_BAD_DESC;
     }
 
     pd_io_buffer_desc_t desc;
-    int err = pd_io_queue_dequeue(direction->active,
-                                  direction->capacity,
-                                  &desc);
+    int err = pd_io_queue_dequeue(direction->active, direction->capacity, &desc);
     if (err != PD_IO_QUEUE_OK) {
         return err;
     }
@@ -428,14 +391,12 @@ static inline int pd_io_direction_receive(
         return PD_IO_QUEUE_BAD_HEADER;
     }
 
-    const uint8_t *buffer =
-        direction->data + (size_t)desc.offset;
+    const uint8_t *buffer = direction->data + (size_t)desc.offset;
 
     pd_io_header_t header;
     memcpy(&header, buffer, sizeof(header));
 
-    uint32_t framed_payload_len =
-        desc.len - (uint32_t)sizeof(pd_io_header_t);
+    uint32_t framed_payload_len = desc.len - (uint32_t)sizeof(pd_io_header_t);
 
     /*
      * The descriptor and the in-band header must agree on the payload size.
@@ -456,9 +417,7 @@ static inline int pd_io_direction_receive(
     }
 
     if (framed_payload_len != 0) {
-        memcpy(payload_out,
-               buffer + sizeof(pd_io_header_t),
-               framed_payload_len);
+        memcpy(payload_out, buffer + sizeof(pd_io_header_t), framed_payload_len);
     }
 
     *header_out = header;

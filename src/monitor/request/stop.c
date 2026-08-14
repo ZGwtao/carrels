@@ -6,7 +6,6 @@
 
 #include <carrels-monitor.h>
 
-
 seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch)
 {
     int target_pd_id = ch;
@@ -17,7 +16,6 @@ seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch)
     microkit_pd_stop(target_pd_id);
     return monitor_call_restore_protocon(target_pd_id + PC_MONITOR_PROTOCON_BASE_CHANNEL);
 }
-
 
 seL4_MessageInfo_t monitor_call_restore_protocon(microkit_channel ch)
 {
