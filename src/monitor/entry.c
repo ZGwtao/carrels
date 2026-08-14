@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2026 UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdarg.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>

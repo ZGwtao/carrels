@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 
 #include <sddf/util/printf.h>
 #include <carrels-monitor.h>

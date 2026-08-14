@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
 import struct
 
 p = "build/container_monitor.svc"
