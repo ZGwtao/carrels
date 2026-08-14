@@ -51,8 +51,12 @@ def main() -> int:
         (data_file, 2)
         for data_file in sorted(build_dir.glob("*.data"))
     ]
+    mktsym_copy_table = [
+        (mktsym_file, 2)
+        for mktsym_file in sorted(build_dir.glob("symbols/*.mktsym"))
+    ]
 
-    copy_table = STATIC_COPY_TABLE + data_copy_table
+    copy_table = STATIC_COPY_TABLE + data_copy_table + mktsym_copy_table
 
     for file_path, partition in copy_table:
         source = Path(file_path)
