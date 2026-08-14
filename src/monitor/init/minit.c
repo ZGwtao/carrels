@@ -141,7 +141,7 @@ ca_monitor_init_protocon_states(uint64_t pc_num)
         SET_PROTOCON_AS_AVAILABLE(i);
     }
 
-    service_registry_create((void *)(NULL), protocon_states, pc_num);
+    service_registry_create(&svc, protocon_states, pc_num);
 }
 
 

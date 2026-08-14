@@ -3,6 +3,9 @@
 #include <libtrustedlo.h>
 
 
+#define SVC_MAX_PATH_LEN 128
+
+
 static inline void
 service_installer_payload_add_service(const void *elf_base, const char data_file[], uintptr_t vaddr)
 {
@@ -35,39 +38,36 @@ service_installer_check_svc(const protocon_svc_t *svc)
 }
 
 static inline void
-service_installer_append_acrtreq(trustedlo_xrtreq_t *xrt_req_list, const protocon_svc_t *svc)
+service_installer_append_acrtreq(trustedlo_xrtreq_t *xrt_req_list, const svc_service_t *svc)
 {
-    // maximumlly, we allow each OS svc to have at most:
-    //  - 4 notifications
-    //  - 4 ppcs
-    //  - 4 irqs (not implemented here)
-    //  - *4 x86ioports (not implemented in microkit)
-    //  - 4 mappings (4 pieaces of memory regions)
-    // these low-level access rights should be enough to describe an OS service
-    for (int i = 0; i < 4; ++i) {
-        if (svc->ppcs[i] >= MICROKIT_MAX_CHANNELS) {
-            continue;
+    for (uint32_t i = 0; i < svc->resource_count; i++) {
+        const svc_resource_t *resource = svc_service_resource(svc, i);
+
+        switch (resource->kind) {
+        case SVC_RESOURCE_CHANNEL_NOTIFY: {
+            if (xrt_req_list->num_req_notifications >= 64) break;
+            seL4_Word idx = xrt_req_list->num_req_notifications++;
+            xrt_req_list->notifications[idx] = (seL4_Word)resource->value;
+            break;
         }
-        seL4_Word ppc = xrt_req_list->num_req_ppcs;
-        xrt_req_list->ppcs[ppc] = (seL4_Word)svc->ppcs[i];
-        xrt_req_list->num_req_ppcs++;
-    }
-    for (int i = 0; i < 4; ++i) {
-        if (svc->notifications[i] >= MICROKIT_MAX_CHANNELS) {
-            continue;
+
+        case SVC_RESOURCE_CHANNEL_PPC: {
+            if (xrt_req_list->num_req_ppcs >= 64) break;
+            seL4_Word idx = xrt_req_list->num_req_ppcs++;
+            xrt_req_list->ppcs[idx] = (seL4_Word)resource->value;
+            break;
         }
-        seL4_Word ntfn = xrt_req_list->num_req_notifications;
-        xrt_req_list->notifications[ntfn] = (seL4_Word)svc->notifications[i];
-        xrt_req_list->num_req_notifications++;
-    }
-    /* TODO: irq, and x86ioports... */
-    for (int i = 0; i < 4; ++i) {
-        if (!svc->mappings[i].vaddr) {
-            continue;
+
+        case SVC_RESOURCE_MAP: {
+            if (xrt_req_list->num_req_mappings >= 64) break;
+            seL4_Word idx = xrt_req_list->num_req_mappings++;
+            xrt_req_list->mappings[idx] = (seL4_Word)resource->value;
+            break;
         }
-        seL4_Word mapping = xrt_req_list->num_req_mappings;
-        xrt_req_list->mappings[mapping] = (seL4_Word)svc->mappings[i].vaddr;
-        xrt_req_list->num_req_mappings++;
+
+        default:
+            break;
+        }
     }
 }
 
@@ -111,21 +111,29 @@ void service_installer_apply(const deploy_plan_t *plan)
          ++i)
     {
         const protocon_svc_req_t *req = plan->req;
-        const protocon_svc_t *curr_svc =
+        const svc_service_t *curr_svc =
                         plan->service_sources[i];
+
+        if (curr_svc->path_len >= SVC_MAX_PATH_LEN) {
+            TSLDR_DBG_PRINT(PROGNAME "service path too long: %u\n", curr_svc->path_len);
+            continue;
+        }
+
+        char path[SVC_MAX_PATH_LEN];
+        memcpy(path, svc_service_path(curr_svc), curr_svc->path_len);
+        path[curr_svc->path_len] = '\0';
 
         TSLDR_DBG_PRINT(
             PROGNAME
             "pc_base: %x, service vaddr: %x, datapath: %s\n",
             (uintptr_t)(plan->pc_base),
             (uintptr_t)(req->service_entries[i]->offset) + (uintptr_t)(req->payload_e_entry),
-            curr_svc->data_path
+            path
         );
-
 
         service_installer_payload_add_service(
             (void *)(plan->pc_base),
-            curr_svc->data_path,
+            path,
             (uintptr_t)(req->service_entries[i]->offset) + (uintptr_t)(req->payload_e_entry)
         );
         service_installer_append_acrtreq(&xrt_req_list, curr_svc);
