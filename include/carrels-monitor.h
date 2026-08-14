@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 #include <libtrustedlo.h>
 #include <tsldr_vm_layout.h>
 #include <monitor_vm_layout.h>
@@ -65,7 +67,7 @@ typedef struct {
 static inline void
 deploy_plan_memzero_services(deploy_plan_t *p)
 {
-    tsldr_miscutil_memset(
+    memset(
         p->service_sources,
         0,
         sizeof(svc_service_t *)
@@ -152,7 +154,7 @@ protocon_state_memzero_services(uint32_t pc_id)
     pc_state_t *state = &protocon_states[pc_id];
 
     for (uint32_t i = 0; i < SVC_TYPE_MAX_NUM; ++i) {
-        tsldr_miscutil_memset(
+        memset(
             state->resource_quota.avail_service_refs[i],
             0,
             (SVC_PER_TYPE_MAX_NUM) * sizeof(svc_service_t *)
@@ -165,7 +167,7 @@ static inline void
 protocon_state_memzero_context(uint32_t pc_id)
 {
     pc_state_t *state = &protocon_states[pc_id];
-    tsldr_miscutil_memset(
+    memset(
         &state->resource_alloc_state.context,
         0,
         sizeof(trustedlo_ctxt_t)
