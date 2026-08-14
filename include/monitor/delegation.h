@@ -46,6 +46,14 @@ static inline const dlg_resource_t *dlg_delegator_resource(const dlg_delegator_t
     return (const dlg_resource_t *)((const uint8_t *)delegator + DLG_DELEGATOR_HEADER_SIZE + index * DLG_RESOURCE_SIZE);
 }
 
+static inline const dlg_delegator_t *dlg_find_delegator(const dlg_header_t *dlg, uint64_t pd_id)
+{
+    for (uint32_t i = 0; i < dlg->delegator_count; i++) {
+        if (dlg->delegators[i]->pd_id == pd_id) return dlg->delegators[i];
+    }
+    return NULL;
+}
+
 static inline bool dlg_parse(const void *base, dlg_header_t *dlg)
 {
     const uint8_t *start = base;

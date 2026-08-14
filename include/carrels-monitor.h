@@ -57,7 +57,7 @@ typedef struct {
     uintptr_t pc_base;
     Elf64_Addr pc_entry;
     const protocon_svc_req_t *req;
-    const protocon_svc_t *service_sources[16];
+    const svc_service_t *service_sources[16];
     uintptr_t base_serialised_service;
 } deploy_plan_t;
 
@@ -68,7 +68,7 @@ deploy_plan_memzero_services(deploy_plan_t *p)
     tsldr_miscutil_memset(
         p->service_sources,
         0,
-        sizeof(protocon_svc_t *)
+        sizeof(svc_service_t *)
     );
 }
 
@@ -83,6 +83,8 @@ void deploy_plan_reset(deploy_plan_t *p)
     p->base_serialised_service = 0x0;
 }
 
+
+extern dlg_header_t dlg;
 
 typedef struct {
 
@@ -100,7 +102,7 @@ typedef struct pc_state {
     protocon_lifecycle_state_t life_cycle_state;
     struct {
         uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
-        const protocon_svc_t *
+        const svc_service_t *
                 avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
     } resource_quota;
 } pc_state_t;
@@ -153,7 +155,7 @@ protocon_state_memzero_services(uint32_t pc_id)
         tsldr_miscutil_memset(
             state->resource_quota.avail_service_refs[i],
             0,
-            (SVC_PER_TYPE_MAX_NUM) * sizeof(protocon_svc_t *)
+            (SVC_PER_TYPE_MAX_NUM) * sizeof(svc_service_t *)
         );
         state->resource_quota.avail_service_per_type[i] = 0;
     }
@@ -213,7 +215,7 @@ void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 
 
 
-void service_registry_create(const monitor_svcdb_t *svcdb_list, pc_state_t *protocon_states, uint64_t pc_num);
+void service_registry_create(const svc_t *svcdb_list, pc_state_t *protocon_states, uint64_t pc_num);
 
 
 void service_planner_select_protocon(

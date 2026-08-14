@@ -44,7 +44,11 @@ typedef struct {
 } protocon_svc_req_t;
 
 
-
+typedef enum {
+    SVC_RESOURCE_CHANNEL_NOTIFY = 1,
+    SVC_RESOURCE_CHANNEL_PPC = 2,
+    SVC_RESOURCE_MAP = 3,
+} svc_resource_kind_t;
 
 #define SVC_MAX_SERVICES 64
 #define SVC_HEADER_SIZE 20

@@ -169,19 +169,12 @@ protocon_pre_instantiate(deploy_plan_t *plan, const payload_info_t *payload)
 static inline void
 protocon_init_txlo_info(const deploy_plan_t *plan)
 {
-    const txlo_monitor_t *monitor = (const txlo_monitor_t *)(NULL);
-    // const txlo_monitor_t *monitor = (const txlo_monitor_t *)(microkit_trusted_loading_info);
+    const dlg_delegator_t *src = dlg_find_delegator(&dlg, plan->pc_id);
+    TSLDR_ASSERT(src != NULL);
+    TSLDR_ASSERT(src->record_size <= 4096);
 
-    txlo_info_t *dest = (txlo_info_t *)(monitor_vm_region_base(
-                            &monitor_vm_layout.loader_metadata,
-                            plan->pc_id
-                        ));
-    txlo_info_t *src = &monitor->tplet_pd_txlo_info_list[plan->pc_id];
-
-    tsldr_miscutil_memset(dest, 0, sizeof(txlo_info_t));
-    tsldr_miscutil_memcpy(dest, src, sizeof(txlo_info_t));
-
-    dest->init = true;
+    void *dest = (void *)monitor_vm_region_base(&monitor_vm_layout.loader_metadata, plan->pc_id);
+    tsldr_miscutil_memcpy(dest, src, src->record_size);
 }
 
 
