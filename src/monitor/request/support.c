@@ -35,5 +35,5 @@ void monitor_main_load_trustedlo(uint32_t cid)
     memcpy((void *)trampoline_base, (const char *)(__carrels_trampoline_start), trampoline_size);
 
     /* clean up client payload region entirely. */
-    memcpy((void *)payload_base, 0, ORC_MONITOR_REGION_SIZE);
+    memset((void *)payload_base, 0, ORC_MONITOR_REGION_SIZE);
 }
