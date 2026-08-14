@@ -5,12 +5,35 @@
 
 #define SVC_MAX_PATH_LEN 128
 
+static seL4_Word service_installer_elf_get_sec_with_vaddr(const void *elf_base,
+                                                      uintptr_t vaddr,
+                                                      seL4_Word *sh_size)
+{
+    const uint8_t *base = (const uint8_t *)elf_base;
+    const Elf64_Ehdr *eh = (const Elf64_Ehdr *)base;
+    const Elf64_Shdr *sh = (const Elf64_Shdr *)(base + eh->e_shoff);
+
+    for (uint16_t i = 0; i < eh->e_shnum; ++i) {
+        seL4_Word start = sh[i].sh_addr;
+        seL4_Word size = sh[i].sh_size;
+        if (vaddr >= start && vaddr < start + size) {
+            if (sh[i].sh_type == SHT_NOBITS) {
+                break;
+            }
+            if (sh_size) {
+                *sh_size = size;
+            }
+            return (seL4_Word)(elf_base + sh[i].sh_offset + (vaddr - start));
+        }
+    }
+    return (seL4_Word)-1;
+}
 
 static inline void
 service_installer_payload_add_service(const void *elf_base, const char data_file[], uintptr_t vaddr)
 {
     int err = 0;
-    seL4_Word target_sh = tsldr_miscutil_fetch_elf_section_with_vaddr(elf_base, vaddr, NULL);
+    seL4_Word target_sh = service_installer_elf_get_sec_with_vaddr(elf_base, vaddr, NULL);
     if (!target_sh) {
         // the reason we allow early return in here is:
         //  a broken client program will only break a dynamic PD's execution

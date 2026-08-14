@@ -44,7 +44,7 @@ monitor_finish_deploy_request(void)
 static inline void
 protocon_load_payload(uintptr_t dest, uintptr_t src, uint64_t size)
 {
-    tsldr_miscutil_memcpy(
+    memcpy(
         (void *)dest,
         (const void *)src,
         size
@@ -174,7 +174,7 @@ protocon_init_txlo_info(const deploy_plan_t *plan)
     TSLDR_ASSERT(src->record_size <= 4096);
 
     void *dest = (void *)monitor_vm_region_base(&monitor_vm_layout.loader_metadata, plan->pc_id);
-    tsldr_miscutil_memcpy(dest, src, src->record_size);
+    memcpy(dest, src, src->record_size);
 }
 
 
@@ -186,7 +186,7 @@ protocon_init_txlo_context(const deploy_plan_t *plan)
                                     &monitor_vm_layout.loader_context,
                                     plan->pc_id
                                 );
-    tsldr_miscutil_memcpy(
+    memcpy(
         ctxt,
         protocon_state_retrieve_context(plan->pc_id),
         sizeof(trustedlo_ctxt_t)

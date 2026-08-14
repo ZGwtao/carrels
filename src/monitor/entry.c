@@ -73,8 +73,8 @@ void init(void)
                    net_config.tx.num_buffers);
     net_buffers_init(&net_tx_queue, 0);
 
-    tsldr_miscutil_memset((char *)monitor_costack1, 0, MKCO_STACK_SIZE);
-    tsldr_miscutil_memset((char *)monitor_costack2, 0, MKCO_STACK_SIZE);
+    memset((char *)monitor_costack1, 0, MKCO_STACK_SIZE);
+    memset((char *)monitor_costack2, 0, MKCO_STACK_SIZE);
 
     stack_ptrs_arg_array_t costacks = { (uintptr_t) monitor_costack1, (uintptr_t) monitor_costack2 };
     microkit_cothread_init(&co_controller_mem, MKCO_STACK_SIZE, costacks);
