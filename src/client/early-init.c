@@ -7,9 +7,7 @@
 #include <libtrustedlo.h>
 #include <tsldr_vm_layout.h>
 
-
-__attribute__((constructor))
-void register_app_early_init(void)
+__attribute__((constructor)) void register_app_early_init(void)
 {
     // trampoline_args_t *args = (trampoline_args_t *)tsldr_vm_layout.trampoline_args.base;
     // client_args_t *client_args =
@@ -23,4 +21,3 @@ void register_app_early_init(void)
     //                       client_args->dynamic_pd_name,
     //                       sizeof(client_args->dynamic_pd_name));
 }
-

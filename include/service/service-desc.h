@@ -36,4 +36,3 @@ typedef struct {
     // data_path
     char data_path[64];
 } protocon_svc_t;
-

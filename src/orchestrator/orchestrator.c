@@ -42,7 +42,10 @@ static char mp_stack1[0x10000];
 static char mp_stack2[0x10000];
 static co_control_t co_controller_mem;
 
-static void blocking_wait(microkit_channel ch) { microkit_cothread_wait_on_channel(ch); }
+static void blocking_wait(microkit_channel ch)
+{
+    microkit_cothread_wait_on_channel(ch);
+}
 
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
@@ -122,33 +125,30 @@ static bool parse_u32_decimal(const char *text, uint32_t *value_out)
     return true;
 }
 
-static inline
-void shell_inst_epilogue(void)
+static inline void shell_inst_epilogue(void)
 {
     sddf_printf("\r\nType: \"Ctrl \\\\ 0\" to return\r\n");
 }
 
 static void shell_print_help(void)
 {
-    sddf_printf(
-        "Commands:\r\n"
-        "  start <elf> [pc_num]  Load and start an ELF; pc_num is %u..%u\r\n"
-        "  lspcs                 List proto-containers\r\n"
-        "  flip                  Flip the ACL rule\r\n"
-        "  stop -i <pd_id>       Stop a protection domain\r\n"
-        "  hang -i <pd_id>       Hang a protection domain\r\n"
-        "  resume -i <pd_id>     Resume a protection domain\r\n"
-        "  help                  Show this help\r\n",
-        MIN_REQ_PC_NUM,
-        MAX_REQ_PC_NUM
-    );
+    sddf_printf("Commands:\r\n"
+                "  start <elf> [pc_num]  Load and start an ELF; pc_num is %u..%u\r\n"
+                "  lspcs                 List proto-containers\r\n"
+                "  flip                  Flip the ACL rule\r\n"
+                "  stop -i <pd_id>       Stop a protection domain\r\n"
+                "  hang -i <pd_id>       Hang a protection domain\r\n"
+                "  resume -i <pd_id>     Resume a protection domain\r\n"
+                "  help                  Show this help\r\n",
+                MIN_REQ_PC_NUM,
+                MAX_REQ_PC_NUM);
 }
 
 void orchestrator_prologue(void)
 {
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) start fs initialisation\n");
     fs_cmpl_t completion;
-    int err = fs_command_blocking(&completion, (fs_cmd_t){ .type = FS_CMD_INITIALISE });
+    int err = fs_command_blocking(&completion, (fs_cmd_t){.type = FS_CMD_INITIALISE});
     if (err || completion.status != FS_STATUS_SUCCESS) {
         TSLDR_DBG_PRINT(PROGNAME "MP|ERROR: Failed to mount\n");
     }
@@ -175,7 +175,7 @@ void orchestrator_prologue(void)
 
 void load_elf_payload(void)
 {
-    while(!fs_init) {
+    while (!fs_init) {
         microkit_cothread_yield();
     }
     TSLDR_DBG_PRINT(PROGNAME "entry of load_elf_payload\n");
@@ -196,12 +196,7 @@ void load_elf_payload(void)
     info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
     error = microkit_msginfo_get_label(info);
     if (error != seL4_NoError) {
-        TSLDR_DBG_PRINT(
-            PROGNAME
-            "call %d fail with error id: %d\n",
-            PC_MONITOR_CALL_DEPLOY,
-            error
-        );
+        TSLDR_DBG_PRINT(PROGNAME "call %d fail with error id: %d\n", PC_MONITOR_CALL_DEPLOY, error);
     }
     shell_output(&shell, "orche@>$ ");
 }
@@ -218,22 +213,17 @@ static int cmd_start(int argc, const char *const *argv)
 
     filename_len = strlen(argv[1]);
     if (filename_len == 0 || filename_len >= sizeof(fname_buf)) {
-        sddf_printf(
-            "ELF filename must contain 1..%u characters\r\n",
-            (unsigned int)(sizeof(fname_buf) - 1)
-        );
+        sddf_printf("ELF filename must contain 1..%u characters\r\n",
+                    (unsigned int)(sizeof(fname_buf) - 1));
         return 1;
     }
 
     if (argc == 3) {
-        if (!parse_u32_decimal(argv[2], &requested_pc_num) ||
-            requested_pc_num < MIN_REQ_PC_NUM ||
+        if (!parse_u32_decimal(argv[2], &requested_pc_num) || requested_pc_num < MIN_REQ_PC_NUM ||
             requested_pc_num > MAX_REQ_PC_NUM) {
-            sddf_printf(
-                "pc_num must be an integer from %d to %d\r\n",
-                MIN_REQ_PC_NUM,
-                MAX_REQ_PC_NUM
-            );
+            sddf_printf("pc_num must be an integer from %d to %d\r\n",
+                        MIN_REQ_PC_NUM,
+                        MAX_REQ_PC_NUM);
             return 1;
         }
     }
@@ -241,8 +231,7 @@ static int cmd_start(int argc, const char *const *argv)
     memcpy(fname_buf, argv[1], filename_len + 1);
     req_pc_num = requested_pc_num;
 
-    if (microkit_cothread_spawn(load_elf_payload, NULL) ==
-        LIBMICROKITCO_NULL_HANDLE) {
+    if (microkit_cothread_spawn(load_elf_payload, NULL) == LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(PROGNAME "Cannot spawn cothread to load payload\n");
         sddf_printf("Failed to start payload loader\r\n");
         return 1;
@@ -252,9 +241,7 @@ static int cmd_start(int argc, const char *const *argv)
     return 0;
 }
 
-static int call_monitor(seL4_Word syscall_id,
-                        bool has_argument,
-                        seL4_Word argument)
+static int call_monitor(seL4_Word syscall_id, bool has_argument, seL4_Word argument)
 {
     microkit_msginfo info;
     seL4_Error error;
@@ -276,9 +263,7 @@ static int call_monitor(seL4_Word syscall_id,
     return 0;
 }
 
-static int cmd_no_argument(int argc,
-                           seL4_Word syscall_id,
-                           const char *usage)
+static int cmd_no_argument(int argc, seL4_Word syscall_id, const char *usage)
 {
     if (argc != 1) {
         sddf_printf("Usage: %s\r\n", usage);
@@ -288,10 +273,8 @@ static int cmd_no_argument(int argc,
     return call_monitor(syscall_id, false, 0);
 }
 
-static int cmd_pd_control(int argc,
-                          const char *const *argv,
-                          seL4_Word syscall_id,
-                          const char *command_name)
+static int
+cmd_pd_control(int argc, const char *const *argv, seL4_Word syscall_id, const char *command_name)
 {
     uint32_t pd_id;
 
@@ -308,9 +291,7 @@ static int cmd_pd_control(int argc,
     return call_monitor(syscall_id, true, (seL4_Word)pd_id);
 }
 
-static int shell_execute(microrl_t *mrl,
-                         int argc,
-                         const char *const *argv)
+static int shell_execute(microrl_t *mrl, int argc, const char *const *argv)
 {
     MICRORL_UNUSED(mrl);
 
@@ -357,9 +338,7 @@ static int shell_execute(microrl_t *mrl,
 }
 
 #if MICRORL_CFG_USE_COMPLETE
-static char **shell_complete(microrl_t *mrl,
-                             int argc,
-                             const char *const *argv)
+static char **shell_complete(microrl_t *mrl, int argc, const char *const *argv)
 {
     size_t matches = 0;
     size_t i;
@@ -407,12 +386,17 @@ void init(void)
     TSLDR_DBG_PRINT(PROGNAME "check fs config\n");
 
     if (serial_config.rx.queue.vaddr != NULL) {
-        serial_queue_init(&serial_rx_queue_handle, serial_config.rx.queue.vaddr, serial_config.rx.data.size, serial_config.rx.data.vaddr);
+        serial_queue_init(&serial_rx_queue_handle,
+                          serial_config.rx.queue.vaddr,
+                          serial_config.rx.data.size,
+                          serial_config.rx.data.vaddr);
     }
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+    serial_queue_init(&serial_tx_queue_handle,
+                      serial_config.tx.queue.vaddr,
+                      serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-    
     fs_set_blocking_wait(blocking_wait);
     fs_command_queue = fs_config.server.command_queue.vaddr;
     fs_completion_queue = fs_config.server.completion_queue.vaddr;
@@ -421,7 +405,7 @@ void init(void)
 
     TSLDR_DBG_PRINT(PROGNAME "finalised init\n");
 
-    stack_ptrs_arg_array_t costacks = { (uintptr_t) mp_stack1, (uintptr_t) mp_stack2 };
+    stack_ptrs_arg_array_t costacks = {(uintptr_t)mp_stack1, (uintptr_t)mp_stack2};
     microkit_cothread_init(&co_controller_mem, 0x10000, costacks);
 
     if (microkit_cothread_spawn(orchestrator_prologue, NULL) == LIBMICROKITCO_NULL_HANDLE) {
@@ -439,10 +423,7 @@ void init(void)
 #if MICRORL_CFG_USE_COMPLETE
     result = microrl_set_complete_callback(&shell, shell_complete);
     if (result != microrlOK) {
-        TSLDR_DBG_PRINT(
-            PROGNAME "microrl_set_complete_callback failed: %d\n",
-            result
-        );
+        TSLDR_DBG_PRINT(PROGNAME "microrl_set_complete_callback failed: %d\n", result);
         microkit_internal_crash(-1);
     }
 #endif
@@ -450,10 +431,7 @@ void init(void)
 #if MICRORL_CFG_USE_CTRL_C
     result = microrl_set_sigint_callback(&shell, shell_sigint);
     if (result != microrlOK) {
-        TSLDR_DBG_PRINT(
-            PROGNAME "microrl_set_sigint_callback failed: %d\n",
-            result
-        );
+        TSLDR_DBG_PRINT(PROGNAME "microrl_set_sigint_callback failed: %d\n", result);
         microkit_internal_crash(-1);
     }
 #endif
@@ -461,8 +439,7 @@ void init(void)
     TSLDR_DBG_PRINT(PROGNAME "finished init\n");
 }
 
-static inline char
-shell_normalise_input(char c)
+static inline char shell_normalise_input(char c)
 {
     unsigned char uc = (unsigned char)c;
     if (uc == 0x02 || uc == 0x08 || uc == 0x7f) {
@@ -471,8 +448,7 @@ shell_normalise_input(char c)
     return c;
 }
 
-static inline void
-orche_handle_serial_event(void)
+static inline void orche_handle_serial_event(void)
 {
     char input[SHELL_INPUT_BUFFER_SIZE];
     size_t input_len = 0;
@@ -482,15 +458,10 @@ orche_handle_serial_event(void)
         input[input_len++] = shell_normalise_input(c);
 
         if (input_len == sizeof(input)) {
-            microrlr_t result =
-                microrl_processing_input(&shell, input, input_len);
+            microrlr_t result = microrl_processing_input(&shell, input, input_len);
 
-            if (result != microrlOK &&
-                result != microrlERRCLFULL) {
-                TSLDR_DBG_PRINT(
-                    PROGNAME "microrl input error: %d\n",
-                    result
-                );
+            if (result != microrlOK && result != microrlERRCLFULL) {
+                TSLDR_DBG_PRINT(PROGNAME "microrl input error: %d\n", result);
             }
 
             input_len = 0;
@@ -498,15 +469,10 @@ orche_handle_serial_event(void)
     }
 
     if (input_len != 0) {
-        microrlr_t result =
-            microrl_processing_input(&shell, input, input_len);
+        microrlr_t result = microrl_processing_input(&shell, input, input_len);
 
-        if (result != microrlOK &&
-            result != microrlERRCLFULL) {
-            TSLDR_DBG_PRINT(
-                PROGNAME "microrl input error: %d\n",
-                result
-            );
+        if (result != microrlOK && result != microrlERRCLFULL) {
+            TSLDR_DBG_PRINT(PROGNAME "microrl input error: %d\n", result);
         }
     }
 }

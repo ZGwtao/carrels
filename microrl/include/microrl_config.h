@@ -38,56 +38,57 @@ extern "C" {
  *                  than MICRORL_CFG_CMDLINE_LEN, no characters are added on the command line.
  */
 #ifndef MICRORL_CFG_CMDLINE_LEN
-#define MICRORL_CFG_CMDLINE_LEN               60
+#define MICRORL_CFG_CMDLINE_LEN 60
 #endif
 
 /**
- * \brief           Number of tokens in the command. Set the maximum number of tokens on the command line.
- *                  If the number of tokens typed in the command line exceeds this value, then a message is printed
- *                  about this, the command line will not be parsed and the 'execute' callback will not be called.
- *                  Token is a word, that separate by whitespace, for example, line with 3 tokens:
+ * \brief           Number of tokens in the command. Set the maximum number of tokens on the command
+ * line. If the number of tokens typed in the command line exceeds this value, then a message is
+ * printed about this, the command line will not be parsed and the 'execute' callback will not be
+ * called. Token is a word, that separate by whitespace, for example, line with 3 tokens:
  *                  "> set mode test"
  */
 #ifndef MICRORL_CFG_CMD_TOKEN_NMB
-#define MICRORL_CFG_CMD_TOKEN_NMB             8
+#define MICRORL_CFG_CMD_TOKEN_NMB 8
 #endif
 
 /**
  * \brief           Define default prompt string here
  */
 #ifndef MICRORL_CFG_PROMPT_STRING
-#define MICRORL_CFG_PROMPT_STRING             "> "
+#define MICRORL_CFG_PROMPT_STRING "> "
 #endif
 
 /**
  * \brief           Enable ANSI color escape sequences in prompt
  */
 #ifndef MICRORL_CFG_USE_PROMPT_COLOR
-#define MICRORL_CFG_USE_PROMPT_COLOR          1
+#define MICRORL_CFG_USE_PROMPT_COLOR 1
 #endif
 
-#define MICRORL_COLOR_RED                     "\033[31m"
-#define MICRORL_COLOR_GREEN                   "\033[32m"
-#define MICRORL_COLOR_YELLOW                  "\033[33m"
-#define MICRORL_COLOR_BLUE                    "\033[34m"
-#define MICRORL_COLOR_PURPLE                  "\033[35m"
-#define MICRORL_COLOR_MAGENTA                 "\033[36m"
-#define MICRORL_COLOR_WHITE                   "\033[37m"
-#define MICRORL_COLOR_DEFAULT                 "\033[0m"
+#define MICRORL_COLOR_RED "\033[31m"
+#define MICRORL_COLOR_GREEN "\033[32m"
+#define MICRORL_COLOR_YELLOW "\033[33m"
+#define MICRORL_COLOR_BLUE "\033[34m"
+#define MICRORL_COLOR_PURPLE "\033[35m"
+#define MICRORL_COLOR_MAGENTA "\033[36m"
+#define MICRORL_COLOR_WHITE "\033[37m"
+#define MICRORL_COLOR_DEFAULT "\033[0m"
 
 /**
- * \brief           Use colors escape code, for highlight you prompt, if your terminal supports color
+ * \brief           Use colors escape code, for highlight you prompt, if your terminal supports
+ * color
  */
 #ifndef MICRORL_CFG_PROMPT_COLOR
-#define MICRORL_CFG_PROMPT_COLOR              MICRORL_COLOR_GREEN
+#define MICRORL_CFG_PROMPT_COLOR MICRORL_COLOR_GREEN
 #endif
 
 /**
- * \brief           Enable it, if you want to use completion functional, also set completion callback in you code.
- *                  Completion functional calls 'copmletion' callback if user press 'TAB'.
+ * \brief           Enable it, if you want to use completion functional, also set completion
+ * callback in you code. Completion functional calls 'copmletion' callback if user press 'TAB'.
  */
 #ifndef MICRORL_CFG_USE_COMPLETE
-#define MICRORL_CFG_USE_COMPLETE              0
+#define MICRORL_CFG_USE_COMPLETE 0
 #endif
 
 /**
@@ -96,7 +97,7 @@ extern "C" {
  *                  "> set wifi "Home Net" "secret password"
  */
 #ifndef MICRORL_CFG_USE_QUOTING
-#define MICRORL_CFG_USE_QUOTING               0
+#define MICRORL_CFG_USE_QUOTING 0
 #endif
 
 /**
@@ -110,7 +111,7 @@ extern "C" {
  *                  At library initialization echo is ON
  */
 #ifndef MICRORL_CFG_USE_ECHO_OFF
-#define MICRORL_CFG_USE_ECHO_OFF              0
+#define MICRORL_CFG_USE_ECHO_OFF 0
 #endif
 
 /**
@@ -118,7 +119,7 @@ extern "C" {
  *                  You can set it to '\0' to disable output of secret data to the terminal
  */
 #ifndef MICRORL_CFG_ECHO_OFF_MASK
-#define MICRORL_CFG_ECHO_OFF_MASK             '*'
+#define MICRORL_CFG_ECHO_OFF_MASK '*'
 #endif
 
 /**
@@ -128,18 +129,19 @@ extern "C" {
  *                  MICRORL_CFG_RING_HISTORY_LEN parameter
  */
 #ifndef MICRORL_CFG_USE_HISTORY
-#define MICRORL_CFG_USE_HISTORY               1
+#define MICRORL_CFG_USE_HISTORY 1
 #endif
 
 /**
  * \brief           History ring buffer length. Defines static buffer size.
  *                  To save memory, each command typed is stored in history ring buffer.
- *                  So we can not say, how many line we can store, it depends from command line length,
- *                  but memory using more effective. We not prefer dinamic memory allocation for small and
- *                  embedded devices. Overhead is 1 char on each saved record (command + terminating zero)
+ *                  So we can not say, how many line we can store, it depends from command line
+ * length, but memory using more effective. We not prefer dinamic memory allocation for small and
+ *                  embedded devices. Overhead is 1 char on each saved record (command + terminating
+ * zero)
  */
 #ifndef MICRORL_CFG_RING_HISTORY_LEN
-#define MICRORL_CFG_RING_HISTORY_LEN          64
+#define MICRORL_CFG_RING_HISTORY_LEN 64
 #endif
 
 /**
@@ -147,26 +149,26 @@ extern "C" {
  *                  line buffer. Allocated on the stack. Must be at least 16.
  */
 #ifndef MICRORL_CFG_PRINT_BUFFER_LEN
-#define MICRORL_CFG_PRINT_BUFFER_LEN          40
+#define MICRORL_CFG_PRINT_BUFFER_LEN 40
 #endif
 
 /**
  * \brief           Enable if for handling terminal ESC sequences. If disabled, then cursor arrow,
- *                  HOME, END will not work. Use Ctrl+A(B,F,P,N,A,E,H,K,U,C). See README.md for more info.
- *                  This functionality increases the code memory.
+ *                  HOME, END will not work. Use Ctrl+A(B,F,P,N,A,E,H,K,U,C). See README.md for more
+ * info. This functionality increases the code memory.
  */
 #ifndef MICRORL_CFG_USE_ESC_SEQ
-#define MICRORL_CFG_USE_ESC_SEQ               1
+#define MICRORL_CFG_USE_ESC_SEQ 1
 #endif
 
 /**
- * \brief           Enable it for use 'sprintf()' implementation from your compiler's standard library, but
- *                  this adds some overhead. If not enabled, that uses my own number conversion code,
+ * \brief           Enable it for use 'sprintf()' implementation from your compiler's standard
+ * library, but this adds some overhead. If not enabled, that uses my own number conversion code,
  *                  which save about 800 byte of code size on AVR (avr-gcc build).
  *                  Try to build with and without, and compare total code size for tune library.
  */
 #ifndef MICRORL_CFG_USE_LIBC_STDIO
-#define MICRORL_CFG_USE_LIBC_STDIO            0
+#define MICRORL_CFG_USE_LIBC_STDIO 0
 #endif
 
 /**
@@ -176,14 +178,15 @@ extern "C" {
  *                  will also simulate a linefeed when it receives the carriage return.
  */
 #ifndef MICRORL_CFG_USE_CARRIAGE_RETURN
-#define MICRORL_CFG_USE_CARRIAGE_RETURN       1
+#define MICRORL_CFG_USE_CARRIAGE_RETURN 1
 #endif
 
 /**
- * \brief           Enable it and add an 'interrupt signal' callback to invoke it when the user presses Ctrl+C
+ * \brief           Enable it and add an 'interrupt signal' callback to invoke it when the user
+ * presses Ctrl+C
  */
 #ifndef MICRORL_CFG_USE_CTRL_C
-#define MICRORL_CFG_USE_CTRL_C                0
+#define MICRORL_CFG_USE_CTRL_C 0
 #endif
 
 /**
@@ -193,7 +196,7 @@ extern "C" {
  *                  already initialize and ready to print message
  */
 #ifndef MICRORL_CFG_PROMPT_ON_INIT
-#define MICRORL_CFG_PROMPT_ON_INIT            1
+#define MICRORL_CFG_PROMPT_ON_INIT 1
 #endif
 
 /**
@@ -202,14 +205,14 @@ extern "C" {
  * The symbol must be "\r", "\n", "\r\n" or "\n\r"
  */
 #ifndef MICRORL_CFG_END_LINE
-#define MICRORL_CFG_END_LINE                  "\r\n"
+#define MICRORL_CFG_END_LINE "\r\n"
 #endif
 
 /**
  * \brief           Enable it to use user-defined pre- and post- command execute callbacks (hooks)
  */
 #ifndef MICRORL_CFG_USE_COMMAND_HOOKS
-#define MICRORL_CFG_USE_COMMAND_HOOKS         0
+#define MICRORL_CFG_USE_COMMAND_HOOKS 0
 #endif
 
 /**
@@ -241,18 +244,18 @@ extern "C" {
  * \note            You can set just 'static' option to not use inline functions
  */
 #ifndef MICRORL_CFG_STATIC_INLINE
-#define MICRORL_CFG_STATIC_INLINE             static inline
+#define MICRORL_CFG_STATIC_INLINE static inline
 #endif
 /**
  * \}
  */
 
-#define MICRORL_VERSION_MAJOR                 2
-#define MICRORL_VERSION_MINOR                 6
-#define MICRORL_VERSION_PATCH                 0
+#define MICRORL_VERSION_MAJOR 2
+#define MICRORL_VERSION_MINOR 6
+#define MICRORL_VERSION_PATCH 0
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif  /* MICRORL_HDR_DEFAULT_CONFIG_H */
+#endif /* MICRORL_HDR_DEFAULT_CONFIG_H */

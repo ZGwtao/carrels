@@ -34,35 +34,35 @@ extern "C" {
  * \brief           Unused variable macro
  * \param[in]       x: Unused variable
  */
-#define MICRORL_UNUSED(x)           ((void)(x))
+#define MICRORL_UNUSED(x) ((void)(x))
 
 /**
  * \brief           Calculate size of statically allocated array
  * \param[in]       x: Input array
  * \return          Number of array elements
  */
-#define MICRORL_ARRAYSIZE(x)        (sizeof(x) / sizeof((x)[0]))
+#define MICRORL_ARRAYSIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /**
  * \brief           MicroRL result enumeration
  */
 typedef enum {
-    microrlOK = 0x00,                            /*!< Everything OK */
-    microrlERR = 0x01,                           /*!< Common error */
-    microrlERRPAR = 0x02,                        /*!< Parameter error */
-    microrlERRTKNNUM = 0x03,                     /*!< Too many tokens */
-    microrlERRCLFULL = 0x04,                     /*!< Command line is full */
-    microrlERRCPLT = 0x05                        /*!< Auto-completion error */
+    microrlOK = 0x00,        /*!< Everything OK */
+    microrlERR = 0x01,       /*!< Common error */
+    microrlERRPAR = 0x02,    /*!< Parameter error */
+    microrlERRTKNNUM = 0x03, /*!< Too many tokens */
+    microrlERRCLFULL = 0x04, /*!< Command line is full */
+    microrlERRCPLT = 0x05    /*!< Auto-completion error */
 } microrlr_t;
 
 /**
  * \brief           ESC seq internal codes
  */
 typedef enum {
-    MICRORL_ESC_BRACKET,                        /*!< Encountered '[' character after ESC code */
-    MICRORL_ESC_HOME,                           /*!< Encountered 'HOME' code after ESC code */
-    MICRORL_ESC_END,                            /*!< Encountered 'END' code after ESC code */
-    MICRORL_ESC_DEL                             /*!< Encountered 'DEL' code after ESC code */
+    MICRORL_ESC_BRACKET, /*!< Encountered '[' character after ESC code */
+    MICRORL_ESC_HOME,    /*!< Encountered 'HOME' code after ESC code */
+    MICRORL_ESC_END,     /*!< Encountered 'END' code after ESC code */
+    MICRORL_ESC_DEL      /*!< Encountered 'DEL' code after ESC code */
 } microrl_esc_code_t;
 
 #if MICRORL_CFG_USE_ECHO_OFF || __DOXYGEN__
@@ -70,9 +70,9 @@ typedef enum {
  * \brief           List of possible echo modes
  */
 typedef enum {
-    MICRORL_ECHO_ONCE,                          /*!< Echo is disabled until Enter is pressed */
-    MICRORL_ECHO_ON,                            /*!< Echo is always enabled */
-    MICRORL_ECHO_OFF                            /*!< Echo is always disabled */
+    MICRORL_ECHO_ONCE, /*!< Echo is disabled until Enter is pressed */
+    MICRORL_ECHO_ON,   /*!< Echo is always enabled */
+    MICRORL_ECHO_OFF   /*!< Echo is always disabled */
 } microrl_echo_t;
 #endif /* MICRORL_CFG_USE_ECHO_OFF || __DOXYGEN__ */
 
@@ -90,10 +90,10 @@ struct microrl_hist_rbuf;
  *
  */
 typedef struct microrl_hist_rbuf {
-    char ring_buf[MICRORL_CFG_RING_HISTORY_LEN];/*!< History buffer */
-    size_t head;                                /*!< Buffer head position */
-    size_t tail;                                /*!< Buffer tail position */
-    size_t count;                               /*!< Navigation counter */
+    char ring_buf[MICRORL_CFG_RING_HISTORY_LEN]; /*!< History buffer */
+    size_t head;                                 /*!< Buffer head position */
+    size_t tail;                                 /*!< Buffer tail position */
+    size_t count;                                /*!< Navigation counter */
 } microrl_hist_rbuf_t;
 #endif /* MICRORL_CFG_USE_HISTORY || __DOXYGEN__ */
 
@@ -104,7 +104,7 @@ typedef struct microrl_hist_rbuf {
  * \return          The number of characters that would have been written,
  *                      not counting the terminating null character.
  */
-typedef int       (*microrl_output_fn)(struct microrl* mrl, const char* str);
+typedef int (*microrl_output_fn)(struct microrl *mrl, const char *str);
 
 /**
  * \brief           Command execute callback function
@@ -113,7 +113,7 @@ typedef int       (*microrl_output_fn)(struct microrl* mrl, const char* str);
  * \param[in]       argv: pointer array to token string
  * \return          '0' on success, '1' otherwise
  */
-typedef int       (*microrl_exec_fn)(struct microrl* mrl, int argc, const char* const *argv);
+typedef int (*microrl_exec_fn)(struct microrl *mrl, int argc, const char *const *argv);
 
 /**
  * \brief           Auto-complete function prototype
@@ -122,73 +122,75 @@ typedef int       (*microrl_exec_fn)(struct microrl* mrl, int argc, const char* 
  * \param[in]       argv: pointer array to token string
  * \return          NULL-terminated string, contain complete variant split by 'Whitespace'
  *                      If complete token found, it's must contain only one token to be completed
- *                      Empty string if complete not found, and multiple string if there are some token
+ *                      Empty string if complete not found, and multiple string if there are some
+ * token
  */
-typedef char**    (*microrl_get_compl_fn)(struct microrl* mrl, int argc, const char* const *argv);
+typedef char **(*microrl_get_compl_fn)(struct microrl *mrl, int argc, const char *const *argv);
 
 /**
  * \brief           Ctrl+C terminal signal function prototype
  * \param[in,out]   mrl: \ref microrl_t working instance
  */
-typedef void      (*microrl_sigint_fn)(struct microrl* mrl);
+typedef void (*microrl_sigint_fn)(struct microrl *mrl);
 
 /**
  * \brief           MicroRL instance
  */
 typedef struct microrl {
-    microrl_output_fn out_fn;                   /*!< Output function for print operations */
-    microrl_exec_fn exec_fn;                    /*!< Command execute callback */
+    microrl_output_fn out_fn; /*!< Output function for print operations */
+    microrl_exec_fn exec_fn;  /*!< Command execute callback */
 #if MICRORL_CFG_USE_COMPLETE || __DOXYGEN__
-    microrl_get_compl_fn get_completion_fn;     /*!< Auto-completion callback */
-#endif /* MICRORL_CFG_USE_COMPLETE || __DOXYGEN__ */
+    microrl_get_compl_fn get_completion_fn; /*!< Auto-completion callback */
+#endif                                      /* MICRORL_CFG_USE_COMPLETE || __DOXYGEN__ */
 #if MICRORL_CFG_USE_CTRL_C || __DOXYGEN__
-    microrl_sigint_fn sigint_fn;                /*!< Ctrl+C terminal signal callback */
-#endif /* MICRORL_CFG_USE_CTRL_C || __DOXYGEN__ */
+    microrl_sigint_fn sigint_fn; /*!< Ctrl+C terminal signal callback */
+#endif                           /* MICRORL_CFG_USE_CTRL_C || __DOXYGEN__ */
 
-    char* prompt_ptr;                           /*!< Pointer to prompt string */
-    size_t prompt_size;                          /*!< Size of prompt string */
-    char cmdline_str[MICRORL_CFG_CMDLINE_LEN + 1];  /*!< Command line input buffer with NULL character */
-    size_t cmdlen;                              /*!< Command length in command line buffer */
-    size_t cursor;                              /*!< Command line buffer position pointer */
-    char last_endl;                             /*!< Either 0 or the CR or LF that just triggered a newline */
+    char *prompt_ptr;   /*!< Pointer to prompt string */
+    size_t prompt_size; /*!< Size of prompt string */
+    char cmdline_str[MICRORL_CFG_CMDLINE_LEN +
+                     1]; /*!< Command line input buffer with NULL character */
+    size_t cmdlen;       /*!< Command length in command line buffer */
+    size_t cursor;       /*!< Command line buffer position pointer */
+    char last_endl;      /*!< Either 0 or the CR or LF that just triggered a newline */
 
 #if MICRORL_CFG_USE_ESC_SEQ || __DOXYGEN__
-    microrl_esc_code_t esc_code;                /*!< Code of first escape sequence symbol */
-    uint8_t escape;                             /*!< Escape sequence caught flag */
-#endif /* MICRORL_CFG_USE_ESC_SEQ || __DOXYGEN__ */
+    microrl_esc_code_t esc_code; /*!< Code of first escape sequence symbol */
+    uint8_t escape;              /*!< Escape sequence caught flag */
+#endif                           /* MICRORL_CFG_USE_ESC_SEQ || __DOXYGEN__ */
 
 #if MICRORL_CFG_USE_HISTORY || __DOXYGEN__
-    microrl_hist_rbuf_t ring_hist;              /*!< Ring history object */
-#endif /* MICRORL_CFG_USE_HISTORY || __DOXYGEN__ */
+    microrl_hist_rbuf_t ring_hist; /*!< Ring history object */
+#endif                             /* MICRORL_CFG_USE_HISTORY || __DOXYGEN__ */
 
 #if MICRORL_CFG_USE_ECHO_OFF || __DOXYGEN__
-    microrl_echo_t echo;                        /*!< Echo mode */
-    int32_t echo_off_pos;                       /*!< Start position to print '*' echo off chars */
-#endif /* MICRORL_CFG_USE_ECHO_OFF || __DOXYGEN__ */
+    microrl_echo_t echo;  /*!< Echo mode */
+    int32_t echo_off_pos; /*!< Start position to print '*' echo off chars */
+#endif                    /* MICRORL_CFG_USE_ECHO_OFF || __DOXYGEN__ */
 
-    void* userdata_ptr;                         /*!< Generic user data storage */
+    void *userdata_ptr; /*!< Generic user data storage */
 } microrl_t;
 
-microrlr_t  microrl_init(microrl_t* mrl, microrl_output_fn out_fn, microrl_exec_fn exec_fn);
+microrlr_t microrl_init(microrl_t *mrl, microrl_output_fn out_fn, microrl_exec_fn exec_fn);
 
-microrlr_t  microrl_set_execute_callback(microrl_t* mrl, microrl_exec_fn exec_fn);
+microrlr_t microrl_set_execute_callback(microrl_t *mrl, microrl_exec_fn exec_fn);
 #if MICRORL_CFG_USE_COMPLETE
-microrlr_t  microrl_set_complete_callback(microrl_t* mrl, microrl_get_compl_fn get_completion_fn);
+microrlr_t microrl_set_complete_callback(microrl_t *mrl, microrl_get_compl_fn get_completion_fn);
 #endif /* MICRORL_CFG_USE_COMPLETE */
 #if MICRORL_CFG_USE_CTRL_C
-microrlr_t  microrl_set_sigint_callback(microrl_t* mrl, microrl_sigint_fn sigint_fn);
+microrlr_t microrl_set_sigint_callback(microrl_t *mrl, microrl_sigint_fn sigint_fn);
 #endif /* MICRORL_CFG_USE_CTRL_C */
 
-microrlr_t  microrl_set_prompt(microrl_t* mrl, char* prompt_str);
+microrlr_t microrl_set_prompt(microrl_t *mrl, char *prompt_str);
 #if MICRORL_CFG_USE_ECHO_OFF || __DOXYGEN__
-microrlr_t  microrl_set_echo(microrl_t* mrl, microrl_echo_t echo);
+microrlr_t microrl_set_echo(microrl_t *mrl, microrl_echo_t echo);
 #endif /* #if MICRORL_CFG_USE_ECHO_OFF */
 
-microrlr_t  microrl_processing_input(microrl_t* mrl, const void* data_ptr, size_t len);
+microrlr_t microrl_processing_input(microrl_t *mrl, const void *data_ptr, size_t len);
 
-uint32_t    microrl_get_version(void);
+uint32_t microrl_get_version(void);
 
-microrlr_t  microrl_clear_terminal(microrl_t* mrl);
+microrlr_t microrl_clear_terminal(microrl_t *mrl);
 
 /**
  * \}
@@ -198,4 +200,4 @@ microrlr_t  microrl_clear_terminal(microrl_t* mrl);
 }
 #endif /* __cplusplus */
 
-#endif  /* MICRORL_HDR_H */
+#endif /* MICRORL_HDR_H */

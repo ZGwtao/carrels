@@ -16,12 +16,9 @@
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
 
-__attribute__((__section__(".serial_client_config")))
-serial_client_config_t serial_config;
-__attribute__((__section__(".fs_client_config")))
-fs_client_config_t fs_config;
-__attribute__((__section__(".net_client_config")))
-net_client_config_t net_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+__attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
+__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
@@ -38,7 +35,10 @@ net_queue_handle_t net_tx_queue;
 co_control_t co_controller_mem;
 static char monitor_costack1[0x10000];
 static char monitor_costack2[0x10000];
-static void blocking_wait(microkit_channel ch) { microkit_cothread_wait_on_channel(ch); }
+static void blocking_wait(microkit_channel ch)
+{
+    microkit_cothread_wait_on_channel(ch);
+}
 
 ca_monitor_bootinfo_t ca_bootinfo;
 pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
@@ -47,7 +47,6 @@ pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
 
 seL4_Word pd_io_acl_rule = 0;
-
 
 void init(void)
 {
@@ -73,31 +72,33 @@ void init(void)
     fs_share = fs_config.server.share.vaddr;
 
     assert(net_config_check_magic(&net_config));
-    net_queue_init(&net_rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
+    net_queue_init(&net_rx_queue,
+                   net_config.rx.free_queue.vaddr,
+                   net_config.rx.active_queue.vaddr,
                    net_config.rx.num_buffers);
-    net_queue_init(&net_tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
+    net_queue_init(&net_tx_queue,
+                   net_config.tx.free_queue.vaddr,
+                   net_config.tx.active_queue.vaddr,
                    net_config.tx.num_buffers);
     net_buffers_init(&net_tx_queue, 0);
 
     memset((char *)monitor_costack1, 0, MKCO_STACK_SIZE);
     memset((char *)monitor_costack2, 0, MKCO_STACK_SIZE);
 
-    stack_ptrs_arg_array_t costacks = { (uintptr_t) monitor_costack1, (uintptr_t) monitor_costack2 };
+    stack_ptrs_arg_array_t costacks = {(uintptr_t)monitor_costack1, (uintptr_t)monitor_costack2};
     microkit_cothread_init(&co_controller_mem, MKCO_STACK_SIZE, costacks);
 
     ca_monitor_init_system(&ca_bootinfo);
 }
 
-seL4_MessageInfo_t
-protected(microkit_channel ch, microkit_msginfo msginfo)
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     return monitor_main_handle_pccall(ch);
 }
 
- void notified(microkit_channel ch)
- {
-    if (ch >= PD_IO_MONITOR_NOTIFY_BASE &&
-        ch < PD_IO_MONITOR_NOTIFY_BASE + PD_IO_CLIENT_COUNT) {
+void notified(microkit_channel ch)
+{
+    if (ch >= PD_IO_MONITOR_NOTIFY_BASE && ch < PD_IO_MONITOR_NOTIFY_BASE + PD_IO_CLIENT_COUNT) {
         uint32_t cid = ch - PD_IO_MONITOR_NOTIFY_BASE;
         monitor_handle_client_payload(cid);
         return;
@@ -106,7 +107,6 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
     fs_process_completions(NULL);
     microkit_cothread_recv_ntfn(ch);
 }
-
 
 seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
 {

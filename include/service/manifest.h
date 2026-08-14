@@ -29,10 +29,8 @@ typedef struct __attribute__((packed)) {
     uint64_t size;
 } service_manifest_entry_t;
 
-_Static_assert(sizeof(service_manifest_header_t) == 24,
-               "Invalid manifest header size");
-_Static_assert(sizeof(service_manifest_entry_t) == 20,
-               "Invalid manifest entry size");
+_Static_assert(sizeof(service_manifest_header_t) == 24, "Invalid manifest header size");
+_Static_assert(sizeof(service_manifest_entry_t) == 20, "Invalid manifest entry size");
 
 typedef struct {
     Elf64_Ehdr *header_payload;
@@ -41,14 +39,12 @@ typedef struct {
     service_manifest_entry_t *service_entries;
 } payload_info_t;
 
-
 typedef struct {
     uint32_t service_count;
     uint32_t service_count_per_type[SVC_TYPE_MAX_NUM];
     service_manifest_entry_t *service_entries[16];
     Elf64_Addr payload_e_entry;
 } protocon_svc_req_t;
-
 
 typedef enum {
     SVC_RESOURCE_CHANNEL_NOTIFY = 1,
@@ -93,41 +89,51 @@ static inline uint32_t svc_read_u32(const uint8_t *p)
     return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
-static inline const svc_resource_t *svc_service_resource(const svc_service_t *service, uint32_t index)
+static inline const svc_resource_t *svc_service_resource(const svc_service_t *service,
+                                                         uint32_t index)
 {
-    if (index >= service->resource_count) return NULL;
-    return (const svc_resource_t *)((const uint8_t *)service + SVC_SERVICE_HEADER_SIZE + index * SVC_RESOURCE_SIZE);
+    if (index >= service->resource_count)
+        return NULL;
+    return (const svc_resource_t *)((const uint8_t *)service + SVC_SERVICE_HEADER_SIZE +
+                                    index * SVC_RESOURCE_SIZE);
 }
 
 static inline const char *svc_service_path(const svc_service_t *service)
 {
-    return (const char *)service + SVC_SERVICE_HEADER_SIZE + service->resource_count * SVC_RESOURCE_SIZE;
+    return (const char *)service + SVC_SERVICE_HEADER_SIZE +
+           service->resource_count * SVC_RESOURCE_SIZE;
 }
 
 static inline bool svc_parse(const void *base, svc_t *svc)
 {
     const uint8_t *start = base;
     const uint8_t *p = start;
-    static const uint8_t magic[8] = { 'O', 'S', 'S', 'v', 'c', 0, 0, 0 };
+    static const uint8_t magic[8] = {'O', 'S', 'S', 'v', 'c', 0, 0, 0};
 
-    if (memcmp(p, magic, sizeof(magic)) != 0) return false;
+    if (memcmp(p, magic, sizeof(magic)) != 0)
+        return false;
 
     svc->version = svc_read_u16(p + 8);
     svc->service_count = svc_read_u32(p + 12);
     svc->total_size = svc_read_u32(p + 16);
-    if (svc->version != SVC_VERSION || svc->service_count > SVC_MAX_SERVICES || svc->total_size < SVC_HEADER_SIZE) return false;
+    if (svc->version != SVC_VERSION || svc->service_count > SVC_MAX_SERVICES ||
+        svc->total_size < SVC_HEADER_SIZE)
+        return false;
 
     p += SVC_HEADER_SIZE;
 
     for (uint32_t i = 0; i < svc->service_count; i++) {
-        if (p + SVC_SERVICE_HEADER_SIZE > start + svc->total_size) return false;
+        if (p + SVC_SERVICE_HEADER_SIZE > start + svc->total_size)
+            return false;
 
         uint32_t record_size = svc_read_u32(p);
         uint32_t resource_count = svc_read_u32(p + 14);
         uint32_t path_len = svc_read_u32(p + 18);
-        uint32_t expected_size = SVC_SERVICE_HEADER_SIZE + resource_count * SVC_RESOURCE_SIZE + path_len;
+        uint32_t expected_size =
+            SVC_SERVICE_HEADER_SIZE + resource_count * SVC_RESOURCE_SIZE + path_len;
 
-        if (record_size != expected_size || p + record_size > start + svc->total_size) return false;
+        if (record_size != expected_size || p + record_size > start + svc->total_size)
+            return false;
 
         svc->services[i] = (const svc_service_t *)p;
         p += record_size;

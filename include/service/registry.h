@@ -8,7 +8,6 @@
 
 #include <service/service-desc.h>
 
-
 typedef struct {
     // specify which PD this array belongs to
     uint8_t pd_idx;

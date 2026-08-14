@@ -12,4 +12,3 @@
 #include <service/service-desc.h>
 #include <service/manifest.h>
 #include <service/registry.h>
-

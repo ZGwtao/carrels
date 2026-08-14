@@ -20,11 +20,11 @@ extern "C" {
 
 #include <microrl.h>
 
-int    print(microrl_t* mrl, const char* str);
-char   get_char(void);
-int    execute(microrl_t* mrl, int argc, const char* const *argv);
-char** complete(microrl_t* mrl, int argc, const char* const *argv);
-void   sigint(microrl_t* mrl);
+int print(microrl_t *mrl, const char *str);
+char get_char(void);
+int execute(microrl_t *mrl, int argc, const char *const *argv);
+char **complete(microrl_t *mrl, int argc, const char *const *argv);
+void sigint(microrl_t *mrl);
 
 #ifdef __cplusplus
 }

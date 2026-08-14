@@ -6,7 +6,6 @@
 
 #include <carrels-monitor.h>
 
-
 seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
 {
     int target_pd_id = ch;

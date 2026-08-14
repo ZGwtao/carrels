@@ -8,7 +8,6 @@
 
 #include <sel4/sel4.h>
 
-
 typedef enum {
     mon_NoError = seL4_NoError,
     mon_DummyError = seL4_NumErrors + 1,

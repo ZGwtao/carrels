@@ -111,8 +111,7 @@ CLANG_FORMAT ?= clang-format
 
 FORMAT_FILES := $(shell git ls-files \
 	'*.c' \
-	'*.h' \
-	'*.S')
+	'*.h' )
 LICENSE_C_FILES := $(shell git ls-files \
 	'*.c' \
 	'*.h' \
