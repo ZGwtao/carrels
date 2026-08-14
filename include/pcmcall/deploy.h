@@ -20,4 +20,4 @@ extern uintptr_t __carrels_payload_start;
 
 seL4_MessageInfo_t monitor_call_deploy_first_half(seL4_Word num_req_pc);
 
-pc_monitor_Error protocon_deploy(payload_info_t *info);
+pc_monitor_error protocon_deploy(payload_info_t *info);

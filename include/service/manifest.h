@@ -92,8 +92,9 @@ static inline uint32_t svc_read_u32(const uint8_t *p)
 static inline const svc_resource_t *svc_service_resource(const svc_service_t *service,
                                                          uint32_t index)
 {
-    if (index >= service->resource_count)
+    if (index >= service->resource_count) {
         return NULL;
+    }
     return (const svc_resource_t *)((const uint8_t *)service + SVC_SERVICE_HEADER_SIZE +
                                     index * SVC_RESOURCE_SIZE);
 }
@@ -110,31 +111,31 @@ static inline bool svc_parse(const void *base, svc_t *svc)
     const uint8_t *p = start;
     static const uint8_t magic[8] = {'O', 'S', 'S', 'v', 'c', 0, 0, 0};
 
-    if (memcmp(p, magic, sizeof(magic)) != 0)
+    if (memcmp(p, magic, sizeof(magic)) != 0) {
         return false;
-
+    }
     svc->version = svc_read_u16(p + 8);
     svc->service_count = svc_read_u32(p + 12);
     svc->total_size = svc_read_u32(p + 16);
     if (svc->version != SVC_VERSION || svc->service_count > SVC_MAX_SERVICES ||
-        svc->total_size < SVC_HEADER_SIZE)
+        svc->total_size < SVC_HEADER_SIZE) {
         return false;
-
+    }
     p += SVC_HEADER_SIZE;
 
     for (uint32_t i = 0; i < svc->service_count; i++) {
-        if (p + SVC_SERVICE_HEADER_SIZE > start + svc->total_size)
+        if (p + SVC_SERVICE_HEADER_SIZE > start + svc->total_size) {
             return false;
-
+        }
         uint32_t record_size = svc_read_u32(p);
         uint32_t resource_count = svc_read_u32(p + 14);
         uint32_t path_len = svc_read_u32(p + 18);
         uint32_t expected_size =
             SVC_SERVICE_HEADER_SIZE + resource_count * SVC_RESOURCE_SIZE + path_len;
 
-        if (record_size != expected_size || p + record_size > start + svc->total_size)
+        if (record_size != expected_size || p + record_size > start + svc->total_size) {
             return false;
-
+        }
         svc->services[i] = (const svc_service_t *)p;
         p += record_size;
     }

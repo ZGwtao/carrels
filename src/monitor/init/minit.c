@@ -43,17 +43,10 @@ static inline void ca_monitor_init_storage(void)
 
     if (!dlg_parse((void *)0xaaaaa10000, &dlg)) {
         TSLDR_DBG_PRINT(PROGNAME "failed to parse dlg\n");
-        while (1)
+        while (1) {
             ;
+        }
     }
-
-    // for (uint32_t i = 0; i < dlg.delegator_count; i++) {
-    //     const dlg_delegator_t *delegator = dlg.delegators[i];
-
-    //     for (uint16_t j = 0; j < delegator->resource_count; j++) {
-    //         const dlg_resource_t *resource = dlg_delegator_resource(delegator, j);
-    //     }
-    // }
 
     for (uint32_t i = 0; i < dlg.delegator_count; i++) {
         const dlg_delegator_t *delegator = dlg.delegators[i];
@@ -66,8 +59,9 @@ static inline void ca_monitor_init_storage(void)
 
     if (!svc_parse((void *)0xaaaaa00000, &svc)) {
         TSLDR_DBG_PRINT(PROGNAME "failed to parse svc\n");
-        while (1)
+        while (1) {
             ;
+        }
     }
 
     for (uint32_t i = 0; i < svc.service_count; i++) {
@@ -93,30 +87,32 @@ ca_monitor_init_cothread_spawn(const client_entry_t client_entry, void *arg, cha
 {
     if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
         TSLDR_DBG_PRINT(err_msg);
-        while (1)
+        while (1) {
             ;
+        }
     }
     microkit_cothread_yield();
 }
 
-static inline pc_monitor_Error ca_monitor_init_validate_pc_count(uint32_t pc_count)
+static inline pc_monitor_error ca_monitor_init_validate_pc_count(uint32_t pc_count)
 {
     if (pc_count > PC_CHILD_PER_MONITOR_MAX_NUM) {
-        return mon_InvalidReqPCNum;
+        return MON_INVALID_REQ_PC_NUM;
     }
 
     TSLDR_DBG_PRINT(PROGNAME "Number of available PCs recorded from svcdb: %d\n", pc_count);
-    return mon_NoError;
+    return MON_NO_ERROR;
 }
 
 static inline void ca_monitor_init_get_pcnum(uint32_t delegator_cnt, ca_monitor_bootinfo_t *info)
 {
-    if (ca_monitor_init_validate_pc_count(delegator_cnt) != mon_NoError) {
+    if (ca_monitor_init_validate_pc_count(delegator_cnt) != MON_NO_ERROR) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PC count: %d; maximum supported count is %d\n",
                         delegator_cnt,
                         (PC_CHILD_PER_MONITOR_MAX_NUM));
-        while (mon_InvalidReqPCNum)
+        while (MON_INVALID_REQ_PC_NUM) {
             ;
+        }
     }
     info->num_pc = delegator_cnt;
     assert(info->num_pc <= PC_CHILD_PER_MONITOR_MAX_NUM);

@@ -74,24 +74,27 @@ static inline void service_installer_append_acrtreq(trustedlo_xrtreq_t *xrt_req_
 
         switch (resource->kind) {
         case SVC_RESOURCE_CHANNEL_NOTIFY: {
-            if (xrt_req_list->num_req_notifications >= 64)
+            if (xrt_req_list->num_req_notifications >= 64) {
                 break;
+            }
             seL4_Word idx = xrt_req_list->num_req_notifications++;
             xrt_req_list->notifications[idx] = (seL4_Word)resource->value;
             break;
         }
 
         case SVC_RESOURCE_CHANNEL_PPC: {
-            if (xrt_req_list->num_req_ppcs >= 64)
+            if (xrt_req_list->num_req_ppcs >= 64) {
                 break;
+            }
             seL4_Word idx = xrt_req_list->num_req_ppcs++;
             xrt_req_list->ppcs[idx] = (seL4_Word)resource->value;
             break;
         }
 
         case SVC_RESOURCE_MAP: {
-            if (xrt_req_list->num_req_mappings >= 64)
+            if (xrt_req_list->num_req_mappings >= 64) {
                 break;
+            }
             seL4_Word idx = xrt_req_list->num_req_mappings++;
             xrt_req_list->mappings[idx] = (seL4_Word)resource->value;
             break;
@@ -104,8 +107,8 @@ static inline void service_installer_append_acrtreq(trustedlo_xrtreq_t *xrt_req_
 }
 
 static inline void
-service_installer_initialise_AcRtReqHeader(void *xrt_req_header,
-                                           const trustedlo_xrtreq_t *xrt_req_list)
+service_installer_initialise_ac_rt_req_header(void *xrt_req_header,
+                                              const trustedlo_xrtreq_t *xrt_req_list)
 {
     trustedlo_xrtreq_header_t *header = (trustedlo_xrtreq_header_t *)(xrt_req_header);
 
@@ -154,6 +157,6 @@ void service_installer_apply(const deploy_plan_t *plan)
         service_installer_append_acrtreq(&xrt_req_list, curr_svc);
     }
 
-    service_installer_initialise_AcRtReqHeader((char *)(plan->base_serialised_service),
-                                               &xrt_req_list);
+    service_installer_initialise_ac_rt_req_header((char *)(plan->base_serialised_service),
+                                                  &xrt_req_list);
 }

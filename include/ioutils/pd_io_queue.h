@@ -11,12 +11,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#define PD_IO_QUEUE_OK 0
-#define PD_IO_QUEUE_EMPTY -1
-#define PD_IO_QUEUE_FULL -2
-#define PD_IO_QUEUE_TOO_LARGE -3
-#define PD_IO_QUEUE_BAD_DESC -4
-#define PD_IO_QUEUE_BAD_HEADER -5
+#define PD_IO_QUEUE_OK (0)
+#define PD_IO_QUEUE_EMPTY (-1)
+#define PD_IO_QUEUE_FULL (-2)
+#define PD_IO_QUEUE_TOO_LARGE (-3)
+#define PD_IO_QUEUE_BAD_DESC (-4)
+#define PD_IO_QUEUE_BAD_HEADER (-5)
 
 typedef struct pd_io_buffer_desc {
     uint64_t offset;

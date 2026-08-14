@@ -38,14 +38,14 @@ seL4_MessageInfo_t monitor_call_list_protocons(void)
 {
     monitor_main_list_protocon_states(ca_bootinfo.num_pc);
 
-    return microkit_msginfo_new(mon_NoError, 0);
+    return microkit_msginfo_new(MON_NO_ERROR, 0);
 }
 
 seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
 {
     monitor_main_list_protocon_states(ca_bootinfo.num_pc);
 
-    seL4_Word self_id = monitor_get_pcid_from_ch(ch);
+    microkit_channel self_id = monitor_get_pcid_from_ch(ch);
     seL4_Word bitmap = 0;
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
         if ((protocon_state_check_lifecycle_state(i, PROTOCON_ACTIVE) ||
@@ -54,7 +54,7 @@ seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
             bitmap |= (1ULL << i);
         }
     }
-    seL4_MessageInfo_t ret = microkit_msginfo_new(mon_NoError, 2);
+    seL4_MessageInfo_t ret = microkit_msginfo_new(MON_NO_ERROR, 2);
     microkit_mr_set(0, bitmap);
     microkit_mr_set(1, monitor_get_pcid_from_ch(ch));
     if (bitmap == 0) {

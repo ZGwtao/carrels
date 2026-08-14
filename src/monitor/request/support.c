@@ -9,14 +9,14 @@
 
 seL4_MessageInfo_t monitor_call_backup_protocon_loading_context(microkit_channel ch)
 {
-    int cid = monitor_get_pcid_from_ch(ch);
+    microkit_channel cid = monitor_get_pcid_from_ch(ch);
 
     trustedlo_ctxt_t *ctxt =
         (trustedlo_ctxt_t *)monitor_vm_region_base(&monitor_vm_layout.loader_context, cid);
 
     memcpy(protocon_state_retrieve_context(cid), ctxt, sizeof(trustedlo_ctxt_t));
 
-    return microkit_msginfo_new(mon_NoError, 0);
+    return microkit_msginfo_new(MON_NO_ERROR, 0);
 }
 
 void monitor_main_load_trustedlo(uint32_t cid)
