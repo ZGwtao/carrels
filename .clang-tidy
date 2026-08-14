@@ -38,7 +38,7 @@ Checks: >
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: '.*/libtrustedlo/(?!include/elf\.h$).*'
+HeaderFilterRegex: '.*/carrels/(include|src)/.*'
 
 CheckOptions:
   readability-identifier-naming.FunctionCase: lower_case
