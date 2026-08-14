@@ -18,7 +18,7 @@ typedef struct __attribute__((packed)) {
     uint8_t kind;
     uint8_t flags;
     uint16_t slot;
-    uint8_t cap_count;
+    uint16_t cap_count;
     uint64_t arg0;
     uint64_t arg1;
 } dlg_resource_t;

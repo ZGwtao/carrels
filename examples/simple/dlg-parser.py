@@ -121,12 +121,12 @@ def parse_delegator(bundle_data, off):
 # + kind:          u8  = 1
 # + flags:         u8  = 1
 # + slot:          u16 = 2
-# + cap_count:     u8  = 1
+# + cap_count:     u16 = 1
 # + arg0:          u64 = 8
 # + arg1:          u64 = 8
 #
 def parse_resource(bundle_data, off):
-    header_format = "<BBHBQQ"
+    header_format = "<BBHHQQ"
     resource_size = struct.calcsize(header_format)
 
     if off + resource_size > len(bundle_data):
