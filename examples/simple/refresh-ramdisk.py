@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from pathlib import Path
-
 import subprocess
 import sys
 
@@ -25,72 +24,21 @@ STATIC_COPY_TABLE = [
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print(
-            f"Usage: {Path(sys.argv[0]).name} <build-dir>",
-            file=sys.stderr,
-        )
-        return 1
-
     build_dir = Path(sys.argv[1]).resolve()
-    if not build_dir.is_dir():
-        print(
-            f"Error: build directory does not exist: {build_dir}",
-            file=sys.stderr,
-        )
-        return 1
-
     script_dir = Path(__file__).resolve().parent
     copy_script = script_dir / "copy2ramdisk.sh"
 
-    if not copy_script.is_file():
-        print(f"Error: cannot find {copy_script}", file=sys.stderr)
-        return 1
+    copy_table = STATIC_COPY_TABLE + \
+        [(f, 2) for f in sorted(build_dir.glob("*.data"))] + \
+        [(f, 2) for f in sorted(build_dir.glob("symbols/*.mktsym"))]
 
-    data_copy_table = [
-        (data_file, 2)
-        for data_file in sorted(build_dir.glob("*.data"))
-    ]
-    mktsym_copy_table = [
-        (mktsym_file, 2)
-        for mktsym_file in sorted(build_dir.glob("symbols/*.mktsym"))
-    ]
-
-    copy_table = STATIC_COPY_TABLE + data_copy_table + mktsym_copy_table
-
-    for file_path, partition in copy_table:
-        source = Path(file_path)
-
-        if not source.is_file():
-            print(
-                f"Error: source file does not exist: {source}",
-                file=sys.stderr,
-            )
-            return 1
-
+    for source, partition in copy_table:
         print(f"Copying {source} to partition {partition}")
-
-        try:
-            subprocess.run(
-                [str(copy_script), str(source), str(partition)],
-                check=True,
-            )
-        except subprocess.CalledProcessError as error:
-            print(
-                f"Error: failed to copy {source} "
-                f"to partition {partition}, exit code {error.returncode}",
-                file=sys.stderr,
-            )
-            return error.returncode
+        result = subprocess.run([str(copy_script), str(source), str(partition)])
+        if result.returncode: return result.returncode
 
     print("All files copied successfully.")
-
-    subprocess.run(
-        [str(script_dir / "listramdisk.sh")],
-        check=True,
-    )
-
-    return 0
+    return subprocess.run([str(script_dir / "listramdisk.sh")]).returncode
 
 
 if __name__ == "__main__":
