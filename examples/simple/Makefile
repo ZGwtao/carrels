@@ -14,6 +14,7 @@ endif
 override LIONSOS:=$(abspath ${LIONSOS})
 
 export CARRELS ?= $(abspath ../..)
+export ROOT ?= $(abspath ../..)
 export CONTAINER_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 export CONFIG_INCLUDE ?= $(abspath src/config)
 export MICROKIT_CONFIG ?= debug
@@ -34,6 +35,7 @@ ${BUILD_DIR}/Makefile: container.mk
 
 ${BUILD_DIR}/Makefile: container.mk Makefile
 	mkdir -p ${BUILD_DIR}
+	echo "export ROOT ?= ${ROOT}" > $@
 	echo "export CARRELS ?= ${CARRELS}" > $@
 	echo "export CONTAINER_DIR ?= ${CONTAINER_DIR}" >> $@
 	echo "export BUILD_DIR := ${BUILD_DIR}" >> $@

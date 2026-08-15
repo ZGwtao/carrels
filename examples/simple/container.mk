@@ -5,8 +5,7 @@
 
 IMAGES := \
 	timer_driver.elf \
-	eth_driver.elf network_vswitch.elf \
-	network_virt_rx.elf network_virt_tx.elf network_copy.elf \
+	eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
 	monitor.elf \
 	orchestrator.elf \
 	fat.elf \
@@ -14,6 +13,7 @@ IMAGES := \
 	client_looping.img \
 	client_faulting.img \
 	client_timeout.img \
+	unikraft.img \
 	bench_simple.img \
 	trampoline.elf \
 	protocon.elf \
@@ -22,7 +22,6 @@ IMAGES := \
 	serial_virt_tx.elf \
 	blk_virt.elf \
 	blk_driver.elf
-# 	unikraft.img \
 
 SUPPORTED_BOARDS:= \
 	qemu_virt_aarch64 \
@@ -100,6 +99,7 @@ include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 ${IMAGES}: $(LIONS_LIBC)/lib/libc.a libsddf_util_debug.a
 
+include $(ROOT)/uk.mk
 
 FORCE:
 
@@ -113,6 +113,7 @@ system: $(METAPROGRAM) $(DTB)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	cp network_copy.elf network_copy0.elf
+	cp network_copy.elf network_copy1.elf
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) -B $(METAPROGRAM) \
 	--sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --objcopy $(OBJCOPY) \
 	--vm-layout $(PROTOCON_VM_LAYOUT) --monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py \
@@ -122,7 +123,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf
-	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy1.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -130,7 +131,6 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_orchestrator.data orchestrator.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_container_monitor.data monitor.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_container_monitor.data monitor.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_orchestrator.data orchestrator.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_container_monitor.data monitor.elf
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
@@ -147,7 +147,7 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
 qemu_disk:
-	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 4 512 16777216 GPT
+	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 4 512 67108864 GPT
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
@@ -158,7 +158,7 @@ qemu: ${IMAGE_FILE} qemu_disk refresh-ramdisk
 		-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 		-m size=2G \
 		-nographic \
-		-netdev user,id=netdev0 \
+		-netdev user,id=netdev0,hostfwd=tcp::8080-:80 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors \
 		-drive file=qemu_disk,if=none,format=raw,id=hd \

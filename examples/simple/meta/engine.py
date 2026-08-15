@@ -178,12 +178,9 @@ class CarrelsContainerEngine:
         the things above are for setting up the regions for a normal conatiner
         the things below are for unikernels specifically.
         """
-        uk_boot_stack = self.create_mr(pc.name, "uk_boot_stack", (0x1000 * (1 << 4)))
-        uk_boot_heap = self.create_mr(pc.name, "uk_boot_heap", (0x1000 * (1 << 10)))
-        self.sdf.add_mr(uk_boot_stack)
-        self.sdf.add_mr(uk_boot_heap)
-        pc.add_map(MAP(uk_boot_stack, 0xFF008000, perms="rw", cached="true"))
-        pc.add_map(MAP(uk_boot_heap, 0xFF018000, perms="rw", cached="true"))
+        uk_heap = self.create_mr(pc.name, "uk_heap", 0x4000000)
+        self.sdf.add_mr(uk_heap)
+        pc.add_map(MAP(uk_heap, 0x200000000, perms="rw", cached="true"))
 
         return cid
 
