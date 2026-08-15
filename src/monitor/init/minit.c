@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 dlg_header_t dlg;
-
 svc_t svc;
 
 static inline void ca_monitor_init_storage(void)
@@ -94,6 +93,27 @@ ca_monitor_init_cothread_spawn(const client_entry_t client_entry, void *arg, cha
     microkit_cothread_yield();
 }
 
+#define PROTOCON_MKTSYMB_BASE 0xaaaaa20000
+#define PROTOCON_MKTSYMB_SLOT_SIZE 0x1000
+
+static inline void protocon_state_init_symb_header(uint32_t pc_id)
+{
+    int err;
+    char sym_file[80];
+    uintptr_t base = PROTOCON_MKTSYMB_BASE + pc_id * PROTOCON_MKTSYMB_SLOT_SIZE;
+    pc_state_t *state = &protocon_states[pc_id];
+
+    snprintf(sym_file, sizeof(sym_file), "protocon%u.mktsym", pc_id);
+
+    pico_vfs_readfile2buf((void *)base, sym_file, &err);
+    if (err != seL4_NoError) {
+        TSLDR_DBG_PRINT(PROGNAME "Failed to load %s\n", sym_file);
+        microkit_internal_crash(-1);
+    }
+
+    mktsymb_read(&state->sym_header, (void *)base);
+}
+
 static inline pc_monitor_error ca_monitor_init_validate_pc_count(uint32_t pc_count)
 {
     if (pc_count > PC_CHILD_PER_MONITOR_MAX_NUM) {
@@ -124,6 +144,8 @@ static inline void ca_monitor_init_protocon_states(uint64_t pc_num)
         protocon_states[i].pc_id = i;
         protocon_state_memzero_services(i);
         protocon_state_memzero_context(i);
+        protocon_state_memzero_symb_header(i);
+        protocon_state_init_symb_header(i);
         monitor_main_load_trustedlo(i);
         SET_PROTOCON_AS_AVAILABLE(i);
     }
@@ -136,20 +158,13 @@ void ca_monitor_init_states(void)
     void *binfo = microkit_cothread_my_arg();
 
     assert(binfo);
-    ca_monitor_bootinfo_t *bootinfo = (ca_monitor_bootinfo_t *)(binfo);
+    ca_monitor_bootinfo_t *bootinfo = (ca_monitor_bootinfo_t *)binfo;
 
-    while (!dlg.delegator_count) {
+    while (!dlg.delegator_count)
         microkit_cothread_yield();
-    }
 
-    // 'dlg' is initiliased by now.
     ca_monitor_init_get_pcnum(dlg.delegator_count, bootinfo);
-
-    /* init all protocon and states */
     ca_monitor_init_protocon_states(bootinfo->num_pc);
-
-    // monitor_deploy_refresh_request();
-
     monitor_init_all_client_links(bootinfo->num_pc);
 }
 

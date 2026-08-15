@@ -37,10 +37,45 @@ static inline void monitor_finish_deploy_request(void)
     monitor_main_notify_orchestrator();
 }
 
-static inline void protocon_load_payload(uintptr_t dest, uintptr_t src, uint64_t size)
+static inline uint64_t mktsymb_bundle_size(const mktsymb_header_t *header)
 {
-    memcpy((void *)dest, (const void *)src, size);
-    TSLDR_DBG_PRINT(PROGNAME "src: %x, dest: %x, size: %d\n", src, dest, size);
+    const uint8_t *p = header->symbols;
+
+    for (uint32_t i = 0; i < header->symbol_cnt; ++i) {
+        mktsymb_symbol_t symbol;
+        p = mktsymb_read_symbol(p, &symbol);
+    }
+
+    return (uint64_t)(p - header->base);
+}
+
+static inline void
+protocon_load_payload(uint32_t pc_id, uintptr_t dest, uintptr_t src, uint64_t elf_size)
+{
+    const mktsymb_header_t *sym = &protocon_states[pc_id].sym_header;
+    uint64_t sym_size = mktsymb_bundle_size(sym);
+    uint64_t sym_offset = sizeof(protocon_image_header_t);
+    uint64_t elf_offset = sym_offset + sym_size;
+
+    protocon_image_header_t *header = (protocon_image_header_t *)dest;
+
+    header->magic = PROTOCON_IMAGE_MAGIC;
+    header->reserved = 0;
+    header->mktsymb_offset = sym_offset;
+    header->mktsymb_size = sym_size;
+    header->elf_offset = elf_offset;
+    header->elf_size = elf_size;
+
+    memcpy((void *)(dest + sym_offset), sym->base, sym_size);
+    memcpy((void *)(dest + elf_offset), (const void *)src, elf_size);
+
+    TSLDR_DBG_PRINT(PROGNAME "pc=%d image=%x sym_off=%x sym_size=%d elf_off=%x elf_size=%d\n",
+                    pc_id,
+                    dest,
+                    sym_offset,
+                    sym_size,
+                    elf_offset,
+                    elf_size);
 }
 
 static inline pc_monitor_error monitor_check_deploy_num(seL4_Word num_req_pc)
@@ -112,7 +147,8 @@ static inline void protocon_pre_instantiate(deploy_plan_t *plan, const payload_i
     plan->pc_entry = (Elf64_Addr)(tsldr_vm_layout.loader_program.base);
     assert(plan->pc_entry == ((Elf64_Ehdr *)(__carrels_protocon_start))->e_entry);
 
-    protocon_load_payload((uintptr_t)(plan->pc_base),
+    protocon_load_payload(plan->pc_id,
+                          (uintptr_t)(plan->pc_base),
                           (uintptr_t)(payload->header_payload),
                           (uint64_t)(payload->elf_payload_size));
 }
