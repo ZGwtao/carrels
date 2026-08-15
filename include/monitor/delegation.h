@@ -11,8 +11,8 @@
 
 #define DLG_MAX_DELEGATORS 16
 #define DLG_HEADER_SIZE 16
-#define DLG_DELEGATOR_HEADER_SIZE 16
-#define DLG_RESOURCE_SIZE 21
+#define DLG_RESOURCE_SIZE sizeof(dlg_resource_t)
+#define DLG_DELEGATOR_HEADER_SIZE sizeof(dlg_delegator_t)
 
 typedef struct __attribute__((packed)) {
     uint8_t kind;
