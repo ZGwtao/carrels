@@ -72,7 +72,8 @@ class CarrelsContainerInfra:
         if name is None:
             name = f"protocon{index}"
 
-        client = PD(name, priority=priority, template=True, sym_emit=True, allow_delegation=True)
+        client = PD(name, priority=priority, stack_size=0x10000,
+                    template=True, sym_emit=True, allow_delegation=True)
 
         self.engine.add_client(client)
         self.protocons.append(client)

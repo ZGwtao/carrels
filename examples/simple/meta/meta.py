@@ -63,7 +63,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         client_limit=16,
     )
     container_infra.connect_orchestrator()
-    protocons = container_infra.add_clients(8)
+    protocons = container_infra.add_clients(2)
     pd_orchestrator = container_infra.pd_orchestrator
     pd_engine = container_infra.pd_engine
 
@@ -103,19 +103,21 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
                     priority=101, budget=100, period=400)
     net_virt_tx = PD("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = PD("net_virt_rx", "network_virt_rx.elf", priority=99)
-    vswitch = PD("net_vswitch", "network_vswitch.elf", priority=98)
-    net_system = Sddf.Net(sdf, net_node, eth_driver, net_virt_tx, net_virt_rx, vswitch=vswitch)
+    net_system = Sddf.Net(sdf, net_node, eth_driver, net_virt_tx, net_virt_rx)
     client0_net_copier = PD(
         "client0_net_copier", "network_copy0.elf", priority=97, budget=20000)
+    client1_net_copier = PD(
+        "client1_net_copier", "network_copy1.elf", priority=97, budget=20000)
 
-    net_system.add_client_with_copier(pd_engine, client0_net_copier, vswitch=True)
+    net_system.add_client_with_copier(protocons[0], client0_net_copier, optional=True)
+    net_system.add_client_with_copier(protocons[1], client1_net_copier, optional=True)
 
     pds = [
         eth_driver,
         net_virt_rx,
         net_virt_tx,
         client0_net_copier,
-        vswitch,
+        client1_net_copier,
     ]
     for pd in pds:
         sdf.add_pd(pd)

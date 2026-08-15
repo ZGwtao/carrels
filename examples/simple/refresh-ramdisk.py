@@ -20,7 +20,7 @@ STATIC_COPY_TABLE = [
     ("bench_simple.img", 1),
     ("container_monitor.svc", 2),
     ("build/delegation/container_monitor.dlg", 2),
-    # ("unikraft.img", 1),
+    ("unikraft.img", 1),
 ]
 
 

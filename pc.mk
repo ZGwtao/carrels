@@ -25,40 +25,6 @@ PC_TSLDR_VM_LAYOUT_HEADER := $(PC_TSLDR_BUILD_DIR_GEN)/tsldr_vm_layout.h
 
 PC_LIBTRUSTEDLO_OBJ := libtrustedlo/libtrustedlo.a
 
-# ===================== unikraft variables ==========================
-
-BM_UNIKRAFT_DIR := $(CARRELS)/dep/unikraft
-BM_CATALOG_CORE_DIR := $(CARRELS)/dep/catalog-core
-
-BM_UK_APPLICATION ?= c-hello
-BM_UK_PAYLOAD_ELF ?= $(BM_UK_APPLICATION)_default-arm64
-
-BM_UK_CONFIG ?= uk-carrels-arm.config
-BM_UK_CONFIG_SRC := $(PC_CONFIG_DIR)/uk/$(BM_UK_CONFIG)
-
-BM_UK_APP_DIR := $(BM_CATALOG_CORE_DIR)/$(BM_UK_APPLICATION)
-BM_UK_BUILD_DIR := $(BUILD_DIR)/uk
-BM_UK_BUILT_ELF := $(BM_UK_BUILD_DIR)/$(BM_UK_PAYLOAD_ELF)
-BM_UK_CONFIGURED := $(BM_UK_BUILD_DIR)/.configured
-
-BM_UK_MAKE_ARGS := \
-	UK_ROOT=$(BM_UNIKRAFT_DIR) \
-	UK_APP=$(BM_UK_APP_DIR) \
-	UK_BUILD=$(BM_UK_BUILD_DIR) \
-	LIONSOS=$(LIONSOS) \
-	SDDF=$(SDDF) \
-	LIBMICROKITCO_PATH=$(LIBMICROKITCO_PATH) \
-	LIBTRUSTEDLO_PATH=$(PC_LIBTRUSTEDLO_DIR) \
-	LIBTRUSTEDLO_LIB=$(abspath pc/$(PC_LIBTRUSTEDLO_OBJ)) \
-	MICROKIT_SDK=$(MICROKIT_SDK) \
-	MICROKIT_BOARD=$(MICROKIT_BOARD) \
-	MICROKIT_CONFIG=$(MICROKIT_CONFIG) \
-	BOARD_DIR=$(BOARD_DIR) \
-	SDDF_UTIL_LIB=$(abspath libsddf_util.a) \
-	TSLDR_HEADER=$(PC_TSLDR_BUILD_DIR_GEN)
-
-# ===================== unikraft variables ==========================
-
 PC_CFLAGS := \
 	-I$(CONTAINER_LIBC_INCLUDE) \
 	-I$(PC_HEADER_DIR) \
@@ -149,29 +115,6 @@ pc/$(PC_LIBTRUSTEDLO_OBJ): pc
 			CPU:=$(CPU) \
 			LLVM:=1
 
-# ===================== unikraft variables ==========================
-
-.PHONY: uk-build
-uk-build: $(BM_UK_CONFIGURED) libsddf_util.a | pc
-	$(MAKE) -C $(BM_UK_APP_DIR) \
-		$(BM_UK_MAKE_ARGS) \
-		-j$$(nproc)
-	cp $(BM_UK_BUILT_ELF) pc/$(BM_UK_PAYLOAD_ELF)
-
-
-$(BM_UK_CONFIGURED): $(BM_UK_CONFIG_SRC)
-	$(MAKE) -C $(BM_UK_APP_DIR) \
-		$(BM_UK_MAKE_ARGS) \
-		distclean
-	$(MAKE) -C $(BM_UK_APP_DIR) \
-		$(BM_UK_MAKE_ARGS) \
-		UK_DEFCONFIG=$(BM_UK_CONFIG_SRC) \
-		defconfig
-	mkdir -p $(BM_UK_BUILD_DIR)
-	touch $@
-
-# ===================== unikraft variables ==========================
-
 vpath client/%.c $(PC_SRC_DIR)/src
 vpath util/%.c $(PC_SRC_DIR)/src
 vpath monitor/%.c $(PC_SRC_DIR)/src
@@ -238,7 +181,6 @@ PC_CLIENT_ELFS := $(addsuffix .elf,$(PC_CLIENT_NAMES))
 PC_CLIENT_IMGS := $(addsuffix .img,$(PC_CLIENT_NAMES))
 
 PC_SERVICE_MANIFEST := $(PC_SRC_DIR)/src/client/service.mf
-PC_UNIKRAFT_MANIFEST := $(PC_SRC_DIR)/src/client/uk.mf
 
 $(PC_CLIENT_ELFS): LDFLAGS += -L$(BOARD_DIR)/lib
 
@@ -251,7 +193,7 @@ client_timeout.elf:  $(PC_TIMEOUT_CLIENT_OBJS)
 $(PC_CLIENT_ELFS): libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
 
-PC_SERVICE_IMGS := $(PC_CLIENT_IMGS) unikraft.img
+PC_SERVICE_IMGS := $(PC_CLIENT_IMGS)
 
 .PHONY: pc-images
 pc-images: $(PC_SERVICE_IMGS)
@@ -261,18 +203,6 @@ $(PC_SERVICE_IMGS): %.img: %.elf $(PC_SERVICE_MANIFEST) \
 	PYTHONPATH=$(SDDF)/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(PC_TOOL_DIR)/service-helper.py \
 		--mf $(PC_SERVICE_MANIFEST) \
-		--elf $< \
-		-o $@
-
-unikraft.elf: uk-build
-	cp pc/$(BM_UK_PAYLOAD_ELF) unikraft.elf
-
-
-unikraft.img: unikraft.elf $(PC_UNIKRAFT_MANIFEST) \
-		$(PC_TOOL_DIR)/service-helper.py
-	PYTHONPATH=$(SDDF)/tools/meta:$$PYTHONPATH $(PYTHON) \
-		$(PC_TOOL_DIR)/service-helper.py \
-		--mf $(PC_UNIKRAFT_MANIFEST) \
 		--elf $< \
 		-o $@
 
