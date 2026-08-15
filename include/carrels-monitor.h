@@ -99,6 +99,7 @@ typedef struct pc_state {
         uint32_t avail_service_per_type[SVC_TYPE_MAX_NUM];
         const svc_service_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
     } resource_quota;
+    mktsymb_header_t sym_header;
 } pc_state_t;
 
 extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
@@ -145,6 +146,12 @@ static inline void protocon_state_memzero_context(uint32_t pc_id)
 {
     pc_state_t *state = &protocon_states[pc_id];
     memset(&state->resource_alloc_state.context, 0, sizeof(trustedlo_ctxt_t));
+}
+
+static inline void protocon_state_memzero_symb_header(uint32_t pc_id)
+{
+    pc_state_t *state = &protocon_states[pc_id];
+    memset(&state->sym_header, 0, sizeof(mktsymb_header_t));
 }
 
 #define SET_PROTOCON_AS_INSTANTIATED(C)                                                            \

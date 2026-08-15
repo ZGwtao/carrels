@@ -121,15 +121,16 @@ service_installer_initialise_ac_rt_req_header(void *xrt_req_header,
     mktxlo_prepare_xrt_req_list((char *)(header) + header->serialised_offset, xrt_req_list);
 }
 
+static inline void *protocon_image_elf(uintptr_t image_base)
+{
+    const protocon_image_header_t *header = (const protocon_image_header_t *)image_base;
+    return (void *)(image_base + header->elf_offset);
+}
+
 void service_installer_apply(const deploy_plan_t *plan)
 {
-    // the request variable, which should be filled out with the low-level access rights information
-    // we use it to record the access rights of the required OS services (i.e., svcs from above)
-    // we will then send this thing to the trusted loading functions for actual trusted loading
-    // the reason we need it is that the trusted loader does not handle high-level information
-    // so we put an information flow transition that turns requested OS services into low-level
-    // details
     trustedlo_xrtreq_t xrt_req_list = {};
+    void *elf_base = protocon_image_elf(plan->pc_base);
 
     for (uint32_t i = 0; i < plan->req->service_count; ++i) {
         const protocon_svc_req_t *req = plan->req;
@@ -144,19 +145,21 @@ void service_installer_apply(const deploy_plan_t *plan)
         memcpy(path, svc_service_path(curr_svc), curr_svc->path_len);
         path[curr_svc->path_len] = '\0';
 
-        TSLDR_DBG_PRINT(PROGNAME "pc_base: %x, service vaddr: %x, datapath: %s\n",
-                        (uintptr_t)(plan->pc_base),
-                        (uintptr_t)(req->service_entries[i]->offset) +
-                            (uintptr_t)(req->payload_e_entry),
+        TSLDR_DBG_PRINT(PROGNAME "image_base: %x, elf_base: %x, service vaddr: %x, datapath: %s\n",
+                        (uintptr_t)plan->pc_base,
+                        (uintptr_t)elf_base,
+                        (uintptr_t)req->service_entries[i]->offset +
+                            (uintptr_t)req->payload_e_entry,
                         path);
 
-        service_installer_payload_add_service((void *)(plan->pc_base),
+        service_installer_payload_add_service(elf_base,
                                               path,
-                                              (uintptr_t)(req->service_entries[i]->offset) +
-                                                  (uintptr_t)(req->payload_e_entry));
+                                              (uintptr_t)req->service_entries[i]->offset +
+                                                  (uintptr_t)req->payload_e_entry);
+
         service_installer_append_acrtreq(&xrt_req_list, curr_svc);
     }
 
-    service_installer_initialise_ac_rt_req_header((char *)(plan->base_serialised_service),
+    service_installer_initialise_ac_rt_req_header((char *)plan->base_serialised_service,
                                                   &xrt_req_list);
 }
