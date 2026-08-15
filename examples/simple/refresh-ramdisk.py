@@ -10,18 +10,11 @@ import sys
 
 
 STATIC_COPY_TABLE = [
-    ("trampoline.elf", 1),
     ("protocon.elf", 1),
-    ("client_timeout.img", 1),
-    ("client_faulting.img", 1),
-    ("client_echo.img", 1),
-    ("client_looping.img", 1),
-    ("bench_simple.img", 1),
+    ("trampoline.elf", 1),
     ("container_monitor.svc", 2),
     ("build/delegation/container_monitor.dlg", 2),
-    ("unikraft.img", 1),
 ]
-
 
 def main() -> int:
     build_dir = Path(sys.argv[1]).resolve()
@@ -30,7 +23,8 @@ def main() -> int:
 
     copy_table = STATIC_COPY_TABLE + \
         [(f, 2) for f in sorted(build_dir.glob("*.data"))] + \
-        [(f, 2) for f in sorted(build_dir.glob("symbols/*.mktsym"))]
+        [(f, 2) for f in sorted(build_dir.glob("symbols/*.mktsym"))] + \
+        [(f, 1) for f in sorted(build_dir.glob("*.img"))]
 
     for source, partition in copy_table:
         print(f"Copying {source} to partition {partition}")

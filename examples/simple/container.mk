@@ -3,26 +3,6 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 
-IMAGES := \
-	timer_driver.elf \
-	eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	monitor.elf \
-	orchestrator.elf \
-	fat.elf \
-	client_echo.img \
-	client_looping.img \
-	client_faulting.img \
-	client_timeout.img \
-	unikraft.img \
-	bench_simple.img \
-	trampoline.elf \
-	protocon.elf \
-	serial_driver.elf \
-	serial_virt_rx.elf \
-	serial_virt_tx.elf \
-	blk_virt.elf \
-	blk_driver.elf
-
 SUPPORTED_BOARDS:= \
 	qemu_virt_aarch64 \
 	maaxboard \
@@ -97,9 +77,29 @@ LIBMICROKITCO_LIBC_INCLUDE := $(LIONS_LIBC)/include
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 
-${IMAGES}: $(LIONS_LIBC)/lib/libc.a libsddf_util_debug.a
-
 include $(ROOT)/uk.mk
+
+IMAGES := \
+	timer_driver.elf \
+	eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
+	monitor.elf \
+	orchestrator.elf \
+	fat.elf \
+	client_echo.img \
+	client_looping.img \
+	client_faulting.img \
+	client_timeout.img \
+	bench_simple.img \
+	$(UNIKERNELS) \
+	trampoline.elf \
+	protocon.elf \
+	serial_driver.elf \
+	serial_virt_rx.elf \
+	serial_virt_tx.elf \
+	blk_virt.elf \
+	blk_driver.elf
+
+${IMAGES}: $(LIONS_LIBC)/lib/libc.a libsddf_util_debug.a
 
 FORCE:
 
@@ -147,7 +147,7 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
 qemu_disk:
-	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 4 512 67108864 GPT
+	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 2 512 67108864 GPT
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
