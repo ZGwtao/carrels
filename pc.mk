@@ -37,6 +37,7 @@ PC_CFLAGS := \
 
 LIBMICROKITCO_CFLAGS_pc := ${PC_CFLAGS}
 PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a
+PC_FS_HELPERS_OBJ := pc/fs/helpers.o
 
 
 PC_ECHO_CLIENT_OBJS := \
@@ -60,6 +61,7 @@ PC_BENCH_SIMPLE_OBJS := \
 	pc/client/early-init.o
 
 PC_MONITOR_OBJS := \
+	$(PC_FS_HELPERS_OBJ) \
 	pc/monitor/entry.o \
 	pc/monitor/mcall.o \
 	pc/monitor/fault/fault.o \
@@ -78,6 +80,7 @@ PC_MONITOR_OBJS := \
 	pc/util/pico_vfs.o
 
 PC_ORCHESTRATOR_OBJS := \
+	$(PC_FS_HELPERS_OBJ) \
 	pc/orchestrator/orchestrator.o \
 	pc/util/pico_vfs.o \
 	pc/microrl.o
@@ -131,6 +134,11 @@ pc/%.o: %.c | pc $(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
+pc/fs/helpers.o: $(PC_SRC_DIR)/lib/fs/helpers/helpers.c | pc \
+	$(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
+	@mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS) $< -o $@
+
 pc/microrl.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS) \
 	-I$(PC_MICRORL_SRC_DIR)/include
 
@@ -140,15 +148,14 @@ pc/microrl.o: $(PC_MICRORL_SRC_DIR)/microrl.c | pc
 
 orchestrator.elf: LDFLAGS += -L$(BOARD_DIR)/lib
 orchestrator.elf: $(PC_ORCHESTRATOR_OBJS) \
-			  	  $(PC_LIBMICROKITCO_OBJ) pc/$(PC_LIBTRUSTEDLO_OBJ) libsddf_util.a \
-              	  $(CONTAINER_LIBC_LIB)
+	$(PC_LIBMICROKITCO_OBJ) pc/$(PC_LIBTRUSTEDLO_OBJ) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 
-protocon.elf:
+protocon.elf: pc/$(PC_LIBTRUSTEDLO_OBJ)
 	cp $(BUILD_DIR)/pc/libtrustedlo/loader.elf $@
 
-trampoline.elf:
+trampoline.elf: pc/$(PC_LIBTRUSTEDLO_OBJ)
 	cp $(BUILD_DIR)/pc/libtrustedlo/trampoline.elf $@
 
 payloads.o: \
@@ -165,7 +172,6 @@ monitor.elf: \
 		$(PC_MONITOR_OBJS) \
 		pc/$(PC_LIBTRUSTEDLO_OBJ) \
 		$(PC_LIBMICROKITCO_OBJ) \
-		$(CONTAINER_LIBC_LIB) \
 		libsddf_util.a payloads.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
@@ -242,13 +248,11 @@ docker-check: docker-env
 			set -eu; \
 			echo "PWD=$$PWD"; \
 			echo "MICROKIT_SDK=$$MICROKIT_SDK"; \
-			echo "LIONSOS=$$LIONSOS"; \
 			python --version; \
 			python -c "import sdfgen"; \
 			python -c "from elftools.elf.elffile import ELFFile"; \
 			command -v lex; \
 			test -d "$$MICROKIT_SDK"; \
-			test -d "$$LIONSOS"; \
 			echo "carrels environment check passed" \
 		'
 
@@ -257,5 +261,5 @@ TIDY_FILES := $(shell find $(PC_SRC_DIR)/src \
 	-type f -name '*.c' -print)
 
 .PHONY: tidy
-tidy: $(CONTAINER_LIBC_LIB) $(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
+tidy: $(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(CLANG_TIDY) $(TIDY_FILES) -- $(CFLAGS) $(PC_CFLAGS)

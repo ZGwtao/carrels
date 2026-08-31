@@ -69,11 +69,9 @@ check:
 			set -eu; \
 			echo "CARRELS=$$(pwd)"; \
 			echo "MICROKIT_SDK=$$MICROKIT_SDK"; \
-			echo "LIONSOS=$$LIONSOS"; \
 			test "$$(pwd)" = "$(WORKDIR)"; \
 			test -f pc.mk; \
 			test -x "$$MICROKIT_SDK/bin/microkit"; \
-			test -d "$$LIONSOS"; \
 			python -c "import sdfgen"; \
 			echo "carrels environment check passed" \
 		'
