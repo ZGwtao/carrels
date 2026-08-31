@@ -33,10 +33,11 @@ ${BUILD_DIR}/Makefile: container.mk
 	mkdir -p ${BUILD_DIR}
 	cp container.mk $@
 
-${BUILD_DIR}/Makefile: container.mk Makefile
+${BUILD_DIR}/Makefile: container.mk Makefile $(ROOT)/uk-on-mk.mk
 	mkdir -p ${BUILD_DIR}
-	echo "export ROOT ?= ${ROOT}" > $@
-	echo "export CARRELS ?= ${CARRELS}" > $@
+	echo "ROOT ?= ${ROOT}" > $@
+	echo "CARRELS ?= ${CARRELS}" >> $@
+	echo "export ROOT CARRELS" >> $@
 	echo "export CONTAINER_DIR ?= ${CONTAINER_DIR}" >> $@
 	echo "export BUILD_DIR := ${BUILD_DIR}" >> $@
 	echo "export MICROKIT_BOARD ?= ${MICROKIT_BOARD}" >> $@

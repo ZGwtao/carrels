@@ -8,9 +8,10 @@ SUPPORTED_BOARDS:= \
 	maaxboard \
 	odroidc4
 
+UK_ON_MK_DIR ?= $(CARRELS)/dep/uk-on-mk
 TOOLCHAIN ?= clang
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-SDDF := $(CARRELS)/dep/sddf
+SDDF ?= $(CARRELS)/dep/sddf
 LIBMICROKITCO_PATH := $(CARRELS)/dep/libmicrokitco
 SYSTEM_FILE := container.system
 IMAGE_FILE := container.img
@@ -77,7 +78,7 @@ LIBMICROKITCO_LIBC_INCLUDE := $(LIONS_LIBC)/include
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 
-include $(ROOT)/uk.mk
+include $(ROOT)/uk-on-mk.mk
 
 IMAGES := \
 	timer_driver.elf \
@@ -147,7 +148,7 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
 qemu_disk:
-	$(CARRELS)/dep/sddf/tools/mkvirtdisk $@ 2 512 67108864 GPT
+	$(SDDF)/tools/mkvirtdisk $@ 2 512 67108864 GPT
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 

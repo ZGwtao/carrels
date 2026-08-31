@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-DISK=${1:-"${SCRIPT_DIR}/build/qemu_disk"}
+DISK=${1:-${RAMDISK_DISK:-"${SCRIPT_DIR}/build/qemu_disk"}}
 
 if [ ! -f "$DISK" ]; then
     echo "Error: disk image does not exist: $DISK" >&2
