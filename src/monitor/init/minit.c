@@ -7,7 +7,7 @@
 #include <carrels-monitor.h>
 #include <libmicrokitco.h>
 #include <assert.h>
-#include <stdio.h>
+#include <sddf/util/printf.h>
 
 dlg_header_t dlg;
 svc_t svc;
@@ -25,8 +25,8 @@ static inline void ca_monitor_init_storage(void)
     char svc_file[80];
     char dlg_file[80];
 
-    snprintf(svc_file, sizeof(svc_file), "%s.svc", microkit_name);
-    snprintf(dlg_file, sizeof(dlg_file), "%s.dlg", microkit_name);
+    sddf_snprintf(svc_file, sizeof(svc_file), "%s.svc", microkit_name);
+    sddf_snprintf(dlg_file, sizeof(dlg_file), "%s.dlg", microkit_name);
 
     pico_vfs_readfile2buf((void *)0xaaaaa00000, svc_file, &err);
     if (err != seL4_NoError) {
@@ -103,7 +103,7 @@ static inline void protocon_state_init_symb_header(uint32_t pc_id)
     uintptr_t base = PROTOCON_MKTSYMB_BASE + pc_id * PROTOCON_MKTSYMB_SLOT_SIZE;
     pc_state_t *state = &protocon_states[pc_id];
 
-    snprintf(sym_file, sizeof(sym_file), "protocon%u.mktsym", pc_id);
+    sddf_snprintf(sym_file, sizeof(sym_file), "protocon%u.mktsym", pc_id);
 
     pico_vfs_readfile2buf((void *)base, sym_file, &err);
     if (err != seL4_NoError) {

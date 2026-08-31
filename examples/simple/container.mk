@@ -26,27 +26,27 @@ VSWITCH:= ${SDDF}/examples/vswitch
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
 RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
-FAT := $(LIONSOS)/components/fs/fat
+FAT := $(CARRELS)/components/fs/fat
 NETWORK_COMPONENTS := $(SDDF)/network/components
 
 vpath %.c ${SDDF} ${VSWITCH}
 
 CFLAGS += \
-	-I$(LIONSOS)/include \
+	-I$(CARRELS)/include \
+	-I$(SDDF)/include/sddf/util/custom_libc \
 	-I$(SDDF)/include \
 	-I$(SDDF)/include/microkit \
 	-I$(VSWITCH)/include \
 	-I$(LIBMICROKITCO_PATH)
 
-include $(LIONSOS)/lib/libc/libc.mk
-
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(LIONS_LIBC)/lib
-LIBS := -lmicrokit -Tmicrokit.ld libsddf_util_debug.a -lc
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := -lmicrokit -Tmicrokit.ld libsddf_util_debug.a
 
 BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
 BLK_COMPONENTS := $(SDDF)/blk/components
 
-SDDF_LIBC_INCLUDE := $(LIONS_LIBC)/include
+SDDF_CUSTOM_LIBC := 1
+SDDF_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include ${SDDF}/util/util.mk
 include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
 include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
@@ -65,16 +65,14 @@ LIBTRUSTEDLO_PATH ?= $(CARRELS)/dep/libtrustedlo
 PROTOCON_VM_LAYOUT := $(LIBTRUSTEDLO_PATH)/config/vm_layout.py
 MONITOR_VM_LAYOUT := $()
 
-FAT_LIBC_LIB := $(LIONS_LIBC)/lib/libc.a
-FAT_LIBC_INCLUDE := $(LIONS_LIBC)/include
-include $(LIONSOS)/components/fs/fat/fat.mk
+FAT_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
+include $(FAT)/fat.mk
 
-CONTAINER_LIBC_LIB := $(LIONS_LIBC)/lib/libc.a
-CONTAINER_LIBC_INCLUDE := $(LIONS_LIBC)/include
+CONTAINER_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 CONTAINER_COMPONENT_DIR := $(CARRELS)
 include $(CONTAINER_COMPONENT_DIR)/pc.mk
 
-LIBMICROKITCO_LIBC_INCLUDE := $(LIONS_LIBC)/include
+LIBMICROKITCO_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 
@@ -100,7 +98,7 @@ IMAGES := \
 	blk_virt.elf \
 	blk_driver.elf
 
-${IMAGES}: $(LIONS_LIBC)/lib/libc.a libsddf_util_debug.a
+${IMAGES}: libsddf_util_debug.a
 
 FORCE:
 
@@ -147,7 +145,7 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
-qemu_disk:
+qemu_disk: $(SYSTEM_FILE)
 	$(SDDF)/tools/mkvirtdisk $@ 2 512 67108864 GPT
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)

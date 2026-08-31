@@ -8,11 +8,6 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
-ifeq ($(strip $(LIONSOS)),)
-$(error LIONSOS must be specified)
-endif
-override LIONSOS:=$(abspath ${LIONSOS})
-
 export CARRELS ?= $(abspath ../..)
 export ROOT ?= $(abspath ../..)
 export CONTAINER_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -49,7 +44,6 @@ submodules:
 	git submodule update --init $(CARRELS)/dep/sddf
 	git submodule update --init $(CARRELS)/dep/libmicrokitco
 	git submodule update --init $(CARRELS)/dep/libtrustedlo
-	git submodule update --init $(CARRELS)/dep/unikraft
-	git submodule update --init $(CARRELS)/dep/catalog-core
+	git submodule update --init --recursive $(CARRELS)/dep/uk-on-mk
 
 FORCE:
