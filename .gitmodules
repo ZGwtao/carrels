@@ -17,3 +17,6 @@
 [submodule "libmicrokitco"]
 	path = dep/libmicrokitco
 	url = https://github.com/au-ts/libmicrokitco.git
+[submodule "dep/uk-on-mk"]
+	path = dep/uk-on-mk
+	url = https://github.com/ZGwtao/uk-on-mk.git

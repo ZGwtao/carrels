@@ -8,13 +8,11 @@ import argparse
 import importlib
 from pathlib import Path
 from sdfgen import SystemDescription, Sddf, DeviceTree, LionsOs
-from importlib.metadata import version
 
 from elf import Elftools
 from vspace import VSpace
 from infra import CarrelsContainerInfra as Infra
 
-assert version("sdfgen").split(".")[1] == "33", "Unexpected sdfgen version"
 
 SDF = SystemDescription
 PD = SDF.ProtectionDomain

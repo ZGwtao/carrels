@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from pathlib import Path
+import os
 import subprocess
 import sys
 
@@ -20,6 +21,7 @@ def main() -> int:
     build_dir = Path(sys.argv[1]).resolve()
     script_dir = Path(__file__).resolve().parent
     copy_script = script_dir / "copy2ramdisk.sh"
+    env = os.environ | {"RAMDISK_DISK": str(build_dir / "qemu_disk")}
 
     copy_table = STATIC_COPY_TABLE + \
         [(f, 2) for f in sorted(build_dir.glob("*.data"))] + \
@@ -28,11 +30,11 @@ def main() -> int:
 
     for source, partition in copy_table:
         print(f"Copying {source} to partition {partition}")
-        result = subprocess.run([str(copy_script), str(source), str(partition)])
+        result = subprocess.run([str(copy_script), str(source), str(partition)], env=env)
         if result.returncode: return result.returncode
 
     print("All files copied successfully.")
-    return subprocess.run([str(script_dir / "listramdisk.sh")]).returncode
+    return subprocess.run([str(script_dir / "listramdisk.sh")], env=env).returncode
 
 
 if __name__ == "__main__":

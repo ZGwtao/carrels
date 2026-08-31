@@ -17,7 +17,7 @@ FILE=$1
 PART=$2
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-DISK="${SCRIPT_DIR}/build/qemu_disk"
+DISK=${RAMDISK_DISK:-"${SCRIPT_DIR}/build/qemu_disk"}
 
 if [ ! -f "$FILE" ]; then
     echo "Error: source file does not exist: $FILE" >&2
