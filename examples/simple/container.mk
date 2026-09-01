@@ -121,6 +121,9 @@ system: $(METAPROGRAM) $(DTB)
 $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 	cp network_copy.elf network_copy0.elf
 	cp network_copy.elf network_copy1.elf
+	cp network_copy.elf network_copy2.elf
+	cp network_copy.elf network_copy3.elf
+	cp network_copy.elf network_copy4.elf
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) -B $(METAPROGRAM) \
 	--sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --objcopy $(OBJCOPY) \
 	--vm-layout $(PROTOCON_VM_LAYOUT) --monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py \
@@ -131,6 +134,9 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy1.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client2_net_copier.data network_copy2.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client3_net_copier.data network_copy3.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client4_net_copier.data network_copy4.elf
 	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
