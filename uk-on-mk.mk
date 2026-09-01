@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 UK_ON_MK_DIR ?= $(ROOT)/dep/uk-on-mk
-UK_APPS := sqlite nginx
+UK_APPS := c-hello c-fs c-http sqlite nginx
 UK_SERVICE_MANIFEST ?= $(ROOT)/src/client/uk.mf
 UK_SERVICE_HELPER ?= $(ROOT)/tools/service-helper.py
 UNIKERNELS := $(addprefix unikraft-,$(addsuffix .img,$(UK_APPS)))
