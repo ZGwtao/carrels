@@ -169,7 +169,7 @@ qemu:
 		-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 		-m size=2G \
 		-nographic \
-		-netdev user,id=netdev0,hostfwd=tcp::8080-:80 \
+		-netdev user,id=netdev0,hostfwd=tcp::8080-10.0.2.15:80,hostfwd=tcp::8081-10.0.2.16:80 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors \
 		-drive file=qemu_disk,if=none,format=raw,id=hd \
