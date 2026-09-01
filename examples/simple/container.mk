@@ -18,7 +18,19 @@ IMAGE_FILE := container.img
 REPORT_FILE := report.txt
 
 
-all: ${IMAGE_FILE}
+.PHONY: all build infra application ramdisk qemu refresh-ramdisk
+
+# Keep the complete workflow ordered even when make is invoked with -j.
+all:
+	$(MAKE) infra
+	$(MAKE) application
+	$(MAKE) ramdisk
+	$(MAKE) qemu
+
+build:
+	$(MAKE) infra
+	$(MAKE) application
+	$(MAKE) ramdisk
 
 include ${SDDF}/tools/make/board/common.mk
 
@@ -78,18 +90,12 @@ include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 include $(ROOT)/uk-on-mk.mk
 
-IMAGES := \
+INFRA_IMAGES := \
 	timer_driver.elf \
 	eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
 	monitor.elf \
 	orchestrator.elf \
 	fat.elf \
-	client_echo.img \
-	client_looping.img \
-	client_faulting.img \
-	client_timeout.img \
-	bench_simple.img \
-	$(UNIKERNELS) \
 	trampoline.elf \
 	protocon.elf \
 	serial_driver.elf \
@@ -98,7 +104,9 @@ IMAGES := \
 	blk_virt.elf \
 	blk_driver.elf
 
-${IMAGES}: libsddf_util_debug.a
+APPLICATION_IMAGES := $(PC_SERVICE_IMGS) $(UNIKERNELS)
+
+$(INFRA_IMAGES) $(APPLICATION_IMAGES): libsddf_util_debug.a
 
 FORCE:
 
@@ -110,7 +118,7 @@ system: $(METAPROGRAM) $(DTB)
 	--output . --sdf $(SYSTEM_FILE)
 
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+$(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 	cp network_copy.elf network_copy0.elf
 	cp network_copy.elf network_copy1.elf
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) -B $(METAPROGRAM) \
@@ -136,21 +144,25 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
 
-$(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) \
 		--search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) 	\
 		--config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
-refresh-ramdisk: $(RAMDISK_INITIALISER) $(IMAGE_FILE)
+infra: $(IMAGE_FILE)
+
+application: $(APPLICATION_IMAGES)
+
+refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
-qemu_disk: $(SYSTEM_FILE)
+qemu_disk:
 	$(SDDF)/tools/mkvirtdisk $@ 2 512 67108864 GPT
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
-		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
-qemu: ${IMAGE_FILE} qemu_disk refresh-ramdisk
+ramdisk: refresh-ramdisk
+
+qemu:
 	$(QEMU) -machine virt,virtualization=on \
 		-cpu cortex-a53 \
 		-serial mon:stdio \
