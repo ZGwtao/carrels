@@ -16,6 +16,7 @@ from infra import CarrelsContainerInfra as Infra
 
 SDF = SystemDescription
 PD = SDF.ProtectionDomain
+PROTOCON_COUNT = 5
 
 
 def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
@@ -61,7 +62,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         client_limit=16,
     )
     container_infra.connect_orchestrator()
-    protocons = container_infra.add_clients(2)
+    protocons = container_infra.add_clients(PROTOCON_COUNT)
     pd_orchestrator = container_infra.pd_orchestrator
     pd_engine = container_infra.pd_engine
 
@@ -110,25 +111,27 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         net_virt_rx,
         vswitch=net_vswitch,
     )
-    client0_net_copier = PD(
-        "client0_net_copier", "network_copy0.elf", priority=97, budget=20000)
-    client1_net_copier = PD(
-        "client1_net_copier", "network_copy1.elf", priority=97, budget=20000)
+    net_copiers = [
+        PD(
+            f"client{i}_net_copier",
+            f"network_copy{i}.elf",
+            priority=97,
+            budget=20000,
+        )
+        for i in range(PROTOCON_COUNT)
+    ]
 
-    net_system.add_client_with_copier(
-        protocons[0], client0_net_copier, vswitch=True, optional=True
-    )
-    net_system.add_client_with_copier(
-        protocons[1], client1_net_copier, vswitch=True, optional=True
-    )
+    for protocon, net_copier in zip(protocons, net_copiers):
+        net_system.add_client_with_copier(
+            protocon, net_copier, vswitch=True, optional=True
+        )
 
     pds = [
         eth_driver,
         net_virt_rx,
         net_virt_tx,
         net_vswitch,
-        client0_net_copier,
-        client1_net_copier,
+        *net_copiers,
     ]
     for pd in pds:
         sdf.add_pd(pd)
@@ -146,11 +149,12 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
 
     assert net_system.connect()
 
-    # Allow both protocons to communicate with each other and with the
-    # external virtio network in both directions.
-    net_system.add_acl_rule(protocons[0], protocons[1], True, True)
-    net_system.add_acl_rule(protocons[0], net_virt_tx, True, True)
-    net_system.add_acl_rule(protocons[1], net_virt_tx, True, True)
+    # Allow every protocon pair to communicate in both directions, and
+    # allow every protocon to communicate with the external virtio network.
+    for src_index, src in enumerate(protocons):
+        for dst in protocons[src_index + 1:]:
+            net_system.add_acl_rule(src, dst, True, True)
+        net_system.add_acl_rule(src, net_virt_tx, True, True)
 
     assert net_system.serialise_config(output_dir)
 
