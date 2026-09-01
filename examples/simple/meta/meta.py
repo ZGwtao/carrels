@@ -101,19 +101,32 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
                     priority=101, budget=100, period=400)
     net_virt_tx = PD("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = PD("net_virt_rx", "network_virt_rx.elf", priority=99)
-    net_system = Sddf.Net(sdf, net_node, eth_driver, net_virt_tx, net_virt_rx)
+    net_vswitch = PD("net_vswitch", "network_vswitch.elf", priority=98)
+    net_system = Sddf.Net(
+        sdf,
+        net_node,
+        eth_driver,
+        net_virt_tx,
+        net_virt_rx,
+        vswitch=net_vswitch,
+    )
     client0_net_copier = PD(
         "client0_net_copier", "network_copy0.elf", priority=97, budget=20000)
     client1_net_copier = PD(
         "client1_net_copier", "network_copy1.elf", priority=97, budget=20000)
 
-    net_system.add_client_with_copier(protocons[0], client0_net_copier, optional=True)
-    net_system.add_client_with_copier(protocons[1], client1_net_copier, optional=True)
+    net_system.add_client_with_copier(
+        protocons[0], client0_net_copier, vswitch=True, optional=True
+    )
+    net_system.add_client_with_copier(
+        protocons[1], client1_net_copier, vswitch=True, optional=True
+    )
 
     pds = [
         eth_driver,
         net_virt_rx,
         net_virt_tx,
+        net_vswitch,
         client0_net_copier,
         client1_net_copier,
     ]
@@ -132,6 +145,13 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     assert blk_system.serialise_config(output_dir)
 
     assert net_system.connect()
+
+    # Allow both protocons to communicate with each other and with the
+    # external virtio network in both directions.
+    net_system.add_acl_rule(protocons[0], protocons[1], True, True)
+    net_system.add_acl_rule(protocons[0], net_virt_tx, True, True)
+    net_system.add_acl_rule(protocons[1], net_virt_tx, True, True)
+
     assert net_system.serialise_config(output_dir)
 
     # generate all LionsOS services descriptors for engines.

@@ -1,7 +1,7 @@
 [submodule "sddf"]
 	path = dep/sddf
-	url = https://github.com/au-ts/sddf.git
-	branch = main
+	url = https://github.com/ZGwtao/sddf.git
+	branch = dynamic-vswitch-dev
 [submodule "libtrustedlo"]
 	path = dep/libtrustedlo
 	url = https://github.com/ZGwtao/libtrustedlo.git
