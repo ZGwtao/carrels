@@ -124,6 +124,9 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 	cp network_copy.elf network_copy2.elf
 	cp network_copy.elf network_copy3.elf
 	cp network_copy.elf network_copy4.elf
+	cp network_copy.elf network_copy5.elf
+	cp network_copy.elf network_copy6.elf
+	cp network_copy.elf network_copy7.elf
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) -B $(METAPROGRAM) \
 	--sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --objcopy $(OBJCOPY) \
 	--vm-layout $(PROTOCON_VM_LAYOUT) --monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py \
@@ -137,6 +140,9 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client2_net_copier.data network_copy2.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client3_net_copier.data network_copy3.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client4_net_copier.data network_copy4.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client5_net_copier.data network_copy5.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client6_net_copier.data network_copy6.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client7_net_copier.data network_copy7.elf
 	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
 	$(OBJCOPY) --update-section .net_vswitch_orchestrator_config=net_vswitch_orchestrator.data monitor.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
@@ -166,7 +172,7 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
 qemu_disk:
-	$(SDDF)/tools/mkvirtdisk $@ 2 512 67108864 GPT
+	$(SDDF)/tools/mkvirtdisk $@ 2 512 134217728 GPT
 
 ramdisk: refresh-ramdisk
 
