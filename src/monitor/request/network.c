@@ -80,7 +80,7 @@ pc_monitor_error monitor_acl_apply_deployment(uint32_t pc_id,
             continue;
         }
         if (!protocon_state_check_lifecycle_state(peer, PROTOCON_ACTIVE) &&
-            !protocon_state_check_lifecycle_state(peer, PROTOCON_HANG)) {
+            !protocon_state_check_lifecycle_state(peer, PROTOCON_SUSPENDED)) {
             unavailable |= peer_bit;
             continue;
         }
