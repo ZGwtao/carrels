@@ -36,8 +36,8 @@ setup_microkit() {
     export SDDF=$sddf
     export UK_ON_MK_DIR=$uk_on_mk
 
-    test "$(git -C "$sdfgen" branch --show-current)" = vswitch-orchestrator-dev || {
-        echo "sdfgen must be on the vswitch-orchestrator-dev branch" >&2
+    test "$(git -C "$sdfgen" branch --show-current)" = dynamic-microkit || {
+        echo "sdfgen must be on the dynamic-microkit branch" >&2
         return 1
     }
 
