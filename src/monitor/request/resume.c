@@ -18,7 +18,7 @@ seL4_MessageInfo_t monitor_call_resume_protocon(microkit_channel ch)
     if (cid == (INVALID_PC_ID)) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id to resume given with ch: %d\n", cid_to_check);
     } else {
-        if (!protocon_state_check_lifecycle_state(cid, PROTOCON_HANG)) {
+        if (!protocon_state_check_lifecycle_state(cid, PROTOCON_SUSPENDED)) {
             TSLDR_DBG_PRINT(PROGNAME "Invalid PD state to resume!\n");
         } else {
             microkit_pd_resume(target_pd_id);

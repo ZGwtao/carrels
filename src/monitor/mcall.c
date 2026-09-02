@@ -49,10 +49,10 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         TSLDR_DBG_PRINT(PROGNAME "Exit and uninstantiate a dynamic PD\n");
         ret = monitor_call_stop_and_restore_protocon(ch - PC_MONITOR_PROTOCON_BASE_CHANNEL);
         break;
-    case PC_MONITOR_CALL_HANG: {
+    case PC_MONITOR_CALL_SUSPEND: {
         seL4_Word target_pd_id = seL4_GetMR(1);
-        TSLDR_DBG_PRINT(PROGNAME "Hang dynamic PD with ID: %d\n", target_pd_id);
-        ret = monitor_call_hang_protocon(target_pd_id);
+        TSLDR_DBG_PRINT(PROGNAME "Suspend dynamic PD with ID: %d\n", target_pd_id);
+        ret = monitor_call_suspend_protocon(target_pd_id);
         break;
     }
     case PC_MONITOR_CALL_RESUME: {

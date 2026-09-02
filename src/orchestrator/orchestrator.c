@@ -77,7 +77,7 @@ static const char *const shell_commands[] = {
     "set-acl",
     "deploy",
     "stop",
-    "hang",
+    "suspend",
     "resume",
     "help",
 };
@@ -217,7 +217,7 @@ static void shell_print_help(void)
                 "  deploy -a <app.img> -pc <id> -peers <ids|all>\r\n"
                 "                         Deploy an image to a protocon and configure peer ACLs\r\n"
                 "  stop -i <pd_id>       Stop a protection domain\r\n"
-                "  hang -i <pd_id>       Hang a protection domain\r\n"
+                "  suspend -i <pd_id>    Suspend a protection domain\r\n"
                 "  resume -i <pd_id>     Resume a protection domain\r\n"
                 "  help                  Show this help\r\n",
                 MIN_REQ_PC_NUM,
@@ -566,8 +566,8 @@ static int shell_execute(microrl_t *mrl, int argc, const char *const *argv)
         return cmd_pd_control(argc, argv, (PC_MONITOR_CALL_TERMINATE_EXT), "stop");
     }
 
-    if (strcmp(argv[0], "hang") == 0) {
-        return cmd_pd_control(argc, argv, (PC_MONITOR_CALL_HANG), "hang");
+    if (strcmp(argv[0], "suspend") == 0) {
+        return cmd_pd_control(argc, argv, (PC_MONITOR_CALL_SUSPEND), "suspend");
     }
 
     if (strcmp(argv[0], "resume") == 0) {
