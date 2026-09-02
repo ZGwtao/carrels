@@ -23,6 +23,13 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
     case PC_MONITOR_CALL_FLIP_ACL_RULE:
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
+    case PC_MONITOR_CALL_SET_VSWITCH_ACL: {
+        seL4_Word port0 = microkit_mr_get(1);
+        seL4_Word port1 = microkit_mr_get(2);
+        seL4_Word allow = microkit_mr_get(3);
+        ret = monitor_call_set_vswitch_acl(port0, port1, allow);
+        break;
+    }
     case PC_MONITOR_CALL_BACKUP_CONTEXT:
         TSLDR_DBG_PRINT(PROGNAME "Backing up trusted loading context for dynamic PD with ID: %d\n",
                         monitor_get_pcid_from_ch(ch));

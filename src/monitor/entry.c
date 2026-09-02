@@ -19,6 +19,8 @@
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 __attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
+__attribute__((__section__(".net_vswitch_orchestrator_config")))
+net_vswitch_orchestrator_config_t net_vswitch_orchestrator_config;
 
 serial_queue_handle_t serial_rx_queue_handle;
 serial_queue_handle_t serial_tx_queue_handle;
@@ -72,6 +74,7 @@ void init(void)
     fs_share = fs_config.server.share.vaddr;
 
     assert(net_config_check_magic(&net_config));
+    assert(net_config_check_magic(&net_vswitch_orchestrator_config));
     net_queue_init(&net_rx_queue,
                    net_config.rx.free_queue.vaddr,
                    net_config.rx.active_queue.vaddr,
