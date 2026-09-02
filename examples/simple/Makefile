@@ -40,9 +40,8 @@ ${BUILD_DIR}/Makefile: container.mk Makefile $(ROOT)/uk-on-mk.mk
 	cat container.mk >> $@
 
 submodules:
-	git submodule update --init $(CARRELS)/dep/sddf
-	git submodule update --init $(CARRELS)/dep/libmicrokitco
-	git submodule update --init $(CARRELS)/dep/libtrustedlo
-	git submodule update --init --recursive $(CARRELS)/dep/uk-on-mk
+	cd $(CARRELS) && git submodule update --init --recursive
+	@test ! -e $(CARRELS)/dep/uk-on-mk/dep/sddf || test -L $(CARRELS)/dep/uk-on-mk/dep/sddf || { echo "refusing to replace non-symlink $(CARRELS)/dep/uk-on-mk/dep/sddf" >&2; exit 1; }
+	ln -sfn ../../sddf $(CARRELS)/dep/uk-on-mk/dep/sddf
 
 FORCE:

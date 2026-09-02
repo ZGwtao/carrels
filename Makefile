@@ -35,6 +35,8 @@ help:
 .PHONY: init
 init:
 	git submodule update --init --recursive
+	@test ! -e dep/uk-on-mk/dep/sddf || test -L dep/uk-on-mk/dep/sddf || { echo "refusing to replace non-symlink dep/uk-on-mk/dep/sddf" >&2; exit 1; }
+	ln -sfn ../../sddf dep/uk-on-mk/dep/sddf
 
 
 .PHONY: image
