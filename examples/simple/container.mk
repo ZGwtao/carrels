@@ -184,4 +184,6 @@ qemu:
 		$(QEMU_NET_ARGS)
 
 ${SDDF}/tools/make/board/common.mk ${SDDF_MAKEFILES} ${CARRELS}/dep/sddf/include &:
-	cd $(CARRELS); git submodule update --init dep/sddf
+	cd $(CARRELS) && git submodule update --init --recursive
+	@test ! -e $(CARRELS)/dep/uk-on-mk/dep/sddf || test -L $(CARRELS)/dep/uk-on-mk/dep/sddf || { echo "refusing to replace non-symlink $(CARRELS)/dep/uk-on-mk/dep/sddf" >&2; exit 1; }
+	ln -sfn ../../sddf $(CARRELS)/dep/uk-on-mk/dep/sddf

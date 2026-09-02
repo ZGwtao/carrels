@@ -8,33 +8,36 @@ if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
 fi
 
 setup_microkit() {
-    local carrels wsp microkit sdfgen sddf uk_on_mk uk_sddf sddf_rev uk_sddf_rev
+    local carrels wsp microkit sdfgen sddf uk_on_mk uk_sddf
 
     carrels=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
     wsp=${WSP:-"$HOME/wsp"}
     microkit=${MICROKIT:-"$wsp/microkit"}
     sdfgen=${SDFGEN:-"$wsp/microkit_sdf_gen"}
     uk_on_mk=${UK_ON_MK_DIR:-"$carrels/dep/uk-on-mk"}
-    sddf=${SDDF:-"$carrels/dep/sddf"}
+    sddf="$carrels/dep/sddf"
     export MICROKIT_SDK=${MICROKIT_SDK:-"$microkit/release/microkit-sdk-2.3.0-dev"}
     export MICROKIT_BOARD=qemu_virt_aarch64 MICROKIT_CONFIG=debug
 
-    for path in "$microkit" "$microkit/seL4" "$sdfgen" "$sddf" "$uk_on_mk"; do
+    for path in "$microkit" "$microkit/seL4" "$sdfgen"; do
         test -d "$path" || { echo "missing directory: $path" >&2; return 1; }
     done
-    export SDDF=$sddf
-    export UK_ON_MK_DIR=$uk_on_mk
-    git -C "$uk_on_mk" submodule update --init --recursive || return
+
+    git -C "$carrels" submodule update --init --recursive || return
+    test -d "$uk_on_mk" || { echo "missing directory: $uk_on_mk" >&2; return 1; }
+    test -d "$sddf" || { echo "missing directory: $sddf" >&2; return 1; }
     uk_sddf="$uk_on_mk/dep/sddf"
-    test -d "$uk_sddf" || { echo "missing directory: $uk_sddf" >&2; return 1; }
-    sddf_rev=$(git -C "$sddf" rev-parse HEAD) || return
-    uk_sddf_rev=$(git -C "$uk_sddf" rev-parse HEAD) || return
-    if [[ $sddf_rev != "$uk_sddf_rev" ]]; then
-        echo "sDDF revision mismatch: carrels=$sddf_rev uk-on-mk=$uk_sddf_rev" >&2
+
+    if [[ -e "$uk_sddf" && ! -L "$uk_sddf" ]]; then
+        echo "refusing to replace non-symlink sDDF path: $uk_sddf" >&2
         return 1
     fi
-    test "$(git -C "$sdfgen" branch --show-current)" = dynamic-microkit || {
-        echo "sdfgen must be on the dynamic-microkit branch" >&2
+    ln -sfn "../../sddf" "$uk_sddf" || return
+    export SDDF=$sddf
+    export UK_ON_MK_DIR=$uk_on_mk
+
+    test "$(git -C "$sdfgen" branch --show-current)" = vswitch-orchestrator-dev || {
+        echo "sdfgen must be on the vswitch-orchestrator-dev branch" >&2
         return 1
     }
 
