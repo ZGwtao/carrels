@@ -110,6 +110,7 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
         net_virt_tx,
         net_virt_rx,
         vswitch=net_vswitch,
+        vswitch_orchestrator=pd_engine,
     )
     net_copiers = [
         PD(

@@ -19,6 +19,7 @@
 #include <lions/fs/config.h>
 #include <ioutils/pico_vfs.h>
 #include <carrels-user.h>
+#include <pcmcall/error.h>
 #include <misc.h>
 
 #define PROGNAME "[@orchestrator] "
@@ -68,6 +69,7 @@ static const char *const shell_commands[] = {
     "start",
     "lspcs",
     "flip",
+    "set-acl",
     "stop",
     "hang",
     "resume",
@@ -136,6 +138,8 @@ static void shell_print_help(void)
                 "  start <elf> [pc_num]  Load and start an ELF; pc_num is %u..%u\r\n"
                 "  lspcs                 List proto-containers\r\n"
                 "  flip                  Flip the ACL rule\r\n"
+                "  set-acl -i <x0> <x1> -v <0|1>\r\n"
+                "                         Disable or enable traffic between vSwitch ports\r\n"
                 "  stop -i <pd_id>       Stop a protection domain\r\n"
                 "  hang -i <pd_id>       Hang a protection domain\r\n"
                 "  resume -i <pd_id>     Resume a protection domain\r\n"
@@ -291,6 +295,50 @@ cmd_pd_control(int argc, const char *const *argv, seL4_Word syscall_id, const ch
     return call_monitor(syscall_id, true, (seL4_Word)pd_id);
 }
 
+static int cmd_set_acl(int argc, const char *const *argv)
+{
+    uint32_t port0;
+    uint32_t port1;
+    uint32_t allow;
+    microkit_msginfo info;
+    seL4_Word vswitch_error;
+
+    if (argc != 6 || strcmp(argv[1], "-i") != 0 || strcmp(argv[4], "-v") != 0) {
+        sddf_printf("Usage: set-acl -i <port0> <port1> -v <0|1>\r\n");
+        return 1;
+    }
+
+    if (!parse_u32_decimal(argv[2], &port0) || port0 > UINT8_MAX ||
+        !parse_u32_decimal(argv[3], &port1) || port1 > UINT8_MAX) {
+        sddf_printf("vSwitch ports must be integers from 0 to %u\r\n", UINT8_MAX);
+        return 1;
+    }
+    if (!parse_u32_decimal(argv[5], &allow) || allow > 1) {
+        sddf_printf("ACL value must be 0 or 1\r\n");
+        return 1;
+    }
+
+    microkit_mr_set(0, PC_MONITOR_CALL_SET_VSWITCH_ACL);
+    microkit_mr_set(1, port0);
+    microkit_mr_set(2, port1);
+    microkit_mr_set(3, allow);
+    info = microkit_ppcall(1, microkit_msginfo_new(0, 4));
+
+    if (microkit_msginfo_get_label(info) != MON_NO_ERROR) {
+        vswitch_error = microkit_mr_get(0);
+        sddf_printf("Failed to set vSwitch ACL (monitor error %lu, vSwitch error %lu)\r\n",
+                    microkit_msginfo_get_label(info),
+                    vswitch_error);
+        return 1;
+    }
+
+    sddf_printf("vSwitch ports %u and %u are now %s\r\n",
+                port0,
+                port1,
+                allow ? "connected" : "disconnected");
+    return 0;
+}
+
 static int shell_execute(microrl_t *mrl, int argc, const char *const *argv)
 {
     MICRORL_UNUSED(mrl);
@@ -309,6 +357,10 @@ static int shell_execute(microrl_t *mrl, int argc, const char *const *argv)
 
     if (strcmp(argv[0], "flip") == 0) {
         return cmd_no_argument(argc, (PC_MONITOR_CALL_FLIP_ACL_RULE), "flip");
+    }
+
+    if (strcmp(argv[0], "set-acl") == 0) {
+        return cmd_set_acl(argc, argv);
     }
 
     if (strcmp(argv[0], "stop") == 0) {

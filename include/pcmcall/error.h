@@ -16,4 +16,5 @@ typedef enum {
     MON_FAIL_TO_INIT_COROUTINE,
     MON_FAIL_TO_DEPLOY,
     MON_NO_AVAIL_PC,
+    MON_VSWITCH_ERROR,
 } pc_monitor_error;
