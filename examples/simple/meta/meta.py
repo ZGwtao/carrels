@@ -150,11 +150,9 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
 
     assert net_system.connect()
 
-    # Allow every protocon pair to communicate in both directions, and
-    # allow every protocon to communicate with the external virtio network.
-    for src_index, src in enumerate(protocons):
-        for dst in protocons[src_index + 1:]:
-            net_system.add_acl_rule(src, dst, True, True)
+    # Inter-protocon ACLs start closed. The monitor opens a pair after both
+    # endpoints' targeted deployment policies allow that connection.
+    for src in protocons:
         net_system.add_acl_rule(src, net_virt_tx, True, True)
 
     assert net_system.serialise_config(output_dir)

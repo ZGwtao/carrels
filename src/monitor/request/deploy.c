@@ -11,6 +11,9 @@
 uint32_t req_pc_num = 0;
 bool deploy_request_active = false;
 monitor_deploy_request_t deploy_request;
+monitor_deploy_result_t deploy_result;
+
+static pc_monitor_error protocon_deploy_to_protocon(payload_info_t *info, uint32_t pc_id);
 
 static inline pc_monitor_error monitor_reset_deploy_request(seL4_Word num_req_pc)
 {
@@ -19,6 +22,9 @@ static inline pc_monitor_error monitor_reset_deploy_request(seL4_Word num_req_pc
         return MON_FAIL_TO_DEPLOY;
     }
     deploy_request.num_req_pc = (uint32_t)num_req_pc;
+    deploy_request.target_pc = 0;
+    deploy_request.requested_peer_mask = 0;
+    deploy_request.targeted = false;
     req_pc_num = (uint32_t)num_req_pc;
     deploy_request_active = true;
     return MON_NO_ERROR;
@@ -28,6 +34,9 @@ static inline void monitor_deploy_refresh_request(void)
 {
     req_pc_num = 0;
     deploy_request.num_req_pc = 0;
+    deploy_request.target_pc = 0;
+    deploy_request.requested_peer_mask = 0;
+    deploy_request.targeted = false;
     deploy_request_active = false;
 }
 
@@ -106,21 +115,41 @@ static inline void monitor_call_deploy_second_half(void)
 
     TSLDR_DBG_PRINT(PROGNAME "entry of monitor_call_deploy_protocon_second_half\n");
 
-    if (monitor_check_deploy_num(num_req_pc) != MON_NO_ERROR) {
+    if (!request->targeted && monitor_check_deploy_num(num_req_pc) != MON_NO_ERROR) {
         monitor_finish_deploy_request();
         return;
     }
 
     err = service_manifest_header_parse(&payload_info, (__carrels_payload_start));
     if (err != seL4_NoError) {
+        if (request->targeted) {
+            deploy_result.error = MON_FAIL_TO_DEPLOY;
+            deploy_result.ready = true;
+        }
         monitor_finish_deploy_request();
         return;
     }
 
-    for (uint32_t i = 0; i < num_req_pc; ++i) {
-        if (protocon_deploy(&payload_info) != MON_NO_ERROR) {
-            TSLDR_DBG_PRINT(PROGNAME "Failed to deploy container\n");
-            break;
+    if (request->targeted) {
+        pc_monitor_error error;
+
+        error = protocon_deploy_to_protocon(&payload_info, request->target_pc);
+        deploy_result.error = error;
+        if (error == MON_NO_ERROR) {
+            error = monitor_acl_apply_deployment(request->target_pc,
+                                                 request->requested_peer_mask,
+                                                 &deploy_result.connected_peer_mask,
+                                                 &deploy_result.rejected_peer_mask,
+                                                 &deploy_result.unavailable_peer_mask);
+            deploy_result.error = error;
+        }
+        deploy_result.ready = true;
+    } else {
+        for (uint32_t i = 0; i < num_req_pc; ++i) {
+            if (protocon_deploy(&payload_info) != MON_NO_ERROR) {
+                TSLDR_DBG_PRINT(PROGNAME "Failed to deploy container\n");
+                break;
+            }
         }
     }
 
@@ -214,6 +243,70 @@ fh_exit:
     return microkit_msginfo_new(err, 0);
 }
 
+seL4_MessageInfo_t monitor_call_deploy_to_protocon(seL4_Word pc_id,
+                                                    seL4_Word peer_mask,
+                                                    seL4_Word peers_all)
+{
+    seL4_Word valid_mask;
+    pc_monitor_error err;
+
+    if (pc_id >= ca_bootinfo.num_pc) {
+        return microkit_msginfo_new(MON_INVALID_PC_ID, 0);
+    }
+    if (!protocon_state_check_lifecycle_state(pc_id, PROTOCON_PASSIVE)) {
+        return microkit_msginfo_new(MON_PC_UNAVAILABLE, 0);
+    }
+    if (peers_all > 1) {
+        return microkit_msginfo_new(MON_INVALID_PEER_SET, 0);
+    }
+
+    valid_mask = ((seL4_Word)1U << ca_bootinfo.num_pc) - 1U;
+    if (peers_all) {
+        peer_mask = valid_mask & ~((seL4_Word)1U << pc_id);
+    } else if (peer_mask & ~valid_mask) {
+        return microkit_msginfo_new(MON_INVALID_PEER_SET, 0);
+    }
+    if (peer_mask & ((seL4_Word)1U << pc_id)) {
+        return microkit_msginfo_new(MON_INVALID_PEER_SET, 0);
+    }
+    if (deploy_request_active) {
+        return microkit_msginfo_new(MON_FAIL_TO_DEPLOY, 0);
+    }
+
+    deploy_request.num_req_pc = 1;
+    deploy_request.target_pc = (uint32_t)pc_id;
+    deploy_request.requested_peer_mask = (uint32_t)peer_mask;
+    deploy_request.targeted = true;
+    deploy_request_active = true;
+    deploy_result = (monitor_deploy_result_t){
+        .target_pc = (uint32_t)pc_id,
+        .error = MON_DEPLOY_IN_PROGRESS,
+        .ready = false,
+    };
+
+    err = monitor_deploy_second_half();
+    if (err != MON_NO_ERROR) {
+        deploy_result.error = err;
+        deploy_result.ready = true;
+        return microkit_msginfo_new(err, 0);
+    }
+    microkit_cothread_yield();
+    return microkit_msginfo_new(MON_NO_ERROR, 0);
+}
+
+seL4_MessageInfo_t monitor_call_deploy_result(void)
+{
+    if (!deploy_result.ready) {
+        return microkit_msginfo_new(MON_DEPLOY_IN_PROGRESS, 0);
+    }
+
+    microkit_mr_set(0, deploy_result.target_pc);
+    microkit_mr_set(1, deploy_result.connected_peer_mask);
+    microkit_mr_set(2, deploy_result.rejected_peer_mask);
+    microkit_mr_set(3, deploy_result.unavailable_peer_mask);
+    return microkit_msginfo_new(deploy_result.error, 4);
+}
+
 pc_monitor_error protocon_deploy(payload_info_t *info)
 {
     deploy_plan_t plan = {0};
@@ -235,4 +328,24 @@ pc_monitor_error protocon_deploy(payload_info_t *info)
 
     protocon_start(&plan);
     return err;
+}
+
+static pc_monitor_error protocon_deploy_to_protocon(payload_info_t *info, uint32_t pc_id)
+{
+    deploy_plan_t plan = {0};
+    protocon_svc_req_t req = {0};
+    pc_monitor_error err;
+
+    service_manifest_parse(info, &req);
+    service_planner_select_protocon_by_id(&req, &plan, protocon_states, pc_id);
+
+    err = protocon_deploy_plan_check(&plan);
+    if (err != MON_NO_ERROR) {
+        return err;
+    }
+
+    protocon_pre_instantiate(&plan, info);
+    service_installer_apply(&plan);
+    protocon_start(&plan);
+    return MON_NO_ERROR;
 }

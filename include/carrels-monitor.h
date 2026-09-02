@@ -201,5 +201,9 @@ void service_registry_create(const svc_t *svcdb_list, pc_state_t *protocon_state
 void service_planner_select_protocon(const protocon_svc_req_t *req,
                                      deploy_plan_t *plan,
                                      const pc_state_t *protocon_states);
+void service_planner_select_protocon_by_id(const protocon_svc_req_t *req,
+                                           deploy_plan_t *plan,
+                                           const pc_state_t *protocon_states,
+                                           uint32_t pc_id);
 
 void service_installer_apply(const deploy_plan_t *plan);

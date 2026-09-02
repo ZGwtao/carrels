@@ -75,3 +75,24 @@ void service_planner_select_protocon(const protocon_svc_req_t *req,
 
     service_planner_deploy_plan_init(plan, &protocon_states[plan->pc_id]);
 }
+
+void service_planner_select_protocon_by_id(const protocon_svc_req_t *req,
+                                           deploy_plan_t *plan,
+                                           const pc_state_t *protocon_states,
+                                           uint32_t pc_id)
+{
+    deploy_plan_reset(plan);
+
+    if (pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM ||
+        !protocon_state_check_lifecycle_state(pc_id, PROTOCON_PASSIVE) ||
+        !service_planner_can_satisfy_request(
+            req, protocon_states[pc_id].resource_quota.avail_service_per_type)) {
+        return;
+    }
+
+    plan->pc_id = pc_id;
+    plan->req = req;
+    plan->base_serialised_service =
+        monitor_vm_region_base(&monitor_vm_layout.txlo_xrt_req, plan->pc_id);
+    service_planner_deploy_plan_init(plan, &protocon_states[plan->pc_id]);
+}
