@@ -41,24 +41,19 @@ PC_FS_HELPERS_OBJ := pc/fs/helpers.o
 
 
 PC_ECHO_CLIENT_OBJS := \
-	pc/client/client_echo.o \
-	pc/client/early-init.o
+	pc/client/client_echo.o
 
 PC_FAULTING_CLIENT_OBJS := \
-	pc/client/client_faulting.o \
-	pc/client/early-init.o
+	pc/client/client_faulting.o
 
 PC_LOOPING_CLIENT_OBJS := \
-	pc/client/client_looping.o \
-	pc/client/early-init.o
+	pc/client/client_looping.o
 
 PC_TIMEOUT_CLIENT_OBJS := \
-	pc/client/client_timeout.o \
-	pc/client/early-init.o
+	pc/client/client_timeout.o
 
 PC_BENCH_SIMPLE_OBJS := \
-	pc/client/bench_simple.o \
-	pc/client/early-init.o
+	pc/client/bench_simple.o
 
 PC_MONITOR_OBJS := \
 	$(PC_FS_HELPERS_OBJ) \
