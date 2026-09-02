@@ -17,4 +17,7 @@ typedef enum {
     MON_FAIL_TO_DEPLOY,
     MON_NO_AVAIL_PC,
     MON_VSWITCH_ERROR,
+    MON_INVALID_PEER_SET,
+    MON_PC_UNAVAILABLE,
+    MON_DEPLOY_IN_PROGRESS,
 } pc_monitor_error;

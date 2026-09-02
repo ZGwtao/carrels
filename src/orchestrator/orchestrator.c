@@ -59,8 +59,13 @@ bool fs_init;
 
 #define MIN_REQ_PC_NUM 1U
 #define MAX_REQ_PC_NUM 16U
+#define MAX_PROTOCON_PORTS MAX_REQ_PC_NUM
 
 uint32_t req_pc_num = MIN_REQ_PC_NUM;
+static uint32_t deploy_pc_id;
+static uint32_t deploy_peer_mask;
+static bool deploy_peers_all;
+static bool deploy_pending;
 
 static microrl_t shell;
 static char fname_buf[FNAME_BUF_SIZE];
@@ -70,6 +75,7 @@ static const char *const shell_commands[] = {
     "lspcs",
     "flip",
     "set-acl",
+    "deploy",
     "stop",
     "hang",
     "resume",
@@ -127,6 +133,74 @@ static bool parse_u32_decimal(const char *text, uint32_t *value_out)
     return true;
 }
 
+static bool parse_peer_ports(const char *text,
+                             uint32_t target_pc,
+                             uint32_t *peer_mask_out,
+                             bool *peers_all_out)
+{
+    const char *cursor = text;
+    uint32_t peer_mask = 0;
+
+    if (text == NULL || peer_mask_out == NULL || peers_all_out == NULL) {
+        return false;
+    }
+    if (strcmp(text, "all") == 0) {
+        *peer_mask_out = 0;
+        *peers_all_out = true;
+        return true;
+    }
+
+    while (*cursor != '\0') {
+        uint32_t port = 0;
+        bool has_digit = false;
+
+        while (*cursor >= '0' && *cursor <= '9') {
+            uint32_t digit = (uint32_t)(*cursor - '0');
+            if (port > (UINT32_MAX - digit) / 10U) {
+                return false;
+            }
+            port = port * 10U + digit;
+            cursor++;
+            has_digit = true;
+        }
+        if (!has_digit || port >= MAX_PROTOCON_PORTS || port == target_pc) {
+            return false;
+        }
+        peer_mask |= (uint32_t)1U << port;
+
+        if (*cursor == '\0') {
+            break;
+        }
+        if (*cursor != ',') {
+            return false;
+        }
+        cursor++;
+        if (*cursor == '\0') {
+            return false;
+        }
+    }
+
+    *peer_mask_out = peer_mask;
+    *peers_all_out = false;
+    return true;
+}
+
+static void print_peer_ports(uint32_t peer_mask)
+{
+    bool first = true;
+
+    for (uint32_t port = 0; port < MAX_PROTOCON_PORTS; ++port) {
+        if (!(peer_mask & ((uint32_t)1U << port))) {
+            continue;
+        }
+        sddf_printf("%s%u", first ? "" : ",", port);
+        first = false;
+    }
+    if (first) {
+        sddf_printf("none");
+    }
+}
+
 static inline void shell_inst_epilogue(void)
 {
     sddf_printf("\r\nType: \"Ctrl \\\\ 0\" to return\r\n");
@@ -140,6 +214,8 @@ static void shell_print_help(void)
                 "  flip                  Flip the ACL rule\r\n"
                 "  set-acl -i <x0> <x1> -v <0|1>\r\n"
                 "                         Disable or enable traffic between vSwitch ports\r\n"
+                "  deploy -a <app.img> -pc <id> -peers <ids|all>\r\n"
+                "                         Deploy an image to a protocon and configure peer ACLs\r\n"
                 "  stop -i <pd_id>       Stop a protection domain\r\n"
                 "  hang -i <pd_id>       Hang a protection domain\r\n"
                 "  resume -i <pd_id>     Resume a protection domain\r\n"
@@ -339,6 +415,125 @@ static int cmd_set_acl(int argc, const char *const *argv)
     return 0;
 }
 
+static void load_targeted_elf_payload(void)
+{
+    microkit_msginfo info;
+    int fs_error;
+    seL4_Word monitor_error;
+
+    while (!fs_init) {
+        microkit_cothread_yield();
+    }
+
+    pico_vfs_readfile2buf((void *)shared2, fname_buf, &fs_error);
+    if (fs_error != seL4_NoError) {
+        sddf_printf("Failed to load application image %s\r\n", fname_buf);
+        deploy_pending = false;
+        shell_inst_epilogue();
+        return;
+    }
+
+    microkit_mr_set(0, PC_MONITOR_CALL_DEPLOY_TO_PROTOCON);
+    microkit_mr_set(1, deploy_pc_id);
+    microkit_mr_set(2, deploy_peer_mask);
+    microkit_mr_set(3, deploy_peers_all ? 1U : 0U);
+    info = microkit_ppcall(1, microkit_msginfo_new(0, 4));
+    monitor_error = microkit_msginfo_get_label(info);
+    if (monitor_error != MON_NO_ERROR) {
+        sddf_printf("Deploy request rejected for %s on protocon %u (monitor error %lu)\r\n",
+                    fname_buf,
+                    deploy_pc_id,
+                    monitor_error);
+        deploy_pending = false;
+        shell_inst_epilogue();
+    }
+}
+
+static void print_deploy_result(void)
+{
+    microkit_msginfo info;
+    seL4_Word error;
+    uint32_t pc_id;
+    uint32_t connected;
+    uint32_t rejected;
+    uint32_t unavailable;
+
+    microkit_mr_set(0, PC_MONITOR_CALL_DEPLOY_RESULT);
+    info = microkit_ppcall(1, microkit_msginfo_new(0, 1));
+    error = microkit_msginfo_get_label(info);
+    if (error == MON_DEPLOY_IN_PROGRESS) {
+        return;
+    }
+
+    pc_id = (uint32_t)microkit_mr_get(0);
+    connected = (uint32_t)microkit_mr_get(1);
+    rejected = (uint32_t)microkit_mr_get(2);
+    unavailable = (uint32_t)microkit_mr_get(3);
+    if (error != MON_NO_ERROR) {
+        sddf_printf("Deployment of %s on protocon %u failed (monitor error %lu)\r\n",
+                    fname_buf,
+                    pc_id,
+                    error);
+    } else {
+        sddf_printf("Deployed %s on protocon %u\r\n", fname_buf, pc_id);
+        sddf_printf("Connected peers: ");
+        print_peer_ports(connected);
+        sddf_printf("\r\nRejected peers: ");
+        print_peer_ports(rejected);
+        sddf_printf("\r\nUnavailable peers: ");
+        print_peer_ports(unavailable);
+        sddf_printf("\r\n");
+    }
+    deploy_pending = false;
+    shell_inst_epilogue();
+}
+
+static int cmd_deploy(int argc, const char *const *argv)
+{
+    uint32_t pc_id;
+    uint32_t peer_mask;
+    bool peers_all;
+    size_t filename_len;
+
+    if (argc != 7 || strcmp(argv[1], "-a") != 0 || strcmp(argv[3], "-pc") != 0 ||
+        strcmp(argv[5], "-peers") != 0 || argv[2][0] == '\0') {
+        sddf_printf("Usage: deploy -a <app.img> -pc <id> -peers <ids|all>\r\n");
+        return 1;
+    }
+    if (deploy_pending) {
+        sddf_printf("A targeted deployment is already in progress\r\n");
+        return 1;
+    }
+    filename_len = strlen(argv[2]);
+    if (filename_len >= sizeof(fname_buf)) {
+        sddf_printf("Application filename must contain 1..%u characters\r\n",
+                    (unsigned int)(sizeof(fname_buf) - 1));
+        return 1;
+    }
+    if (!parse_u32_decimal(argv[4], &pc_id) || pc_id >= MAX_PROTOCON_PORTS) {
+        sddf_printf("protocon id must be an integer from 0 to %u\r\n",
+                    MAX_PROTOCON_PORTS - 1U);
+        return 1;
+    }
+    if (!parse_peer_ports(argv[6], pc_id, &peer_mask, &peers_all)) {
+        sddf_printf("-peers must be 'all' or comma-separated port ids excluding %u\r\n", pc_id);
+        return 1;
+    }
+
+    memcpy(fname_buf, argv[2], filename_len + 1);
+    deploy_pc_id = pc_id;
+    deploy_peer_mask = peer_mask;
+    deploy_peers_all = peers_all;
+    deploy_pending = true;
+    if (microkit_cothread_spawn(load_targeted_elf_payload, NULL) == LIBMICROKITCO_NULL_HANDLE) {
+        deploy_pending = false;
+        sddf_printf("Failed to start targeted payload loader\r\n");
+        return 1;
+    }
+    microkit_cothread_yield();
+    return 0;
+}
+
 static int shell_execute(microrl_t *mrl, int argc, const char *const *argv)
 {
     MICRORL_UNUSED(mrl);
@@ -361,6 +556,10 @@ static int shell_execute(microrl_t *mrl, int argc, const char *const *argv)
 
     if (strcmp(argv[0], "set-acl") == 0) {
         return cmd_set_acl(argc, argv);
+    }
+
+    if (strcmp(argv[0], "deploy") == 0) {
+        return cmd_deploy(argc, argv);
     }
 
     if (strcmp(argv[0], "stop") == 0) {
@@ -538,6 +737,10 @@ void notified(microkit_channel ch)
         orche_handle_serial_event();
     } else if (ch == 30) {
         /* Notification from monitor. */
-        shell_inst_epilogue();
+        if (deploy_pending) {
+            print_deploy_result();
+        } else {
+            shell_inst_epilogue();
+        }
     }
 }

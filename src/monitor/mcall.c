@@ -20,6 +20,16 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         seL4_Word num_req_pc = microkit_mr_get(1);
         ret = monitor_call_deploy_first_half(num_req_pc);
         break;
+    case PC_MONITOR_CALL_DEPLOY_TO_PROTOCON: {
+        seL4_Word pc_id = microkit_mr_get(1);
+        seL4_Word peer_mask = microkit_mr_get(2);
+        seL4_Word peers_all = microkit_mr_get(3);
+        ret = monitor_call_deploy_to_protocon(pc_id, peer_mask, peers_all);
+        break;
+    }
+    case PC_MONITOR_CALL_DEPLOY_RESULT:
+        ret = monitor_call_deploy_result();
+        break;
     case PC_MONITOR_CALL_FLIP_ACL_RULE:
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
