@@ -43,17 +43,8 @@ PC_FS_HELPERS_OBJ := pc/fs/helpers.o
 PC_ECHO_CLIENT_OBJS := \
 	pc/client/client_echo.o
 
-PC_FAULTING_CLIENT_OBJS := \
-	pc/client/client_faulting.o
-
-PC_LOOPING_CLIENT_OBJS := \
-	pc/client/client_looping.o
-
-PC_TIMEOUT_CLIENT_OBJS := \
-	pc/client/client_timeout.o
-
-PC_BENCH_SIMPLE_OBJS := \
-	pc/client/bench_simple.o
+PC_WHOAMI_CLIENT_OBJS := \
+	pc/client/whoami.o
 
 PC_MONITOR_OBJS := \
 	$(PC_FS_HELPERS_OBJ) \
@@ -90,10 +81,7 @@ PC_OBJS := \
 	$(PC_PROTOCON_OBJS) \
 	$(PC_TRAMPOLINE_OBJS) \
 	$(PC_ECHO_CLIENT_OBJS) \
-	$(PC_FAULTING_CLIENT_OBJS) \
-	$(PC_LOOPING_CLIENT_OBJS) \
-	$(PC_TIMEOUT_CLIENT_OBJS) \
-	$(PC_BENCH_SIMPLE_OBJS)
+	$(PC_WHOAMI_CLIENT_OBJS)
 
 
 $(PC_MONITOR_VM_LAYOUT_HEADER): pc \
@@ -173,11 +161,8 @@ monitor.elf: \
 
 
 PC_CLIENT_NAMES := \
-	bench_simple \
 	client_echo \
-	client_looping \
-	client_faulting \
-	client_timeout
+	whoami
 
 PC_CLIENT_ELFS := $(addsuffix .elf,$(PC_CLIENT_NAMES))
 PC_CLIENT_IMGS := $(addsuffix .img,$(PC_CLIENT_NAMES))
@@ -186,11 +171,8 @@ PC_SERVICE_MANIFEST := $(PC_SRC_DIR)/src/client/service.mf
 
 $(PC_CLIENT_ELFS): LDFLAGS += -L$(BOARD_DIR)/lib
 
-bench_simple.elf:    $(PC_BENCH_SIMPLE_OBJS)
-client_echo.elf:     $(PC_ECHO_CLIENT_OBJS)
-client_looping.elf:  $(PC_LOOPING_CLIENT_OBJS)
-client_faulting.elf: $(PC_FAULTING_CLIENT_OBJS)
-client_timeout.elf:  $(PC_TIMEOUT_CLIENT_OBJS)
+client_echo.elf: $(PC_ECHO_CLIENT_OBJS)
+whoami.elf:      $(PC_WHOAMI_CLIENT_OBJS)
 
 $(PC_CLIENT_ELFS): libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
