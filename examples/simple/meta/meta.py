@@ -16,7 +16,7 @@ from infra import CarrelsContainerInfra as Infra
 
 SDF = SystemDescription
 PD = SDF.ProtectionDomain
-PROTOCON_COUNT = 5
+PROTOCON_COUNT = 8
 
 
 def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
