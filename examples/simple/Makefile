@@ -19,9 +19,9 @@ export MICROKIT_BOARD ?= qemu_virt_aarch64
 IMAGE_FILE := $(BUILD_DIR)/container.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
-.PHONY: all build infra application ramdisk qemu
+.PHONY: all build infra apps app-native app-uk ramdisk qemu
 
-all build infra application ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
+all build infra apps app-native app-uk ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy: ${BUILD_DIR}/Makefile FORCE

@@ -18,18 +18,18 @@ IMAGE_FILE := container.img
 REPORT_FILE := report.txt
 
 
-.PHONY: all build infra application ramdisk qemu refresh-ramdisk
+.PHONY: all build infra apps app-native app-uk ramdisk qemu refresh-ramdisk
 
 # Keep the complete workflow ordered even when make is invoked with -j.
 all:
 	$(MAKE) infra
-	$(MAKE) application
+	$(MAKE) apps
 	$(MAKE) ramdisk
 	$(MAKE) qemu
 
 build:
 	$(MAKE) infra
-	$(MAKE) application
+	$(MAKE) apps
 	$(MAKE) ramdisk
 
 include ${SDDF}/tools/make/board/common.mk
@@ -104,7 +104,9 @@ INFRA_IMAGES := \
 	blk_virt.elf \
 	blk_driver.elf
 
-APPLICATION_IMAGES := $(PC_SERVICE_IMGS) $(UNIKERNELS)
+NATIVE_APPLICATION_IMAGES := $(PC_SERVICE_IMGS)
+UNIKRAFT_APPLICATION_IMAGES := $(UNIKERNELS)
+APPLICATION_IMAGES := $(NATIVE_APPLICATION_IMAGES) $(UNIKRAFT_APPLICATION_IMAGES)
 
 $(INFRA_IMAGES) $(APPLICATION_IMAGES): libsddf_util_debug.a
 
@@ -165,7 +167,9 @@ $(IMAGE_FILE) $(REPORT_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
 
 infra: $(IMAGE_FILE)
 
-application: $(APPLICATION_IMAGES)
+apps: app-native app-uk
+app-native: $(NATIVE_APPLICATION_IMAGES)
+app-uk: $(UNIKRAFT_APPLICATION_IMAGES)
 
 refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
