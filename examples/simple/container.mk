@@ -6,7 +6,8 @@
 SUPPORTED_BOARDS:= \
 	qemu_virt_aarch64 \
 	maaxboard \
-	odroidc4
+	odroidc4 \
+	x86_64_generic
 
 UK_ON_MK_DIR ?= $(CARRELS)/dep/uk-on-mk
 TOOLCHAIN ?= clang
@@ -41,9 +42,28 @@ RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
 FAT := $(CARRELS)/components/fs/fat
 NETWORK_COMPONENTS := $(SDDF)/network/components
 
+# Use the board's default block device unless NVMe is explicitly requested.
+# For x86_64/QEMU: make ... NVME=1
+NVME ?= 1
+ifeq ($(NVME),1)
+ifneq ($(ARCH),x86_64)
+$(error NVME=1 is currently supported only on x86_64)
+endif
+BLK_DRIV_DIR := nvme
+QEMU_BLK_ARGS := -device nvme,drive=hd,serial=carrels,addr=0x4.0
+BLK_META_ARGS := --nvme
+CFLAGS += -DCARRELS_BLK_NVME
+else ifeq ($(NVME),0)
+BLK_META_ARGS :=
+CFLAGS += -DCARRELS_BLK_BOARD_DEFAULT
+else
+$(error NVME must be either 0 or 1)
+endif
+
 vpath %.c ${SDDF} ${VSWITCH}
 
 CFLAGS += \
+	-DSDDF_VIRTIO_PCI_TRANSPORT_SKIP_BUS_CHECK \
 	-I$(CARRELS)/include \
 	-I$(SDDF)/include/sddf/util/custom_libc \
 	-I$(SDDF)/include \
@@ -112,12 +132,9 @@ $(INFRA_IMAGES) $(APPLICATION_IMAGES): libsddf_util_debug.a
 
 FORCE:
 
-
-system: $(METAPROGRAM) $(DTB)
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) -B $(METAPROGRAM) \
-	--sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --objcopy $(OBJCOPY) \
-	--vm-layout $(PROTOCON_VM_LAYOUT) --monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py \
-	--output . --sdf $(SYSTEM_FILE)
+LAYOUT_CMD := \
+	--vm-layout $(PROTOCON_VM_LAYOUT) \
+	--monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py
 
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
@@ -129,10 +146,18 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 	cp network_copy.elf network_copy5.elf
 	cp network_copy.elf network_copy6.elf
 	cp network_copy.elf network_copy7.elf
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) -B $(METAPROGRAM) \
-	--sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --objcopy $(OBJCOPY) \
-	--vm-layout $(PROTOCON_VM_LAYOUT) --monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py \
-	--output . --sdf $(SYSTEM_FILE)
+ifneq ($(strip $(DTS)),)
+	$(PYTHON) -B \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(BLK_META_ARGS)
+else
+	$(PYTHON) -B \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(BLK_META_ARGS)
+endif
+ifdef BLK_NEED_TIMER
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
+endif
 	$(OBJCOPY) --update-section .device_resources=eth_driver_device_resources.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
@@ -181,18 +206,12 @@ qemu_disk:
 ramdisk: refresh-ramdisk
 
 qemu:
-	$(QEMU) -machine virt,virtualization=on \
-		-cpu cortex-a53 \
-		-serial mon:stdio \
-		-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-		-m size=2G \
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_BLK_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
+		-drive file=qemu_disk,if=none,format=raw,id=hd \
 		-netdev user,id=netdev0,hostfwd=tcp::8080-10.0.2.15:80,hostfwd=tcp::8081-10.0.2.16:80 \
 		-global virtio-mmio.force-legacy=false \
-		-d guest_errors \
-		-drive file=qemu_disk,if=none,format=raw,id=hd \
-		$(QEMU_BLK_ARGS) \
-		$(QEMU_NET_ARGS)
+		-d guest_errors -smp 4
 
 ${SDDF}/tools/make/board/common.mk ${SDDF_MAKEFILES} ${CARRELS}/dep/sddf/include &:
 	cd $(CARRELS) && git submodule update --init --recursive

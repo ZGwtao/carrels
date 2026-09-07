@@ -17,7 +17,7 @@ setup_microkit() {
     uk_on_mk=${UK_ON_MK_DIR:-"$carrels/dep/uk-on-mk"}
     sddf="$carrels/dep/sddf"
     export MICROKIT_SDK=${MICROKIT_SDK:-"$microkit/release/microkit-sdk-2.3.0-dev"}
-    export MICROKIT_BOARD=qemu_virt_aarch64 MICROKIT_CONFIG=debug
+    export MICROKIT_BOARD=x86_64_generic MICROKIT_CONFIG=debug
 
     for path in "$microkit" "$microkit/seL4" "$sdfgen"; do
         test -d "$path" || { echo "missing directory: $path" >&2; return 1; }
