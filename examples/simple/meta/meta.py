@@ -8,6 +8,7 @@ import argparse
 import importlib
 from pathlib import Path
 from sdfgen import SystemDescription, Sddf, DeviceTree, LionsOs
+from typing import Optional
 
 from elf import Elftools
 from vspace import VSpace
@@ -16,32 +17,127 @@ from infra import CarrelsContainerInfra as Infra
 
 SDF = SystemDescription
 PD = SDF.ProtectionDomain
+MR = SDF.MemoryRegion
+MAP = SDF.Map
+IOPORT = SDF.IoPort
+IRQIOAPIC = SDF.IrqIoapic
 PROTOCON_COUNT = 8
 
 
-def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
-    blk_node = dtb.node(board.blk)
-    assert blk_node is not None
-    timer_node = dtb.node(board.timer)
-    assert timer_node is not None
+def generate(
+    sdf_path: str,
+    output_dir: str,
+    dtb: Optional[DeviceTree],
+    nvme: bool,
+):
+    serial_node = None
+    blk_node = None
+    timer_node = None
+    net_node = None
+
+    if dtb is not None:
+        serial_node = dtb.node(board.serial)
+        assert serial_node is not None
+        blk_node = dtb.node(board.blk)
+        assert blk_node is not None
+        timer_node = dtb.node(board.timer)
+        assert timer_node is not None
+        net_node = dtb.node(board.ethernet)
+        assert net_node is not None
 
     timer_driver = PD("timer_driver", "timer_driver.elf", priority=254)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        hpet_irq = IRQIOAPIC(
+            ioapic_id=0,
+            pin=2,
+            vector=107,
+            id=0,
+            trigger=IRQIOAPIC.Trigger.EDGE,
+        )
+        timer_driver.add_irq(hpet_irq)
+        hpet_regs = MR(sdf, "hpet_regs", 0x1000, paddr=0xFED00000)
+        hpet_regs_map = MAP(hpet_regs, 0x5000_0000, "rw", cached=False)
+        timer_driver.add_map(hpet_regs_map)
+        sdf.add_mr(hpet_regs)
 
     serial_driver = PD("serial_driver", "serial_driver.elf", priority=100)
     serial_virt_tx = PD("serial_virt_tx", "serial_virt_tx.elf", priority=99)
     serial_virt_rx = PD("serial_virt_rx", "serial_virt_rx.elf", priority=99)
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver,
                                 serial_virt_tx, virt_rx=serial_virt_rx)
+    if board.arch == SystemDescription.Arch.X86_64:
+        serial_port = IOPORT(0x3F8, 8, 0)
+        serial_driver.add_ioport(serial_port)
+        serial_driver.add_irq(
+            IRQIOAPIC(ioapic_id=0, pin=4, vector=0, id=1)
+        )
 
     blk_driver = PD("blk_driver", "blk_driver.elf", priority=200)
     blk_virt = PD("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
 
-    if board.name == "maaxboard":
-        timer_system.add_client(blk_driver)
+    if nvme:
+        assert board.arch == SystemDescription.Arch.X86_64
+
+        # These addresses are part of the current sDDF NVMe driver's ABI.
+        dma_regions = [
+            ("nvme_admin_sq", 0x5EDF0000, 0x20100000, 0x1000),
+            ("nvme_admin_cq", 0x5EDF1000, 0x20101000, 0x1000),
+            ("nvme_io_sq", 0x5EDF2000, 0x20102000, 0x1000),
+            ("nvme_io_cq", 0x5EDF3000, 0x20103000, 0x1000),
+            ("nvme_identify", 0x5EDF4000, 0x20104000, 0x2000),
+            ("nvme_prp_list", 0x5F800000, 0x20200000, 0x80000),
+        ]
+        for name, paddr, vaddr, size in dma_regions:
+            mr = MR(sdf, name, size, paddr=paddr)
+            sdf.add_mr(mr)
+            blk_driver.add_map(MAP(mr, vaddr, "rw", cached=False))
+
+        # QEMU q35 assigns this BAR to the NVMe controller at 00:04.0.
+        nvme_bar0 = MR(sdf, "nvme_bar0", 0x4000, paddr=0xFEB90000)
+        sdf.add_mr(nvme_bar0)
+        blk_driver.add_map(MAP(nvme_bar0, 0x20000000, "rw", cached=False))
+        blk_driver.add_irq(
+            IRQIOAPIC(
+                ioapic_id=0, pin=10, vector=2, id=17,
+                trigger=IRQIOAPIC.Trigger.LEVEL,
+                polarity=IRQIOAPIC.Polarity.ACTIVELOW,
+            )
+        )
+
+        # The x86 NVMe driver uses PCI configuration mechanism #1.
+        blk_driver.add_ioport(IOPORT(0xCF8, 4, 1))
+        blk_driver.add_ioport(IOPORT(0xCFC, 4, 2))
+
+    elif board.arch == SystemDescription.Arch.X86_64:
+        blk_requests_mr = MR(sdf, "virtio_requests", 65536, paddr=0x5FDF0000)
+        sdf.add_mr(blk_requests_mr)
+        blk_driver.add_map(MAP(blk_requests_mr, 0x20200000, "rw"))
+
+        blk_virtio_metadata_mr = MR(
+            sdf, "virtio_metadata", 65536, paddr=0x5FFF0000
+        )
+        sdf.add_mr(blk_virtio_metadata_mr)
+        blk_driver.add_map(MAP(blk_virtio_metadata_mr, 0x20210000, "rw"))
+
+        virtio_blk_regs = MR(
+            sdf, "virtio_blk_regs", 0x4000, paddr=0xFE004000
+        )
+        sdf.add_mr(virtio_blk_regs)
+        blk_driver.add_map(
+            MAP(virtio_blk_regs, 0x60000000, "rw", cached=False)
+        )
+        blk_driver.add_irq(
+            IRQIOAPIC(
+                ioapic_id=0, pin=11, vector=2, id=17,
+                trigger=IRQIOAPIC.Trigger.LEVEL,
+                polarity=IRQIOAPIC.Polarity.ACTIVELOW,
+            )
+        )
+
+    timer_system.add_client(blk_driver)
 
     pds = [
         serial_driver,
@@ -94,12 +190,38 @@ def generate(sdf_path: str, output_dir: str, dtb: DeviceTree):
     for pd in pds:
         sdf.add_pd(pd)
 
-    # Net subsystem
-    net_node = dtb.node(board.ethernet)
-    assert net_node is not None
-
     eth_driver = PD("eth_driver", "eth_driver.elf",
                     priority=101, budget=100, period=400)
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        hw_net_rings = MR(
+            sdf, "hw_net_rings", 65536, paddr=0x7A000000
+        )
+        sdf.add_mr(hw_net_rings)
+        hw_net_rings_map = MAP(
+            hw_net_rings, 0x7000_0000, "rw", cached=False
+        )
+        eth_driver.add_map(hw_net_rings_map)
+
+        virtio_net_regs = MR(
+            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+        )
+        sdf.add_mr(virtio_net_regs)
+        virtio_net_regs_map = MAP(
+            virtio_net_regs, 0x6000_0000, "rw", cached=False
+        )
+        eth_driver.add_map(virtio_net_regs_map)
+
+        virtio_net_irq = IRQIOAPIC(
+            ioapic_id=0,
+            pin=10,
+            vector=1,
+            id=16,
+            trigger=IRQIOAPIC.Trigger.LEVEL,
+            polarity=IRQIOAPIC.Polarity.ACTIVELOW,
+        )
+        eth_driver.add_irq(virtio_net_irq)
+
     net_virt_tx = PD("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = PD("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_vswitch = PD("net_vswitch", "network_vswitch.elf", priority=98)
@@ -188,7 +310,7 @@ if __name__ == "__main__":
     sddf = Sddf(board_args.sddf)
     BOARDS = load_boards(board_args.sddf)
     parser = argparse.ArgumentParser(parents=[board_parser])
-    parser.add_argument("--dtb", required=True)
+    parser.add_argument("--dtb", required=False)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
@@ -197,6 +319,7 @@ if __name__ == "__main__":
                         help="path to libtrustedlo config/vm_layout.py")
     parser.add_argument("--monitor-vm-layout", required=True,
                         help="path to monitor config/vm_layout.py")
+    parser.add_argument("--nvme", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -209,7 +332,9 @@ if __name__ == "__main__":
 
     elf = Elftools(args.objcopy)
 
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = None
+    if board.arch != SystemDescription.Arch.X86_64:
+        with open(args.dtb, "rb") as f:
+            dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb, args.nvme)
