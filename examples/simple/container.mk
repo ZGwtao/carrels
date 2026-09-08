@@ -7,7 +7,8 @@ SUPPORTED_BOARDS:= \
 	qemu_virt_aarch64 \
 	maaxboard \
 	odroidc4 \
-	x86_64_generic
+	x86_64_generic \
+	x86_64_generic_vtx
 
 UK_ON_MK_DIR ?= $(CARRELS)/dep/uk-on-mk
 TOOLCHAIN ?= clang
@@ -18,6 +19,9 @@ SYSTEM_FILE := container.system
 IMAGE_FILE := container.img
 REPORT_FILE := report.txt
 PROTOCON_COUNT ?= 4
+
+# qemu or vtx-demo
+X86_DEVICE_PROFILE ?= qemu
 
 # Each FATFS has an exclusive partition: orchestrator, monitor, then one per
 # protocon. Keep all partitions at 64 MiB so the monitor ramdisk remains large
@@ -150,12 +154,14 @@ ifneq ($(strip $(DTS)),)
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
-	    --protocon-count $(PROTOCON_COUNT) $(BLK_META_ARGS)
+	    --protocon-count $(PROTOCON_COUNT) \
+	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 else
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
-	    --protocon-count $(PROTOCON_COUNT) $(BLK_META_ARGS)
+	    --protocon-count $(PROTOCON_COUNT) \
+	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 endif
 ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
