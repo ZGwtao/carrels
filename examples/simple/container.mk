@@ -17,6 +17,14 @@ LIBMICROKITCO_PATH := $(CARRELS)/dep/libmicrokitco
 SYSTEM_FILE := container.system
 IMAGE_FILE := container.img
 REPORT_FILE := report.txt
+PROTOCON_COUNT ?= 4
+
+# Each FATFS has an exclusive partition: orchestrator, monitor, then one per
+# protocon. Keep all partitions at 64 MiB so the monitor ramdisk remains large
+# enough for the infrastructure and application configuration files.
+QEMU_DISK_PARTITION_COUNT := $(shell expr $(PROTOCON_COUNT) + 2)
+QEMU_DISK_PARTITION_BYTES ?= 67108864
+QEMU_DISK_SIZE_BYTES := $(shell expr $(QEMU_DISK_PARTITION_COUNT) \* $(QEMU_DISK_PARTITION_BYTES))
 
 
 .PHONY: all build infra apps app-native app-uk ramdisk qemu refresh-ramdisk
@@ -138,22 +146,16 @@ LAYOUT_CMD := \
 
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
-	cp network_copy.elf network_copy0.elf
-	cp network_copy.elf network_copy1.elf
-	cp network_copy.elf network_copy2.elf
-	cp network_copy.elf network_copy3.elf
-	cp network_copy.elf network_copy4.elf
-	cp network_copy.elf network_copy5.elf
-	cp network_copy.elf network_copy6.elf
-	cp network_copy.elf network_copy7.elf
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(BLK_META_ARGS)
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
+	    --protocon-count $(PROTOCON_COUNT) $(BLK_META_ARGS)
 else
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(BLK_META_ARGS)
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
+	    --protocon-count $(PROTOCON_COUNT) $(BLK_META_ARGS)
 endif
 ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
@@ -162,14 +164,6 @@ endif
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy0.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy1.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client2_net_copier.data network_copy2.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client3_net_copier.data network_copy3.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client4_net_copier.data network_copy4.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client5_net_copier.data network_copy5.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client6_net_copier.data network_copy6.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_client7_net_copier.data network_copy7.elf
 	$(OBJCOPY) --update-section .net_vswitch_config=net_vswitch.data network_vswitch.elf
 	$(OBJCOPY) --update-section .net_vswitch_orchestrator_config=net_vswitch_orchestrator.data monitor.elf
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
@@ -200,8 +194,8 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
 		$(RAMDISK_INITIALISER) $(BUILD_DIR)
 
-qemu_disk:
-	$(SDDF)/tools/mkvirtdisk $@ 2 512 134217728 GPT
+qemu_disk: FORCE
+	$(SDDF)/tools/mkvirtdisk $@ $(QEMU_DISK_PARTITION_COUNT) 512 $(QEMU_DISK_SIZE_BYTES) GPT
 
 ramdisk: refresh-ramdisk
 

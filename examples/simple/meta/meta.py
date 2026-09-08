@@ -21,15 +21,21 @@ MR = SDF.MemoryRegion
 MAP = SDF.Map
 IOPORT = SDF.IoPort
 IRQIOAPIC = SDF.IrqIoapic
-PROTOCON_COUNT = 8
-
 
 def generate(
     sdf_path: str,
     output_dir: str,
     dtb: Optional[DeviceTree],
     nvme: bool,
+    protocon_count: int,
 ):
+    # sDDF blk_virt supports at most 1024 concurrent requests across all
+    # block clients. Each FATFS instance contributes one such client.
+    fatfs_client_count = protocon_count + 2
+    fatfs_capacity_limit = 1024 // fatfs_client_count
+    fatfs_blk_queue_capacity = min(
+        128, 1 << (fatfs_capacity_limit.bit_length() - 1)
+    )
     serial_node = None
     blk_node = None
     timer_node = None
@@ -158,7 +164,7 @@ def generate(
         client_limit=16,
     )
     container_infra.connect_orchestrator()
-    protocons = container_infra.add_clients(PROTOCON_COUNT)
+    protocons = container_infra.add_clients(protocon_count)
     pd_orchestrator = container_infra.pd_orchestrator
     pd_engine = container_infra.pd_engine
 
@@ -180,12 +186,36 @@ def generate(
 
     pd_fs_engine = PD("engine_fs", "engine_fs.elf", priority=96)
     pd_fs_orchestrator = PD("orchestrator_fs", "orchestrator_fs.elf", priority=96)
-    engine_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_engine, pd_engine, blk=blk_system, partition=1)
-    orchestrator_fs = LionsOs.FileSystem.Fat(sdf, pd_fs_orchestrator, pd_orchestrator, blk=blk_system, partition=0)
+    engine_fs = LionsOs.FileSystem.Fat(
+        sdf, pd_fs_engine, pd_engine, blk=blk_system, partition=1,
+        blk_queue_capacity=fatfs_blk_queue_capacity,
+    )
+    orchestrator_fs = LionsOs.FileSystem.Fat(
+        sdf, pd_fs_orchestrator, pd_orchestrator, blk=blk_system, partition=0,
+        blk_queue_capacity=fatfs_blk_queue_capacity,
+    )
+    protocon_fs_pds = [
+        PD(f"protocon{i}_fs", f"protocon{i}_fs.elf", priority=96)
+        for i in range(protocon_count)
+    ]
+    protocon_filesystems = [
+        LionsOs.FileSystem.Fat(
+            sdf,
+            fs_pd,
+            protocon,
+            blk=blk_system,
+            # Partitions 0 and 1 belong to orchestrator and monitor.
+            partition=i + 2,
+            blk_queue_capacity=fatfs_blk_queue_capacity,
+            optional=True,
+        )
+        for i, (protocon, fs_pd) in enumerate(zip(protocons, protocon_fs_pds))
+    ]
 
     pds = [
         pd_fs_engine,
         pd_fs_orchestrator,
+        *protocon_fs_pds,
     ]
     for pd in pds:
         sdf.add_pd(pd)
@@ -241,7 +271,7 @@ def generate(
             priority=97,
             budget=20000,
         )
-        for i in range(PROTOCON_COUNT)
+        for i in range(protocon_count)
     ]
 
     for protocon, net_copier in zip(protocons, net_copiers):
@@ -263,6 +293,9 @@ def generate(
     assert orchestrator_fs.serialise_config(output_dir)
     assert engine_fs.connect()
     assert engine_fs.serialise_config(output_dir)
+    for protocon_fs in protocon_filesystems:
+        assert protocon_fs.connect()
+        assert protocon_fs.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
     assert timer_system.connect()
@@ -279,17 +312,37 @@ def generate(
 
     assert net_system.serialise_config(output_dir)
 
+    # Each client gets an independent copier ELF and its matching config.
+    # Keep this together with the dynamically-sized client list rather than
+    # duplicating a fixed copier count in container.mk.
+    for i, net_copier in enumerate(net_copiers):
+        elf.copy_elf("network_copy", f"network_copy{i}")
+        elf.update_elf_section(
+            f"network_copy{i}.elf",
+            "net_copy_config",
+            f"net_copy_{net_copier.name}",
+        )
+
     # generate all LionsOS services descriptors for engines.
     assert sdf.gensvc(output_dir)
 
     elf.copy_elf("fat", "orchestrator_fs", None)
     elf.copy_elf("fat", "engine_fs", None)
+    for fs_pd in protocon_fs_pds:
+        elf.copy_elf("fat", fs_pd.name, None)
 
     elf.update_elf_section("orchestrator_fs.elf", "blk_client_config", "blk_client_orchestrator_fs")
     elf.update_elf_section("orchestrator_fs.elf", "fs_server_config", "fs_server_orchestrator_fs")
 
     elf.update_elf_section("engine_fs.elf", "blk_client_config", "blk_client_engine_fs")
     elf.update_elf_section("engine_fs.elf", "fs_server_config", "fs_server_engine_fs")
+    for fs_pd in protocon_fs_pds:
+        elf.update_elf_section(
+            f"{fs_pd.name}.elf", "blk_client_config", f"blk_client_{fs_pd.name}"
+        )
+        elf.update_elf_section(
+            f"{fs_pd.name}.elf", "fs_server_config", f"fs_server_{fs_pd.name}"
+        )
 
     with open(f"{output_dir}/{sdf_path}", "w+") as f:
         f.write(sdf.render())
@@ -320,6 +373,7 @@ if __name__ == "__main__":
     parser.add_argument("--monitor-vm-layout", required=True,
                         help="path to monitor config/vm_layout.py")
     parser.add_argument("--nvme", action="store_true", default=False)
+    parser.add_argument("--protocon-count", type=int, default=8)
 
     args = parser.parse_args()
 
@@ -337,4 +391,7 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, args.nvme)
+    if args.protocon_count <= 0 or args.protocon_count > 16:
+        parser.error("--protocon-count must be in the range 1..16")
+
+    generate(args.sdf, args.output, dtb, args.nvme, args.protocon_count)
