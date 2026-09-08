@@ -3,6 +3,12 @@
 
 UK_ON_MK_DIR ?= $(ROOT)/dep/uk-on-mk
 UK_APPS := c-hello c-fs c-http c-nginx-client sqlite nginx
+
+ifneq ($(filter aarch64 x86_64,$(ARCH)),$(ARCH))
+$(error Unsupported ARCH '$(ARCH)'; expected aarch64 or x86_64)
+endif
+BM_UK_ARCH := $(ARCH)
+
 UK_SERVICE_MANIFEST ?= $(ROOT)/src/client/uk.mf
 UK_SERVICE_HELPER ?= $(ROOT)/tools/service-helper.py
 UNIKERNELS := $(addprefix unikraft-,$(addsuffix .img,$(UK_APPS)))
@@ -10,7 +16,7 @@ UNIKERNELS := $(addprefix unikraft-,$(addsuffix .img,$(UK_APPS)))
 define UK_APP_template
 
 UK_APP_BUILD_DIR_$(1) := $(BUILD_DIR)/uk/$(1)
-UK_APP_ELF_$(1) := $$(UK_APP_BUILD_DIR_$(1))/$(1)_default-arm64
+UK_APP_ELF_$(1) := $$(UK_APP_BUILD_DIR_$(1))/$(1)_default-$$(BM_UK_ARCH)
 
 .PHONY: uk-build-$(1)
 
@@ -19,6 +25,7 @@ uk-build-$(1): libsddf_util.a
 		ROOT=$(UK_ON_MK_DIR) BUILD_DIR=$(BUILD_DIR) SDDF=$(SDDF) \
 		MICROKIT_SDK=$(MICROKIT_SDK) MICROKIT_BOARD=$(MICROKIT_BOARD) \
 		MICROKIT_CONFIG=$(MICROKIT_CONFIG) BOARD_DIR=$(BOARD_DIR) \
+		ARCH=$(ARCH) \
 		BM_UK_APPLICATION=$(1) uk-build
 	cp $$(UK_APP_ELF_$(1)) unikraft-$(1).elf
 
