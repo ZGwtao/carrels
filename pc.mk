@@ -46,6 +46,10 @@ PC_ECHO_CLIENT_OBJS := \
 PC_WHOAMI_CLIENT_OBJS := \
 	pc/client/whoami.o
 
+PC_FS_CLIENT_OBJS := \
+	$(PC_FS_HELPERS_OBJ) \
+	pc/client/client_fs.o
+
 PC_MONITOR_OBJS := \
 	$(PC_FS_HELPERS_OBJ) \
 	pc/monitor/entry.o \
@@ -81,7 +85,8 @@ PC_OBJS := \
 	$(PC_PROTOCON_OBJS) \
 	$(PC_TRAMPOLINE_OBJS) \
 	$(PC_ECHO_CLIENT_OBJS) \
-	$(PC_WHOAMI_CLIENT_OBJS)
+	$(PC_WHOAMI_CLIENT_OBJS) \
+	$(PC_FS_CLIENT_OBJS)
 
 
 $(PC_MONITOR_VM_LAYOUT_HEADER): pc \
@@ -162,7 +167,8 @@ monitor.elf: \
 
 PC_CLIENT_NAMES := \
 	client_echo \
-	whoami
+	whoami \
+	client_fs
 
 PC_CLIENT_ELFS := $(addsuffix .elf,$(PC_CLIENT_NAMES))
 PC_CLIENT_IMGS := $(addsuffix .img,$(PC_CLIENT_NAMES))
@@ -173,6 +179,7 @@ $(PC_CLIENT_ELFS): LDFLAGS += -L$(BOARD_DIR)/lib
 
 client_echo.elf: $(PC_ECHO_CLIENT_OBJS)
 whoami.elf:      $(PC_WHOAMI_CLIENT_OBJS)
+client_fs.elf:   $(PC_FS_CLIENT_OBJS)
 
 $(PC_CLIENT_ELFS): libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
 	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@

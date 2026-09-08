@@ -11,9 +11,11 @@
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/util/printf.h>
+#include <lions/fs/config.h>
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
 
 static serial_queue_handle_t serial_tx_queue_handle;
 static uint64_t started_at_ns;
