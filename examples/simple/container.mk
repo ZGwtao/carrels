@@ -23,6 +23,15 @@ PROTOCON_COUNT ?= 4
 # qemu or vtx-demo
 X86_DEVICE_PROFILE ?= qemu
 
+# Older sDDF checkpoints use a machine-specific board name in their metadata
+# while the Microkit SDK uses x86_64_generic. Keep those two namespaces
+# separate when invoking the metaprogram.
+META_BOARD := $(MICROKIT_BOARD)
+ifeq ($(MICROKIT_BOARD),x86_64_generic)
+X86_BOARD ?= qemu_virt_x86
+META_BOARD := $(X86_BOARD)
+endif
+
 # Each FATFS has an exclusive partition: orchestrator, monitor, then one per
 # protocon. Keep all partitions at 64 MiB so the monitor ramdisk remains large
 # enough for the infrastructure and application configuration files.
@@ -98,6 +107,8 @@ include ${SDDF}/serial/components/serial_components.mk
 include ${SDDF}/libco/libco.mk
 include ${BLK_DRIVER}/blk_driver.mk
 include ${BLK_COMPONENTS}/blk_components.mk
+include ${SDDF}/drivers/acpi/acpi_driver.mk
+include ${SDDF}/drivers/pci/pci_driver.mk
 
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
@@ -128,6 +139,7 @@ INFRA_IMAGES := \
 	monitor.elf \
 	orchestrator.elf \
 	fat.elf \
+	acpi_driver.elf pci_driver.elf \
 	trampoline.elf \
 	protocon.elf \
 	serial_driver.elf \
@@ -152,13 +164,13 @@ LAYOUT_CMD := \
 $(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) -B \
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(META_BOARD) $(LAYOUT_CMD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 else
 	$(PYTHON) -B \
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) $(LAYOUT_CMD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(META_BOARD) $(LAYOUT_CMD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
