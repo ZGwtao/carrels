@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import sys
+import struct
 import argparse
 import importlib
 from pathlib import Path
@@ -20,8 +21,13 @@ SDF = SystemDescription
 PD = SDF.ProtectionDomain
 MR = SDF.MemoryRegion
 MAP = SDF.Map
+Map = SDF.Map
+CapMap = SDF.CapMap
+CNode = SDF.CNode
+Channel = SDF.Channel
 IOPORT = SDF.IoPort
 IRQIOAPIC = SDF.IrqIoapic
+IrqIoapic = SDF.IrqIoapic
 
 
 @dataclass(frozen=True)
@@ -135,7 +141,7 @@ def init_serial_system(sdf: SDF, serial_node, arch, x86_profile: X86DeviceProfil
 
 
 def init_blk_system(sdf: SDF, blk_node, arch, nvme: bool, timer_system,
-                    x86_profile: X86DeviceProfile):
+                    x86_profile: X86DeviceProfile, pci_driver: PD):
     blk_driver = PD("blk_driver", "blk_driver.elf", priority=200)
     blk_virt = PD("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
@@ -209,6 +215,11 @@ def init_blk_system(sdf: SDF, blk_node, arch, nvme: bool, timer_system,
 
     timer_system.add_client(blk_driver)
     add_pds(sdf, blk_driver, blk_virt)
+
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 4))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 5))
+    sdf.add_channel(Channel(pci_driver, blk_driver, a_id=2, b_id=10))
+
     return blk_system
 
 
@@ -277,7 +288,7 @@ def init_filesystems(sdf: SDF, blk_system, pd_engine, pd_orchestrator, protocons
 
 
 def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
-                    protocon_count: int, x86_profile: X86DeviceProfile):
+                    protocon_count: int, x86_profile: X86DeviceProfile, pci_driver: PD):
     eth_driver = PD("eth_driver", "eth_driver.elf",
                     priority=101, budget=100, period=400)
 
@@ -332,6 +343,11 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
         )
 
     add_pds(sdf, eth_driver, net_virt_rx, net_virt_tx, net_vswitch, *net_copiers)
+
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, eth_driver, None, 2))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, eth_driver, None, 3))
+    sdf.add_channel(Channel(pci_driver, eth_driver, a_id=1, b_id=10))
+
     return net_system, net_virt_tx, net_copiers
 
 
@@ -386,6 +402,106 @@ def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
             f"{fs_pd.name}.elf", "fs_server_config", f"fs_server_{fs_pd.name}"
         )
 
+class AcpiTablesConfig:
+    def __init__(
+        self,
+        max_total_size: int,
+    ):
+        self.max_total_size = max_total_size
+        self.patched_tables_end = 0
+        self.alignment = 0x1000
+        self.max_num_acpi_tables = 20 # This needs to be synced with MAX_NUM_ACPI_TABLES in acpi.h
+        self.num_tables = 0
+        self.acpi_table_bytes = bytearray()
+        self.acpi_table_pointers = [0] * self.max_num_acpi_tables
+
+    # TODO: add the checks
+    def add_acpi_table(self, acpi_file):
+        acpi_file = "/Users/terrybai/tmp/acpi_vb105/vb105_acpi/" + acpi_file + ".dat"
+        print(acpi_file)
+        assert os.path.isfile(acpi_file)
+        with open(acpi_file, "rb") as data_file:
+            byte_list = list(data_file.read())
+
+            if len(byte_list) + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_pointers[self.num_tables] = len(self.acpi_table_bytes)
+                self.acpi_table_bytes.extend(byte_list)
+                self.patched_tables_end = len(self.acpi_table_bytes)
+                self.num_tables += 1
+
+        trailing_len = len(self.acpi_table_bytes) % self.alignment
+        if trailing_len != 0:
+            padding_len = self.alignment - trailing_len
+            if padding_len + len(self.acpi_table_bytes) < self.max_total_size:
+                self.acpi_table_bytes.extend(b"\x00" * padding_len)
+
+    def tables_serialise(self):
+        pack_str = "<" + "B" * len(self.acpi_table_bytes)
+
+        return struct.pack(
+            pack_str,
+            *self.acpi_table_bytes
+        )
+
+    def summary_serialise(self):
+        pack_str = "<" + "Q" * self.max_num_acpi_tables + "QQII"
+
+        return struct.pack(
+            pack_str,
+            *self.acpi_table_pointers,
+            self.patched_tables_end,
+            self.max_total_size,
+            self.alignment,
+            self.num_tables,
+        )
+
+def init_acpi_pci():
+    acpi_driver = PD("acpi_driver", "acpi_driver.elf", priority=253, stack_size=0x5000)
+    pci_driver = PD("pci_driver", "pci_driver.elf", priority=252)
+
+    acpi_bootinfo_post_capdl_untypeds = MR(sdf, "bootinfo_post_capdl_untypeds", 0x1000, prefill_bootinfo="post_capdl_untypeds")
+    sdf.add_mr(acpi_bootinfo_post_capdl_untypeds)
+    acpi_driver.add_map(Map(acpi_bootinfo_post_capdl_untypeds, 0x2000000, "r", setvar_vaddr="bootinfo_post_capdl_untypeds"))
+
+    acpi_bootinfo_rsdp = MR(sdf, "bootinfo_rsdp", 0x1000, prefill_bootinfo="x86_acpi_rsdp")
+    sdf.add_mr(acpi_bootinfo_rsdp)
+    acpi_driver.add_map(Map(acpi_bootinfo_rsdp, 0x2001000, "r", setvar_vaddr="bootinfo_rsdp"))
+
+    acpi_tables_config = AcpiTablesConfig(0x500000)
+
+    cnode_remaining_untypeds = CNode("remaining_untypeds", True, 9)
+    sdf.add_cnode(cnode_remaining_untypeds)
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_remaining_untypeds, 1))
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, pci_driver, None, 2))
+
+    cnode_pci_resources = CNode("pci_resources", False, 9)
+    sdf.add_cnode(cnode_pci_resources)
+    acpi_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 3))
+    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cnode, None, cnode_pci_resources, 1))
+
+    mr_aml_object_pool = MR(sdf, "aml_object_pool", 0x100000)
+    sdf.add_mr(mr_aml_object_pool)
+    acpi_driver.add_map(Map(mr_aml_object_pool, 0x30000000, "rw"))
+
+    mr_aml_state_stack = MR(sdf, "aml_state_stack", 0x10000)
+    sdf.add_mr(mr_aml_state_stack)
+    acpi_driver.add_map(Map(mr_aml_state_stack, 0x50000000, "rw"))
+
+    mr_acpi_tables_copy = MR(sdf, "acpi_tables_copy", 0x50000)
+    sdf.add_mr(mr_acpi_tables_copy)
+    acpi_driver.add_map(Map(mr_acpi_tables_copy, 0x40000000, "rw"))
+
+    mr_pci_resources = MR(sdf, "pci_resources", 0x40000)
+    sdf.add_mr(mr_pci_resources)
+    acpi_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+    pci_driver.add_map(Map(mr_pci_resources, 0x60000000, "rw", cached=False))
+
+    sdf.add_channel(Channel(acpi_driver, pci_driver, a_id=0, b_id=0))
+    sdf.add_pd(acpi_driver)
+    sdf.add_pd(pci_driver)
+
+    return acpi_driver, pci_driver, acpi_tables_config
+
 
 def generate(
     sdf_path: str,
@@ -396,11 +512,14 @@ def generate(
     x86_device_profile: str,
 ):
     x86_profile = X86_DEVICE_PROFILES[x86_device_profile]
+
+    acpi_driver, pci_driver, acpi_tables_config = init_acpi_pci()
+
     serial_node, blk_node, timer_node, net_node = resolve_device_nodes(dtb)
     timer_system, _ = init_timer_system(sdf, timer_node, board.arch, x86_profile)
     serial_system = init_serial_system(sdf, serial_node, board.arch, x86_profile)
     blk_system = init_blk_system(
-        sdf, blk_node, board.arch, nvme, timer_system, x86_profile
+        sdf, blk_node, board.arch, nvme, timer_system, x86_profile, pci_driver
     )
     container_infra, protocons = init_container_infra(sdf, protocon_count)
     pd_engine = container_infra.pd_engine
@@ -412,7 +531,7 @@ def generate(
         sdf, blk_system, pd_engine, pd_orchestrator, protocons, protocon_count
     )
     net_system, net_virt_tx, net_copiers = init_net_system(
-        sdf, net_node, board.arch, pd_engine, protocons, protocon_count, x86_profile
+        sdf, net_node, board.arch, pd_engine, protocons, protocon_count, x86_profile, pci_driver
     )
     connect_and_serialise(
         output_dir, engine_fs, orchestrator_fs, protocon_filesystems,
@@ -421,6 +540,10 @@ def generate(
     # Generate all LionsOS service descriptors after optional services exist.
     assert sdf.gensvc(output_dir)
     update_generated_elfs(protocon_fs_pds, net_copiers)
+
+    with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
+        f.write(acpi_tables_config.summary_serialise())
+    elf.update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
 
     with open(f"{output_dir}/{sdf_path}", "w+") as f:
         f.write(sdf.render())
