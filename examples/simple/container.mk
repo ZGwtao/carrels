@@ -197,10 +197,11 @@ endif
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
 
+SPEC = capdl_spec.json
 $(IMAGE_FILE) $(REPORT_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) \
 		--search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) 	\
-		--config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+		--config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE) --capdl-json ${SPEC}
 
 infra: $(IMAGE_FILE)
 
@@ -217,7 +218,7 @@ qemu_disk: FORCE
 
 ramdisk: refresh-ramdisk
 
-qemu:
+qemu: infra app-uk ramdisk
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_BLK_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
 		-drive file=qemu_disk,if=none,format=raw,id=hd \
