@@ -161,22 +161,23 @@ def init_blk_system(sdf: SDF, blk_node, arch, nvme: bool, timer_system,
             sdf.add_mr(mr)
             blk_driver.add_map(MAP(mr, vaddr, "rw", cached=False))
 
-        nvme_bar0 = MR(sdf, "nvme_bar0", 0x4000,
-                       paddr=x86_profile.nvme_bar_paddr)
-        sdf.add_mr(nvme_bar0)
-        blk_driver.add_map(MAP(nvme_bar0, 0x20000000, "rw", cached=False))
-        blk_driver.add_irq(
-            IRQIOAPIC(
-                ioapic_id=0,
-                pin=x86_profile.nvme_irq_pin,
-                vector=x86_profile.nvme_irq_vector,
-                id=17,
-                trigger=IRQIOAPIC.Trigger.LEVEL,
-                polarity=IRQIOAPIC.Polarity.ACTIVELOW,
-            )
-        )
-        blk_driver.add_ioport(IOPORT(0xCF8, 4, 1))
-        blk_driver.add_ioport(IOPORT(0xCFC, 4, 2))
+        # nvme_bar0 = MR(sdf, "nvme_bar0", 0x4000,
+        #                paddr=x86_profile.nvme_bar_paddr)
+        # sdf.add_mr(nvme_bar0)
+        # blk_driver.add_map(MAP(nvme_bar0, 0x20000000, "rw", cached=False))
+        # blk_driver.add_irq(
+        #     IRQIOAPIC(
+        #         ioapic_id=0,
+        #         pin=x86_profile.nvme_irq_pin,
+        #         vector=x86_profile.nvme_irq_vector,
+        #         id=17,
+        #         trigger=IRQIOAPIC.Trigger.LEVEL,
+        #         polarity=IRQIOAPIC.Polarity.ACTIVELOW,
+        #     )
+        # )
+        # blk_driver.add_ioport(IOPORT(0xCF8, 4, 1))
+        # blk_driver.add_ioport(IOPORT(0xCFC, 4, 2))
+        blk_driver.add_irq_placeholder(17)
 
     elif arch == SystemDescription.Arch.X86_64:
         if x86_profile.virtio_blk_bar_paddr is None:
@@ -299,22 +300,23 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
         sdf.add_mr(hw_net_rings)
         eth_driver.add_map(MAP(hw_net_rings, 0x7000_0000, "rw", cached=False))
 
-        virtio_net_regs = MR(
-            sdf, "virtio_net_regs", 0x4000, paddr=x86_profile.net_bar_paddr
-        )
-        sdf.add_mr(virtio_net_regs)
-        eth_driver.add_map(MAP(virtio_net_regs, 0x6000_0000, "rw", cached=False))
+        # virtio_net_regs = MR(
+        #     sdf, "virtio_net_regs", 0x4000, paddr=x86_profile.net_bar_paddr
+        # )
+        # sdf.add_mr(virtio_net_regs)
+        # eth_driver.add_map(MAP(virtio_net_regs, 0x6000_0000, "rw", cached=False))
 
-        eth_driver.add_irq(
-            IRQIOAPIC(
-                ioapic_id=0,
-                pin=x86_profile.net_irq_pin,
-                vector=x86_profile.net_irq_vector,
-                id=16,
-                trigger=IRQIOAPIC.Trigger.LEVEL,
-                polarity=IRQIOAPIC.Polarity.ACTIVELOW,
-            )
-        )
+        # eth_driver.add_irq(
+        #     IRQIOAPIC(
+        #         ioapic_id=0,
+        #         pin=x86_profile.net_irq_pin,
+        #         vector=x86_profile.net_irq_vector,
+        #         id=16,
+        #         trigger=IRQIOAPIC.Trigger.LEVEL,
+        #         polarity=IRQIOAPIC.Polarity.ACTIVELOW,
+        #     )
+        # )
+        eth_driver.add_irq_placeholder(16)
 
     net_virt_tx = PD("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = PD("net_virt_rx", "network_virt_rx.elf", priority=99)
