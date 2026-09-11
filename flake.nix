@@ -70,7 +70,6 @@
           python = pkgs.python312.withPackages (ps: [
             pysdfgen
             ps.pyelftools
-            ps.pip
             ts_ci
           ]);
         in
