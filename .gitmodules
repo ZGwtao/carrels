@@ -12,6 +12,7 @@
 [submodule "dep/uk-on-mk"]
 	path = dep/uk-on-mk
 	url = https://github.com/ZGwtao/uk-on-mk.git
+	branch = checkpoint-demo
 [submodule "dep/microkit_sdf_gen"]
 	path = dep/microkit_sdf_gen
 	url = https://github.com/au-ts/microkit_sdf_gen.git

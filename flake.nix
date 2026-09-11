@@ -75,6 +75,9 @@
         in
         {
             docs = pkgs.mkShell rec {
+              NIX_CFLAGS_COMPILE = [
+                "-Wno-error=incompatible-pointers-types"
+              ];
               nativeBuildInputs = with pkgs; [
                 texliveFull
                 pandoc
@@ -91,6 +94,7 @@
                 gnumake
                 dosfstools
                 gptfdisk
+                gcc13
                 # for git-clang-format.
                 llvm.libclang.python
                 llvm.lld
