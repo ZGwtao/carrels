@@ -218,7 +218,7 @@ qemu_disk: FORCE
 
 ramdisk: refresh-ramdisk
 
-qemu: infra app-uk ramdisk
+qemu: ramdisk
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_BLK_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
 		-drive file=qemu_disk,if=none,format=raw,id=hd \
