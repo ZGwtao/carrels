@@ -207,6 +207,31 @@ static inline void protocon_init_txlo_context(const deploy_plan_t *plan)
     ctxt->txlo_monitor_init_field.call_id = PC_MONITOR_CALL_BACKUP_CONTEXT;
 }
 
+static inline void protocon_restart_loader(uint32_t pc_id, seL4_Word entry_point)
+{
+    seL4_UserContext ctxt = {0};
+
+#if defined(CONFIG_ARCH_X86_64)
+    ctxt.rip = entry_point;
+    ctxt.rsp = TSLDR_VM_MICROKIT_X86_STACK_END;
+#elif defined(CONFIG_ARCH_AARCH64)
+    ctxt.pc = entry_point;
+    ctxt.sp = TSLDR_VM_MICROKIT_AARCH64_STACK_END;
+#else
+#error "Unsupported architecture"
+#endif
+
+    seL4_Error err = seL4_TCB_WriteRegisters(BASE_TCB_CAP + pc_id,
+                                              seL4_True,
+                                              0,
+                                              2,
+                                              &ctxt);
+    if (err != seL4_NoError) {
+        TSLDR_DBG_PRINT(PROGNAME "Failed to restart loader for child %u: %d\n", pc_id, err);
+        microkit_internal_crash(err);
+    }
+}
+
 static inline void protocon_start(deploy_plan_t *plan)
 {
     protocon_init_txlo_info(plan);
@@ -216,7 +241,7 @@ static inline void protocon_start(deploy_plan_t *plan)
 
     SET_PROTOCON_AS_INSTANTIATED(plan->pc_id)
 
-    microkit_pd_restart(plan->pc_id, plan->pc_entry);
+    protocon_restart_loader(plan->pc_id, plan->pc_entry);
     TSLDR_DBG_PRINT(PROGNAME "Started child PD at entrypoint address: %x\n", plan->pc_entry);
 }
 
