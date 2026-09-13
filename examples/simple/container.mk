@@ -17,6 +17,7 @@ SDDF ?= $(CARRELS)/dep/sddf
 LIBMICROKITCO_PATH := $(CARRELS)/dep/libmicrokitco
 SYSTEM_FILE := container.system
 IMAGE_FILE := container.img
+DLG_FILE := container_monitor.dlg
 REPORT_FILE := report.txt
 PROTOCON_COUNT ?= 4
 
@@ -198,10 +199,11 @@ endif
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
 
 SPEC = capdl_spec.json
-$(IMAGE_FILE) $(REPORT_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
+$(IMAGE_FILE) $(REPORT_FILE) $(DLG_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) \
 		--search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) 	\
 		--config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE) --capdl-json ${SPEC}
+	cp $(BUILD_DIR)/build/delegation/*.dlg $(BUILD_DIR)
 
 infra: $(IMAGE_FILE)
 
@@ -210,8 +212,9 @@ app-native: $(NATIVE_APPLICATION_IMAGES)
 app-uk: $(UNIKRAFT_APPLICATION_IMAGES)
 
 refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
+	cp $(CONTAINER_DIR)/disk-test.txt $(BUILD_DIR)/disk-test.txt
 	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
-		$(RAMDISK_INITIALISER) $(BUILD_DIR)
+		$(RAMDISK_INITIALISER) $(BUILD_DIR) $(PROTOCON_COUNT)
 
 qemu_disk: FORCE
 	$(SDDF)/tools/mkvirtdisk $@ $(QEMU_DISK_PARTITION_COUNT) 512 $(QEMU_DISK_SIZE_BYTES) GPT

@@ -14,11 +14,12 @@ STATIC_COPY_TABLE = [
     ("protocon.elf", 1),
     ("trampoline.elf", 1),
     ("container_monitor.svc", 2),
-    ("build/delegation/container_monitor.dlg", 2),
+    ("container_monitor.dlg", 2),
 ]
 
 def main() -> int:
     build_dir = Path(sys.argv[1]).resolve()
+    protocon_count = int(sys.argv[2])
     script_dir = Path(__file__).resolve().parent
     copy_script = script_dir / "copy2ramdisk.sh"
     env = os.environ | {"RAMDISK_DISK": str(build_dir / "qemu_disk")}
@@ -27,6 +28,9 @@ def main() -> int:
         [(f, 2) for f in sorted(build_dir.glob("*.data"))] + \
         [(f, 2) for f in sorted(build_dir.glob("symbols/*.mktsym"))] + \
         [(f, 1) for f in sorted(build_dir.glob("*.img"))]
+
+    for x in range(2, 2 + protocon_count):
+        copy_table += [(f, x) for f in sorted(build_dir.glob("disk-test.txt"))]
 
     for source, partition in copy_table:
         print(f"Copying {source} to partition {partition}")

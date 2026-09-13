@@ -11,6 +11,7 @@
  */
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -37,17 +38,21 @@ static serial_queue_handle_t serial_tx_queue_handle;
 static ptrdiff_t fs_buffer;
 static uint64_t active_request;
 static uint64_t file_descriptor;
-static const char file_path[] = "native-client.txt";
-static const char file_contents[] = "written by the native FATFS client\n";
+static const char file_path[] = "disk-test.txt";
+static const char new_file_contents[] = "updated by the native FATFS client\n";
 
 enum fs_demo_state {
     FS_DEMO_MOUNT,
+    FS_DEMO_OPEN_INITIAL_READ,
+    FS_DEMO_INITIAL_READ,
+    FS_DEMO_CLOSE_INITIAL_READ,
     FS_DEMO_OPEN_WRITE,
+    FS_DEMO_TRUNCATE,
     FS_DEMO_WRITE,
     FS_DEMO_CLOSE_WRITE,
-    FS_DEMO_OPEN_READ,
-    FS_DEMO_READ,
-    FS_DEMO_CLOSE_READ,
+    FS_DEMO_OPEN_VERIFY_READ,
+    FS_DEMO_VERIFY_READ,
+    FS_DEMO_CLOSE_VERIFY_READ,
     FS_DEMO_DONE,
 };
 
@@ -84,19 +89,62 @@ static void process_completion(uint64_t request_id)
     switch (state) {
     case FS_DEMO_MOUNT:
         strcpy(fs_buffer_ptr(fs_buffer), file_path);
-        state = FS_DEMO_OPEN_WRITE;
+        state = FS_DEMO_OPEN_INITIAL_READ;
         issue((fs_cmd_t){
             .type = FS_CMD_FILE_OPEN,
             .params.file_open =
                 {
                     .path = {.offset = fs_buffer, .size = strlen(fs_buffer_ptr(fs_buffer)) + 1},
-                    .flags = FS_OPEN_FLAGS_READ_WRITE | FS_OPEN_FLAGS_CREATE,
+                    .flags = FS_OPEN_FLAGS_READ_ONLY,
+                },
+        });
+        break;
+    case FS_DEMO_OPEN_INITIAL_READ:
+        file_descriptor = completion.data.file_open.fd;
+        memset(fs_buffer_ptr(fs_buffer), 0, FS_BUFFER_SIZE);
+        state = FS_DEMO_INITIAL_READ;
+        issue((fs_cmd_t){
+            .type = FS_CMD_FILE_READ,
+            .params.file_read =
+                {
+                    .fd = file_descriptor,
+                    .offset = 0,
+                    .buf = {.offset = fs_buffer, .size = FS_BUFFER_SIZE - 1},
+                },
+        });
+        break;
+    case FS_DEMO_INITIAL_READ:
+        ((char *)fs_buffer_ptr(fs_buffer))[completion.data.file_read.len_read] = '\0';
+        sddf_printf("FS-CLIENT|INFO: disk-test.txt initial content:\n%s",
+                    (char *)fs_buffer_ptr(fs_buffer));
+        state = FS_DEMO_CLOSE_INITIAL_READ;
+        issue((fs_cmd_t){
+            .type = FS_CMD_FILE_CLOSE,
+            .params.file_close = {.fd = file_descriptor},
+        });
+        break;
+    case FS_DEMO_CLOSE_INITIAL_READ:
+        strcpy(fs_buffer_ptr(fs_buffer), file_path);
+        state = FS_DEMO_OPEN_WRITE;
+        issue((fs_cmd_t){
+            .type = FS_CMD_FILE_OPEN,
+            .params.file_open =
+                {
+                    .path = {.offset = fs_buffer, .size = sizeof(file_path)},
+                    .flags = FS_OPEN_FLAGS_READ_WRITE,
                 },
         });
         break;
     case FS_DEMO_OPEN_WRITE:
         file_descriptor = completion.data.file_open.fd;
-        strcpy(fs_buffer_ptr(fs_buffer), file_contents);
+        state = FS_DEMO_TRUNCATE;
+        issue((fs_cmd_t){
+            .type = FS_CMD_FILE_TRUNCATE,
+            .params.file_truncate = {.fd = file_descriptor, .length = 0},
+        });
+        break;
+    case FS_DEMO_TRUNCATE:
+        strcpy(fs_buffer_ptr(fs_buffer), new_file_contents);
         state = FS_DEMO_WRITE;
         issue((fs_cmd_t){
             .type = FS_CMD_FILE_WRITE,
@@ -104,12 +152,12 @@ static void process_completion(uint64_t request_id)
                 {
                     .fd = file_descriptor,
                     .offset = 0,
-                    .buf = {.offset = fs_buffer, .size = strlen(fs_buffer_ptr(fs_buffer))},
+                    .buf = {.offset = fs_buffer, .size = sizeof(new_file_contents) - 1},
                 },
         });
         break;
     case FS_DEMO_WRITE:
-        assert(completion.data.file_write.len_written == sizeof(file_contents) - 1);
+        assert(completion.data.file_write.len_written == sizeof(new_file_contents) - 1);
         state = FS_DEMO_CLOSE_WRITE;
         issue((fs_cmd_t){
             .type = FS_CMD_FILE_CLOSE,
@@ -118,7 +166,7 @@ static void process_completion(uint64_t request_id)
         break;
     case FS_DEMO_CLOSE_WRITE:
         strcpy(fs_buffer_ptr(fs_buffer), file_path);
-        state = FS_DEMO_OPEN_READ;
+        state = FS_DEMO_OPEN_VERIFY_READ;
         issue((fs_cmd_t){
             .type = FS_CMD_FILE_OPEN,
             .params.file_open =
@@ -128,31 +176,38 @@ static void process_completion(uint64_t request_id)
                 },
         });
         break;
-    case FS_DEMO_OPEN_READ:
+    case FS_DEMO_OPEN_VERIFY_READ:
         file_descriptor = completion.data.file_open.fd;
         memset(fs_buffer_ptr(fs_buffer), 0, FS_BUFFER_SIZE);
-        state = FS_DEMO_READ;
+        state = FS_DEMO_VERIFY_READ;
         issue((fs_cmd_t){
             .type = FS_CMD_FILE_READ,
             .params.file_read =
                 {
                     .fd = file_descriptor,
                     .offset = 0,
-                    .buf = {.offset = fs_buffer, .size = sizeof(file_contents) - 1},
+                    .buf = {.offset = fs_buffer, .size = FS_BUFFER_SIZE - 1},
                 },
         });
         break;
-    case FS_DEMO_READ:
-        assert(completion.data.file_read.len_read == sizeof(file_contents) - 1);
-        assert(memcmp(fs_buffer_ptr(fs_buffer), file_contents, sizeof(file_contents) - 1) == 0);
-        state = FS_DEMO_CLOSE_READ;
+    case FS_DEMO_VERIFY_READ: {
+        bool verified =
+            completion.data.file_read.len_read == sizeof(new_file_contents) - 1 &&
+            memcmp(fs_buffer_ptr(fs_buffer), new_file_contents, sizeof(new_file_contents) - 1) == 0;
+
+        ((char *)fs_buffer_ptr(fs_buffer))[completion.data.file_read.len_read] = '\0';
+        sddf_printf("FS-CLIENT|INFO: disk-test.txt new content:\n%s",
+                    (char *)fs_buffer_ptr(fs_buffer));
+        sddf_printf("FS-CLIENT|INFO: disk-test.txt verification: %s\n",
+                    verified ? "PASSED" : "FAILED");
+        state = FS_DEMO_CLOSE_VERIFY_READ;
         issue((fs_cmd_t){
             .type = FS_CMD_FILE_CLOSE,
             .params.file_close = {.fd = file_descriptor},
         });
         break;
-    case FS_DEMO_CLOSE_READ:
-        sddf_printf("FS-CLIENT|INFO: wrote, reopened, and verified native-client.txt\n");
+    }
+    case FS_DEMO_CLOSE_VERIFY_READ:
         fs_buffer_free(fs_buffer);
         state = FS_DEMO_DONE;
         break;
