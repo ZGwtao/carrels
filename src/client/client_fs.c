@@ -42,6 +42,7 @@ static const char file_path[] = "disk-test.txt";
 static const char new_file_contents[] = "updated by the native FATFS client\n";
 
 enum fs_demo_state {
+    FS_DEMO_RESET,
     FS_DEMO_MOUNT,
     FS_DEMO_OPEN_INITIAL_READ,
     FS_DEMO_INITIAL_READ,
@@ -53,6 +54,7 @@ enum fs_demo_state {
     FS_DEMO_OPEN_VERIFY_READ,
     FS_DEMO_VERIFY_READ,
     FS_DEMO_CLOSE_VERIFY_READ,
+    FS_DEMO_UNMOUNT,
     FS_DEMO_DONE,
 };
 
@@ -77,6 +79,18 @@ static void process_completion(uint64_t request_id)
     fs_command_complete(request_id, NULL, &completion);
     fs_request_free(request_id);
 
+    /*
+     * The FATFS server outlives a deployed client.  A previous client may
+     * therefore have left it mounted, while a fresh server legitimately
+     * reports that there is nothing to deinitialise.  In either case, finish
+     * the reset by issuing a real mount whose result is checked below.
+     */
+    if (state == FS_DEMO_RESET) {
+        state = FS_DEMO_MOUNT;
+        issue((fs_cmd_t){.type = FS_CMD_INITIALISE});
+        return;
+    }
+
     if (completion.status != FS_STATUS_SUCCESS) {
         sddf_printf("FS-CLIENT|ERROR: command %u failed with status %u\n",
                     (unsigned)state,
@@ -87,6 +101,9 @@ static void process_completion(uint64_t request_id)
     }
 
     switch (state) {
+    case FS_DEMO_RESET:
+        /* Handled above because an unmounted server returns an error. */
+        break;
     case FS_DEMO_MOUNT:
         strcpy(fs_buffer_ptr(fs_buffer), file_path);
         state = FS_DEMO_OPEN_INITIAL_READ;
@@ -208,6 +225,10 @@ static void process_completion(uint64_t request_id)
         break;
     }
     case FS_DEMO_CLOSE_VERIFY_READ:
+        state = FS_DEMO_UNMOUNT;
+        issue((fs_cmd_t){.type = FS_CMD_DEINITIALISE});
+        break;
+    case FS_DEMO_UNMOUNT:
         fs_buffer_free(fs_buffer);
         state = FS_DEMO_DONE;
         break;
@@ -232,8 +253,8 @@ void init(void)
     fs_share = fs_config.server.share.vaddr;
     assert(fs_buffer_allocate(&fs_buffer) == 0);
 
-    state = FS_DEMO_MOUNT;
-    issue((fs_cmd_t){.type = FS_CMD_INITIALISE});
+    state = FS_DEMO_RESET;
+    issue((fs_cmd_t){.type = FS_CMD_DEINITIALISE});
 }
 
 void notified(microkit_channel ch)
