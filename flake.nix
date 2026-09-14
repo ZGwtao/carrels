@@ -7,7 +7,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    sdfgen.url = "git+file:./dep/microkit_sdf_gen";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen/checkpoint-demo";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
