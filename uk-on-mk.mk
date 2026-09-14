@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 UK_ON_MK_DIR ?= $(ROOT)/dep/uk-on-mk
-UK_APPS := c-hello c-fs c-http c-nginx-client sqlite nginx
+UK_APPS := c-hello c-fs c-http c-nginx-client sqlite nginx redis
 
 ifneq ($(filter aarch64 x86_64,$(ARCH)),$(ARCH))
 $(error Unsupported ARCH '$(ARCH)'; expected aarch64 or x86_64)
