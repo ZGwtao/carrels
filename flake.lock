@@ -105,15 +105,16 @@
       "locked": {
         "lastModified": 1788930758,
         "narHash": "sha256-T3fbZWa5IywAEZhsiMFQAOIu2v5x6+p7sjsIRPcNVDA=",
-        "ref": "refs/heads/checkpoint-demo",
+        "owner": "au-ts",
+        "repo": "microkit_sdf_gen",
         "rev": "c0158d889663744f3248032c985d74f1d3973418",
-        "revCount": 844,
-        "type": "git",
-        "url": "file:./dep/microkit_sdf_gen"
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:./dep/microkit_sdf_gen"
+        "owner": "au-ts",
+        "ref": "checkpoint-demo",
+        "repo": "microkit_sdf_gen",
+        "type": "github"
       }
     },
     "systems": {

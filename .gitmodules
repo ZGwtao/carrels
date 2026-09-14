@@ -16,6 +16,7 @@
 [submodule "dep/microkit_sdf_gen"]
 	path = dep/microkit_sdf_gen
 	url = https://github.com/au-ts/microkit_sdf_gen.git
+	branch = checkpoint-demo
 [submodule "dep/microkit"]
 	path = dep/microkit
 	url = https://github.com/au-ts/dynamic-microkit
