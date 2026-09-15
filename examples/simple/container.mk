@@ -33,10 +33,9 @@ X86_BOARD ?= qemu_virt_x86
 META_BOARD := $(X86_BOARD)
 endif
 
-# Each FATFS has an exclusive partition: orchestrator, monitor, then one per
-# protocon. Keep all partitions at 64 MiB so the monitor ramdisk remains large
-# enough for the infrastructure and application configuration files.
-QEMU_DISK_PARTITION_COUNT := $(shell expr $(PROTOCON_COUNT) + 2)
+# Private partitions: orchestrator, monitor, and one per protocon. The final
+# partition is an additional FATFS shared by every protocon.
+QEMU_DISK_PARTITION_COUNT := $(shell expr $(PROTOCON_COUNT) + 3)
 QEMU_DISK_PARTITION_BYTES ?= 67108864
 QEMU_DISK_SIZE_BYTES := $(shell expr $(QEMU_DISK_PARTITION_COUNT) \* $(QEMU_DISK_PARTITION_BYTES))
 
@@ -123,6 +122,7 @@ MONITOR_VM_LAYOUT := $()
 
 FAT_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(FAT)/fat.mk
+include $(CARRELS)/components/fs/multiplexer/multiplexer.mk
 
 CONTAINER_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 CONTAINER_COMPONENT_DIR := $(CARRELS)
@@ -140,6 +140,8 @@ INFRA_IMAGES := \
 	monitor.elf \
 	orchestrator.elf \
 	fat.elf \
+	shared_fat.elf \
+	fs_multiplexer.elf \
 	acpi_driver.elf pci_driver.elf \
 	trampoline.elf \
 	protocon.elf \

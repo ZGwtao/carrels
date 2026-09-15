@@ -249,7 +249,7 @@ def connect_container_services(serial_system, timer_system, pd_engine, pd_orches
 def fatfs_blk_queue_capacity(protocon_count: int) -> int:
     # sDDF blk_virt supports at most 1024 concurrent requests across all
     # block clients. Each FATFS instance contributes one such client.
-    fatfs_client_count = protocon_count + 2
+    fatfs_client_count = protocon_count + 3
     capacity_limit = 1024 // fatfs_client_count
     return min(128, 1 << (capacity_limit.bit_length() - 1))
 
@@ -284,8 +284,27 @@ def init_filesystems(sdf: SDF, blk_system, pd_engine, pd_orchestrator, protocons
         )
         for i, (protocon, fs_pd) in enumerate(zip(protocons, protocon_fs_pds))
     ]
-    add_pds(sdf, pd_fs_engine, pd_fs_orchestrator, *protocon_fs_pds)
-    return engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds
+    pd_shared_fs = PD("shared_fs", "shared_fs.elf", priority=96)
+    pd_fs_multiplexer = PD("fs_multiplexer", "fs_multiplexer.elf", priority=97)
+    shared_fs = LionsOs.FileSystem.SharedFat(
+        sdf,
+        pd_shared_fs,
+        protocons,
+        multiplexer=pd_fs_multiplexer,
+        blk=blk_system,
+        # Partitions [0, protocon_count + 1] remain private.
+        partition=protocon_count + 2,
+        blk_queue_capacity=blk_queue_capacity,
+        optional=True,
+    )
+    add_pds(
+        sdf, pd_fs_engine, pd_fs_orchestrator, *protocon_fs_pds,
+        pd_shared_fs, pd_fs_multiplexer,
+    )
+    return (
+        engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds,
+        shared_fs, pd_shared_fs, pd_fs_multiplexer,
+    )
 
 
 def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
@@ -354,7 +373,7 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
 
 
 def connect_and_serialise(output_dir: str, engine_fs, orchestrator_fs,
-                          protocon_filesystems, serial_system, timer_system,
+                          protocon_filesystems, shared_fs, serial_system, timer_system,
                           blk_system, net_system, protocons, net_virt_tx) -> None:
     assert orchestrator_fs.connect()
     assert orchestrator_fs.serialise_config(output_dir)
@@ -367,18 +386,22 @@ def connect_and_serialise(output_dir: str, engine_fs, orchestrator_fs,
     assert serial_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
-    assert blk_system.connect()
-    assert blk_system.serialise_config(output_dir)
-
     assert net_system.connect()
     # Inter-protocon ACLs start closed. The monitor opens a pair after both
     # endpoints' targeted deployment policies allow that connection.
     for src in protocons:
         net_system.add_acl_rule(src, net_virt_tx, True, True)
     assert net_system.serialise_config(output_dir)
+    # Append shared services after existing client resources so their channel
+    # numbers, service IDs and virtual addresses retain their previous values.
+    assert shared_fs.connect()
+    assert shared_fs.serialise_config(output_dir)
+    assert blk_system.connect()
+    assert blk_system.serialise_config(output_dir)
 
 
-def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
+def update_generated_elfs(protocon_fs_pds, shared_fs_pd, fs_multiplexer_pd,
+                          net_copiers) -> None:
     # Each client gets an independent copier ELF and its matching config.
     for i, net_copier in enumerate(net_copiers):
         elf.copy_elf("network_copy", f"network_copy{i}")
@@ -392,6 +415,7 @@ def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
     elf.copy_elf("fat", "engine_fs", None)
     for fs_pd in protocon_fs_pds:
         elf.copy_elf("fat", fs_pd.name, None)
+    elf.copy_elf("shared_fat", shared_fs_pd.name, None)
 
     for name in ("orchestrator_fs", "engine_fs"):
         elf.update_elf_section(name + ".elf", "blk_client_config", "blk_client_" + name)
@@ -403,6 +427,18 @@ def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
         elf.update_elf_section(
             f"{fs_pd.name}.elf", "fs_server_config", f"fs_server_{fs_pd.name}"
         )
+    elf.update_elf_section(
+        f"{shared_fs_pd.name}.elf", "blk_client_config",
+        f"blk_client_{shared_fs_pd.name}",
+    )
+    elf.update_elf_section(
+        f"{shared_fs_pd.name}.elf", "fs_shared_server_config",
+        f"fs_shared_server_{shared_fs_pd.name}",
+    )
+    elf.update_elf_section(
+        f"{fs_multiplexer_pd.name}.elf", "fs_multiplexer_config",
+        f"fs_multiplexer_{fs_multiplexer_pd.name}",
+    )
 
 class AcpiTablesConfig:
     def __init__(
@@ -529,19 +565,22 @@ def generate(
     connect_container_services(
         serial_system, timer_system, pd_engine, pd_orchestrator, protocons
     )
-    engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds = init_filesystems(
+    (engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds,
+     shared_fs, shared_fs_pd, fs_multiplexer_pd) = init_filesystems(
         sdf, blk_system, pd_engine, pd_orchestrator, protocons, protocon_count
     )
     net_system, net_virt_tx, net_copiers = init_net_system(
         sdf, net_node, board.arch, pd_engine, protocons, protocon_count, x86_profile, pci_driver
     )
     connect_and_serialise(
-        output_dir, engine_fs, orchestrator_fs, protocon_filesystems,
+        output_dir, engine_fs, orchestrator_fs, protocon_filesystems, shared_fs,
         serial_system, timer_system, blk_system, net_system, protocons, net_virt_tx,
     )
     # Generate all LionsOS service descriptors after optional services exist.
     assert sdf.gensvc(output_dir)
-    update_generated_elfs(protocon_fs_pds, net_copiers)
+    update_generated_elfs(
+        protocon_fs_pds, shared_fs_pd, fs_multiplexer_pd, net_copiers
+    )
 
     with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
         f.write(acpi_tables_config.summary_serialise())
