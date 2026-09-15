@@ -5,12 +5,21 @@ deploy -a unikraft-c-nginx-client.img -pc 1 -peers 0
 
 suspend -i 0
 
-
 sandbox0:
 curl -v http://localhost:8080/
+curl http://localhost:8080/
 sandbox1:
 curl -v http://localhost:8081/
 
+deploy -a unikraft-redis.img -pc 1 -peers all
+
+redis-cli -h localhost -p 8081 PING
+
+redis-benchmark \
+    -h 127.0.0.1 -p 8081 -t ping,set,get,incr \
+    -n 100000 -c 16 -P 4
+
+deploy -a unikraft-sqlite.img -pc 2 -peers all
 
 resume -i 0
 
