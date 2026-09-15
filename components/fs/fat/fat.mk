@@ -65,4 +65,22 @@ fat/%.o: $(FAT_SRC_DIR)/%.c $(FAT_LIBC_INCLUDE) $(CHECK_FAT_FLAGS_MD5) |fat
 fat.elf: $(FAT_OBJ) libmicrokitco_fat.a lib_fs_server.a libsddf_util_debug.a
 	$(LD) -L$(BOARD_DIR)/lib $^ -lmicrokit -Tmicrokit.ld -o $@
 
--include $(FAT_OBJ:.o=.d)
+# Recompile the same FAT implementation against the tagged multiplexer
+# protocol.  The ordinary fat.elf and its ABI remain unchanged.
+SHARED_FAT_OBJ := $(patsubst fat/%,shared_fat/%,$(FAT_OBJ))
+
+shared_fat shared_fat/ff15:
+	mkdir -p $@
+
+shared_fat/ff15/%.o: CFLAGS := $(FAT_CFLAGS) $(CFLAGS) -DFS_MULTIPLEXED
+shared_fat/ff15/%.o: $(FAT_FF15_SRC_DIR)/%.c $(FAT_LIBC_INCLUDE) $(CHECK_FAT_FLAGS_MD5) | shared_fat/ff15
+	$(CC) -c $(CFLAGS) $< -o $@
+
+shared_fat/%.o: CFLAGS := $(FAT_CFLAGS) $(CFLAGS) -DFS_MULTIPLEXED
+shared_fat/%.o: $(FAT_SRC_DIR)/%.c $(FAT_LIBC_INCLUDE) $(CHECK_FAT_FLAGS_MD5) | shared_fat
+	$(CC) -c $(CFLAGS) $< -o $@
+
+shared_fat.elf: $(SHARED_FAT_OBJ) libmicrokitco_fat.a lib_fs_server.a libsddf_util_debug.a
+	$(LD) -L$(BOARD_DIR)/lib $^ -lmicrokit -Tmicrokit.ld -o $@
+
+-include $(FAT_OBJ:.o=.d) $(SHARED_FAT_OBJ:.o=.d)

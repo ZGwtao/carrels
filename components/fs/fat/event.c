@@ -14,11 +14,19 @@
 #include <sddf/blk/config.h>
 #include <lions/fs/protocol.h>
 #include <lions/fs/config.h>
+#ifdef FS_MULTIPLEXED
+#include <lions/fs/multiplexer.h>
+#include <lions/fs/multiplexer_config.h>
+#endif
 #include "decl.h"
 #include "ff.h"
 #include "diskio.h"
 
 __attribute__((__section__(".fs_server_config"))) fs_server_config_t fs_config;
+#ifdef FS_MULTIPLEXED
+__attribute__((__section__(".fs_shared_server_config")))
+fs_shared_server_config_t fs_shared_config;
+#endif
 __attribute__((__section__(".blk_client_config"))) blk_client_config_t blk_config;
 
 co_control_t co_controller_mem;
@@ -28,9 +36,16 @@ blk_queue_handle_t blk_queue;
 blk_storage_info_t *blk_storage_info;
 char *blk_data;
 
+#ifdef FS_MULTIPLEXED
+fs_mux_queue_t *fs_command_queue;
+fs_mux_queue_t *fs_completion_queue;
+region_resource_t *fs_client_shares;
+uint64_t fs_num_clients;
+#else
 fs_queue_t *fs_command_queue;
 fs_queue_t *fs_completion_queue;
 char *fs_share;
+#endif
 
 uint64_t worker_thread_stack_one;
 uint64_t worker_thread_stack_two;
@@ -87,17 +102,41 @@ void (*operation_functions[])(void) = {
 
 static fs_request request_pool[FAT_THREAD_NUM];
 
-void fill_client_response(fs_msg_t* message, const fs_request* finished_request) {
-    message->cmpl.id = finished_request->request_id;
-    message->cmpl.status = finished_request->shared_data.status;
-    message->cmpl.data = finished_request->shared_data.result;
+void fill_client_response(
+#ifdef FS_MULTIPLEXED
+    fs_mux_msg_t *message,
+#else
+    fs_msg_t *message,
+#endif
+    const fs_request* finished_request) {
+#ifdef FS_MULTIPLEXED
+    message->cmpl.client_id = finished_request->shared_data.client_id;
+    fs_cmpl_t *completion = &message->cmpl.completion;
+#else
+    fs_cmpl_t *completion = &message->cmpl;
+#endif
+    completion->id = finished_request->request_id;
+    completion->status = finished_request->shared_data.status;
+    completion->data = finished_request->shared_data.result;
 }
 
 // Setting up the request in the request_pool and push the request to the thread pool
-void setup_request(int32_t index, fs_msg_t* message) {
-    request_pool[index].request_id = message->cmd.id;
-    request_pool[index].cmd = message->cmd.type;
-    request_pool[index].shared_data.params = message->cmd.params;
+void setup_request(int32_t index,
+#ifdef FS_MULTIPLEXED
+                   fs_mux_msg_t *message
+#else
+                   fs_msg_t *message
+#endif
+) {
+#ifdef FS_MULTIPLEXED
+    fs_cmd_t *command = &message->cmd.command;
+    request_pool[index].shared_data.client_id = message->cmd.client_id;
+#else
+    fs_cmd_t *command = &message->cmd;
+#endif
+    request_pool[index].request_id = command->id;
+    request_pool[index].cmd = command->type;
+    request_pool[index].shared_data.params = command->params;
     void (*func)(void) = operation_functions[request_pool[index].cmd];
     void *shared_data = &request_pool[index].shared_data;
     request_pool[index].handle = microkit_cothread_spawn(func, shared_data);
@@ -120,15 +159,28 @@ _Static_assert(FF_FS_LOCK >= (FAT_MAX_OPENED_DIRNUM + FAT_MAX_OPENED_FILENUM),
     "FF_FS_LOCK should be equal or larger than max opened dir number and max opened file number combined");
 
 void init(void) {
+#ifdef FS_MULTIPLEXED
+    assert(fs_multiplexer_config_check_magic(&fs_shared_config));
+#else
     assert(fs_config_check_magic(&fs_config));
+#endif
     assert(blk_config_check_magic(&blk_config));
 
     assert(blk_config.virt.num_buffers >= FAT_WORKER_THREAD_NUM);
 
     max_cluster_size = blk_config.data.size / FAT_WORKER_THREAD_NUM;
+#ifdef FS_MULTIPLEXED
+    assert(fs_shared_config.num_clients > 0);
+    assert(fs_shared_config.num_clients <= FS_MULTIPLEXER_MAX_CLIENTS);
+    fs_command_queue = fs_shared_config.multiplexer.command_queue.vaddr;
+    fs_completion_queue = fs_shared_config.multiplexer.completion_queue.vaddr;
+    fs_client_shares = fs_shared_config.client_shares;
+    fs_num_clients = fs_shared_config.num_clients;
+#else
     fs_command_queue = fs_config.client.command_queue.vaddr;
     fs_completion_queue = fs_config.client.completion_queue.vaddr;
     fs_share = fs_config.client.share.vaddr;
+#endif
 
     blk_data = blk_config.data.vaddr;
 
@@ -166,7 +218,12 @@ void init(void) {
 */
 void notified(microkit_channel ch) {
     LOG_FATFS("Notification received on channel:: %d\n", ch);
-    if (ch != fs_config.client.id && ch != blk_config.virt.id) {
+#ifdef FS_MULTIPLEXED
+    const microkit_channel fs_channel = fs_shared_config.multiplexer.id;
+#else
+    const microkit_channel fs_channel = fs_config.client.id;
+#endif
+    if (ch != fs_channel && ch != blk_config.virt.id) {
         LOG_FATFS("Unknown channel:%d\n", ch);
         return;
     }
@@ -218,7 +275,11 @@ void notified(microkit_channel ch) {
         for (uint16_t i = 1; i < FAT_THREAD_NUM; i++) {
             co_state_t state = microkit_cothread_query_state(request_pool[i].handle);
             if (state == cothread_not_active && request_pool[i].stat == INUSE) {
+#ifdef FS_MULTIPLEXED
+                fill_client_response(fs_mux_queue_idx_empty(fs_completion_queue, fs_response_enqueued), &(request_pool[i]));
+#else
                 fill_client_response(fs_queue_idx_empty(fs_completion_queue, fs_response_enqueued), &(request_pool[i]));
+#endif
                 fs_response_enqueued++;
                 LOG_FATFS("FS enqueue response:status: %lu\n", request_pool[i].shared_data.status);
                 request_pool[i].stat= FREE;
@@ -234,8 +295,13 @@ void notified(microkit_channel ch) {
             microkit_cothread_ref_t index;
             // If there is space and we do not know the size of the queue, get it now
             if (queue_size_init == false && microkit_cothread_free_handle_available(&index)) {
+#ifdef FS_MULTIPLEXED
+                command_queue_size = fs_mux_queue_length_consumer(fs_command_queue);
+                completion_queue_size = fs_mux_queue_length_producer(fs_completion_queue);
+#else
                 command_queue_size = fs_queue_length_consumer(fs_command_queue);
                 completion_queue_size = fs_queue_length_producer(fs_completion_queue);
+#endif
                 queue_size_init = true;
             }
 
@@ -246,14 +312,25 @@ void notified(microkit_channel ch) {
             }
 
             // Copy the request to local buffer first to avoid modification from client side
+#ifdef FS_MULTIPLEXED
+            fs_mux_msg_t client_req = *fs_mux_queue_idx_filled(fs_command_queue, fs_request_dequeued);
+            fs_cmd_t *client_command = &client_req.cmd.command;
+            if (client_req.cmd.client_id >= fs_num_clients) {
+                fs_request_dequeued++;
+                command_queue_size--;
+                continue;
+            }
+#else
             fs_msg_t client_req = *fs_queue_idx_filled(fs_command_queue, fs_request_dequeued);
+            fs_cmd_t *client_command = &client_req.cmd;
+#endif
 
             fs_request_dequeued++;
             command_queue_size--;
 
             // For invalid request, dequeue but do not process
-            if (client_req.cmd.type >= FS_NUM_COMMANDS) {
-                LOG_FATFS("Wrong CMD type: %lu\n", client_req.cmd.type);
+            if (client_command->type >= FS_NUM_COMMANDS) {
+                LOG_FATFS("Wrong CMD type: %lu\n", client_command->type);
                 continue;
             }
 
@@ -269,12 +346,20 @@ void notified(microkit_channel ch) {
     }
     // Publish the changes to the fs_queue, If there are replies to client or server, reply back here
     if (fs_request_dequeued) {
+#ifdef FS_MULTIPLEXED
+        fs_mux_queue_publish_consumption(fs_command_queue, fs_request_dequeued);
+#else
         fs_queue_publish_consumption(fs_command_queue, fs_request_dequeued);
+#endif
     }
     if (fs_response_enqueued) {
         LOG_FATFS("FS notify client\n");
+#ifdef FS_MULTIPLEXED
+        fs_mux_queue_publish_production(fs_completion_queue, fs_response_enqueued);
+#else
         fs_queue_publish_production(fs_completion_queue, fs_response_enqueued);
-        microkit_notify(fs_config.client.id);
+#endif
+        microkit_notify(fs_channel);
     }
     if (blk_request_pushed) {
         LOG_FATFS("FS notify block virt\n");
