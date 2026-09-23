@@ -34,8 +34,8 @@ bool dir_used[MAX_OPEN_FILES];
 
 /* Data shared with client */
 #ifdef FS_MULTIPLEXED
-extern region_resource_t *fs_client_shares;
-#define FS_SHARE(args) ((char *)fs_client_shares[(args)->client_id].vaddr)
+extern uintptr_t *fs_client_shares;
+#define FS_SHARE(args) ((char *)fs_client_shares[(args)->client_id])
 #else
 extern char *fs_share;
 #define FS_SHARE(args) (fs_share)

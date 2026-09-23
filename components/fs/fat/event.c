@@ -39,7 +39,9 @@ char *blk_data;
 #ifdef FS_MULTIPLEXED
 fs_mux_queue_t *fs_command_queue;
 fs_mux_queue_t *fs_completion_queue;
-region_resource_t *fs_client_shares;
+/* Points to one address-sized word per client in fs_shared_config. Word i is
+ * the base address of client i's fixed-size data region; unused words are zero. */
+uintptr_t *fs_client_shares;
 uint64_t fs_num_clients;
 #else
 fs_queue_t *fs_command_queue;

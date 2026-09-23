@@ -25,7 +25,7 @@ typedef struct fs_multiplexer_config {
 typedef struct fs_shared_server_config {
     uint8_t magic[LIONS_FS_MULTIPLEXER_MAGIC_LEN];
     fs_connection_resource_t multiplexer;
-    region_resource_t client_shares[FS_MULTIPLEXER_MAX_CLIENTS];
+    uintptr_t client_shares[FS_MULTIPLEXER_MAX_CLIENTS];
     uint64_t num_clients;
 } fs_shared_server_config_t;
 
