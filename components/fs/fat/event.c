@@ -43,10 +43,16 @@ fs_mux_queue_t *fs_completion_queue;
  * the base address of client i's fixed-size data region; unused words are zero. */
 uintptr_t *fs_client_shares;
 uint64_t fs_num_clients;
+
+#define FS_GET_CMD_FROM_MSG(msg) ((fs_cmd_t *)&((fs_mux_msg_t *)msg)->cmd.command)
+#define FS_GET_CMPL_FROM_MSG(msg) ((fs_cmpl_t *)&((fs_mux_msg_t *)msg)->cmpl.completion)
 #else
 fs_queue_t *fs_command_queue;
 fs_queue_t *fs_completion_queue;
 char *fs_share;
+
+#define FS_GET_CMD_FROM_MSG(msg) ((fs_cmd_t *)&((fs_msg_t *)msg)->cmd)
+#define FS_GET_CMPL_FROM_MSG(msg) ((fs_cmpl_t *)&((fs_msg_t *)msg)->cmpl)
 #endif
 
 uint64_t worker_thread_stack_one;
@@ -104,18 +110,15 @@ void (*operation_functions[])(void) = {
 
 static fs_request request_pool[FAT_THREAD_NUM];
 
-void fill_client_response(
 #ifdef FS_MULTIPLEXED
-    fs_mux_msg_t *message,
+void fill_client_response(fs_mux_msg_t *message, const fs_request* finished_request)
 #else
-    fs_msg_t *message,
+void fill_client_response(fs_msg_t *message, const fs_request* finished_request)
 #endif
-    const fs_request* finished_request) {
+{
+    fs_cmpl_t *completion = FS_GET_CMPL_FROM_MSG(message);
 #ifdef FS_MULTIPLEXED
     message->cmpl.client_id = finished_request->shared_data.client_id;
-    fs_cmpl_t *completion = &message->cmpl.completion;
-#else
-    fs_cmpl_t *completion = &message->cmpl;
 #endif
     completion->id = finished_request->request_id;
     completion->status = finished_request->shared_data.status;
@@ -123,18 +126,16 @@ void fill_client_response(
 }
 
 // Setting up the request in the request_pool and push the request to the thread pool
-void setup_request(int32_t index,
+
 #ifdef FS_MULTIPLEXED
-                   fs_mux_msg_t *message
+void setup_request(int32_t index, fs_mux_msg_t *message)
 #else
-                   fs_msg_t *message
+void setup_request(int32_t index, fs_msg_t *message)
 #endif
-) {
+{
+    fs_cmd_t *command = FS_GET_CMD_FROM_MSG(message);
 #ifdef FS_MULTIPLEXED
-    fs_cmd_t *command = &message->cmd.command;
     request_pool[index].shared_data.client_id = message->cmd.client_id;
-#else
-    fs_cmd_t *command = &message->cmd;
 #endif
     request_pool[index].request_id = command->id;
     request_pool[index].cmd = command->type;
