@@ -271,8 +271,8 @@ void handle_file_write(void) {
 
     RET = f_write(file, data, btw, &bw);
 #ifdef FS_MULTIPLEXED
-    /* Shared consumers must observe a completed write without waiting for the
-     * long-lived writer (for example nginx's access log) to close its fd. */
+    // @gt ??? this makes sure different clients see synchronised contents
+    //         but is there a better way to not sacrifice performance?
     if (RET == FR_OK) {
         RET = f_sync(file);
     }
