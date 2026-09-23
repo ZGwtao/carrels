@@ -270,6 +270,12 @@
 
 
 #define FF_FS_LOCK		48
+
+/* The shared FAT server serialises requests from all clients.  Permit a
+ * read-only handle while another client keeps the same file open for writing
+ * (for example, nginx's access log).  Other conflicting operations remain
+ * protected by FF_FS_LOCK. */
+#define FF_FS_SHARE_READ_WITH_WRITER 1
 /* The option FF_FS_LOCK switches file lock function to control duplicated file open
 /  and illegal operation to open objects. This option must be 0 when FF_FS_READONLY
 /  is 1.

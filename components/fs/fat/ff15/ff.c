@@ -972,8 +972,14 @@ static FRESULT chk_share (	/* Check if the file can be accessed */
 		return (!be && acc != 2) ? FR_TOO_MANY_OPEN_FILES : FR_OK;	/* Is there a blank entry for new object? */
 	}
 
-	/* The object was opened. Reject any open against writing file and all write mode open */
+	/* The object was opened.  The shared server serialises all operations, so
+	 * allow a read-only observer while a writer remains open when configured.
+	 * Writes and destructive operations still require exclusive access. */
+#if defined(FS_MULTIPLEXED) && FF_FS_SHARE_READ_WITH_WRITER
+	return acc != 0 ? FR_LOCKED : FR_OK;
+#else
 	return (acc != 0 || Files[i].ctr == 0x100) ? FR_LOCKED : FR_OK;
+#endif
 }
 
 

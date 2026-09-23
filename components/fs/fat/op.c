@@ -106,7 +106,13 @@ void handle_initialise(void) {
     LOG_FATFS("Mounting file system!\n");
     co_data_t *args = microkit_cothread_my_arg();
     if (fs_initialised) {
+#ifdef FS_MULTIPLEXED
+        /* A shared volume is mounted once by the server.  Each newly deployed
+         * client still performs its own logical mount handshake. */
+        args->status = FS_STATUS_SUCCESS;
+#else
         args->status = FS_STATUS_ERROR;
+#endif
         return;
     }
     fs_initialised = true;
@@ -120,6 +126,11 @@ void handle_initialise(void) {
 
 void handle_deinitialise(void) {
     co_data_t *args = microkit_cothread_my_arg();
+#ifdef FS_MULTIPLEXED
+    /* One client must not tear down a volume that other clients are using. */
+    args->status = fs_initialised ? FS_STATUS_SUCCESS : FS_STATUS_ERROR;
+    return;
+#endif
     if (!fs_initialised) {
         args->status = FS_STATUS_ERROR;
         return;
@@ -225,6 +236,13 @@ void handle_file_write(void) {
     uint32_t bw = 0;
 
     RET = f_write(file, data, btw, &bw);
+#ifdef FS_MULTIPLEXED
+    /* Shared consumers must observe a completed write without waiting for the
+     * long-lived writer (for example nginx's access log) to close its fd. */
+    if (RET == FR_OK) {
+        RET = f_sync(file);
+    }
+#endif
     fd_end_op(fd);
 
     if (RET == FR_OK) {

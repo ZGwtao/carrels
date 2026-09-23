@@ -102,8 +102,9 @@ void fs_process_completions(void (*fs_request_flag_set)(uint64_t))
     fs_queue_publish_consumption(fs_completion_queue, to_consume);
 }
 
-void fs_command_issue(fs_cmd_t cmd)
+void fs_command_issue_on(const fs_client_config_t *config, fs_cmd_t cmd)
 {
+    assert(config != NULL);
     assert(cmd.id <= REQUEST_ID_MAXIMUM);
     assert(request_metadata[cmd.id].used);
 
@@ -111,8 +112,13 @@ void fs_command_issue(fs_cmd_t cmd)
     assert(fs_queue_length_producer(fs_command_queue) != FS_QUEUE_CAPACITY);
     *fs_queue_idx_empty(fs_command_queue, 0) = message;
     fs_queue_publish_production(fs_command_queue, 1);
-    microkit_notify(fs_config.server.id);
+    microkit_notify(config->server.id);
     request_metadata[cmd.id].command = cmd;
+}
+
+void fs_command_issue(fs_cmd_t cmd)
+{
+    fs_command_issue_on(&fs_config, cmd);
 }
 
 void fs_command_complete(uint64_t request_id, fs_cmd_t *command, fs_cmpl_t *completion)
