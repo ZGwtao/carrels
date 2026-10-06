@@ -10,11 +10,14 @@ endif
 override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 export CARRELS ?= $(abspath ../..)
 export ROOT ?= $(abspath ../..)
+BUILD_DEFAULTS := $(CARRELS)/config/build-defaults.sh
+DEFAULT_MICROKIT_BOARD := $(shell . $(BUILD_DEFAULTS); printf '%s' "$$MICROKIT_BOARD")
+DEFAULT_MICROKIT_CONFIG := $(shell . $(BUILD_DEFAULTS); printf '%s' "$$MICROKIT_CONFIG")
 export CONTAINER_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 export CONFIG_INCLUDE ?= $(abspath src/config)
-export MICROKIT_CONFIG ?= debug
-export BUILD_DIR ?= $(abspath build)
-export MICROKIT_BOARD ?= qemu_virt_aarch64
+export MICROKIT_CONFIG ?= $(DEFAULT_MICROKIT_CONFIG)
+export MICROKIT_BOARD ?= $(DEFAULT_MICROKIT_BOARD)
+export BUILD_DIR ?= $(abspath build/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))
 
 IMAGE_FILE := $(BUILD_DIR)/container.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
@@ -27,7 +30,7 @@ all build infra apps app-native app-uk ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
 ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy: ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
-${BUILD_DIR}/Makefile: container.mk Makefile $(ROOT)/uk-on-mk.mk
+${BUILD_DIR}/Makefile: container.mk Makefile $(BUILD_DEFAULTS) $(ROOT)/uk-on-mk.mk
 	mkdir -p ${BUILD_DIR}
 	echo "ROOT ?= ${ROOT}" > $@
 	echo "CARRELS ?= ${CARRELS}" >> $@

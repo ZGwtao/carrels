@@ -57,6 +57,10 @@ build:
 
 include ${SDDF}/tools/make/board/common.mk
 
+ifeq ($(ARCH),aarch64)
+CFLAGS += -include $(CARRELS)/include/sddf-arch-compat.h
+endif
+
 VSWITCH:= ${SDDF}/examples/vswitch
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
@@ -64,9 +68,12 @@ RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
 FAT := $(CARRELS)/components/fs/fat
 NETWORK_COMPONENTS := $(SDDF)/network/components
 
-# Use the board's default block device unless NVMe is explicitly requested.
-# For x86_64/QEMU: make ... NVME=1
+# Match the storage device exposed by qemu.sh unless explicitly overridden.
+ifeq ($(ARCH),x86_64)
 NVME ?= 1
+else
+NVME ?= 0
+endif
 ifeq ($(NVME),1)
 ifneq ($(ARCH),x86_64)
 $(error NVME=1 is currently supported only on x86_64)
@@ -108,8 +115,10 @@ include ${SDDF}/serial/components/serial_components.mk
 include ${SDDF}/libco/libco.mk
 include ${BLK_DRIVER}/blk_driver.mk
 include ${BLK_COMPONENTS}/blk_components.mk
+ifeq ($(ARCH),x86_64)
 include ${SDDF}/drivers/acpi/acpi_driver.mk
 include ${SDDF}/drivers/pci/pci_driver.mk
+endif
 
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
@@ -140,7 +149,6 @@ INFRA_IMAGES := \
 	monitor.elf \
 	orchestrator.elf \
 	fat.elf \
-	acpi_driver.elf pci_driver.elf \
 	trampoline.elf \
 	protocon.elf \
 	serial_driver.elf \
@@ -148,6 +156,10 @@ INFRA_IMAGES := \
 	serial_virt_tx.elf \
 	blk_virt.elf \
 	blk_driver.elf
+
+ifeq ($(ARCH),x86_64)
+INFRA_IMAGES += acpi_driver.elf pci_driver.elf
+endif
 
 NATIVE_APPLICATION_IMAGES := $(PC_SERVICE_IMGS)
 UNIKRAFT_APPLICATION_IMAGES := $(UNIKERNELS)

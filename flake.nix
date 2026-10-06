@@ -69,7 +69,14 @@
 
           python = pkgs.python312.withPackages (ps: [
             pysdfgen
+            ps.jsonschema
+            ps.jinja2
+            ps.lxml
+            ps.ply
+            ps.pyfdt
             ps.pyelftools
+            ps.pyyaml
+            ps.typing-extensions
             ts_ci
           ]);
         in

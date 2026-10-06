@@ -141,7 +141,7 @@ def init_serial_system(sdf: SDF, serial_node, arch, x86_profile: X86DeviceProfil
 
 
 def init_blk_system(sdf: SDF, blk_node, arch, nvme: bool, timer_system,
-                    x86_profile: X86DeviceProfile, pci_driver: PD):
+                    x86_profile: X86DeviceProfile, pci_driver: Optional[PD]):
     blk_driver = PD("blk_driver", "blk_driver.elf", priority=200)
     blk_virt = PD("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
@@ -217,9 +217,11 @@ def init_blk_system(sdf: SDF, blk_node, arch, nvme: bool, timer_system,
     timer_system.add_client(blk_driver)
     add_pds(sdf, blk_driver, blk_virt)
 
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 4))
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 5))
-    sdf.add_channel(Channel(pci_driver, blk_driver, a_id=2, b_id=10))
+    if arch == SystemDescription.Arch.X86_64:
+        assert pci_driver is not None
+        pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, blk_driver, None, 4))
+        pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, blk_driver, None, 5))
+        sdf.add_channel(Channel(pci_driver, blk_driver, a_id=2, b_id=10))
 
     return blk_system
 
@@ -289,7 +291,8 @@ def init_filesystems(sdf: SDF, blk_system, pd_engine, pd_orchestrator, protocons
 
 
 def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
-                    protocon_count: int, x86_profile: X86DeviceProfile, pci_driver: PD):
+                    protocon_count: int, x86_profile: X86DeviceProfile,
+                    pci_driver: Optional[PD]):
     eth_driver = PD("eth_driver", "eth_driver.elf",
                     priority=101, budget=100, period=400)
 
@@ -346,9 +349,11 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
 
     add_pds(sdf, eth_driver, net_virt_rx, net_virt_tx, net_vswitch, *net_copiers)
 
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, eth_driver, None, 2))
-    pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, eth_driver, None, 3))
-    sdf.add_channel(Channel(pci_driver, eth_driver, a_id=1, b_id=10))
+    if arch == SystemDescription.Arch.X86_64:
+        assert pci_driver is not None
+        pci_driver.add_cap_map(CapMap(CapMap.CapType.Vspace, eth_driver, None, 2))
+        pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, eth_driver, None, 3))
+        sdf.add_channel(Channel(pci_driver, eth_driver, a_id=1, b_id=10))
 
     return net_system, net_virt_tx, net_copiers
 
@@ -515,7 +520,10 @@ def generate(
 ):
     x86_profile = X86_DEVICE_PROFILES[x86_device_profile]
 
-    acpi_driver, pci_driver, acpi_tables_config = init_acpi_pci()
+    acpi_tables_config = None
+    pci_driver = None
+    if board.arch == SystemDescription.Arch.X86_64:
+        _, pci_driver, acpi_tables_config = init_acpi_pci()
 
     serial_node, blk_node, timer_node, net_node = resolve_device_nodes(dtb)
     timer_system, _ = init_timer_system(sdf, timer_node, board.arch, x86_profile)
@@ -543,9 +551,10 @@ def generate(
     assert sdf.gensvc(output_dir)
     update_generated_elfs(protocon_fs_pds, net_copiers)
 
-    with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
-        f.write(acpi_tables_config.summary_serialise())
-    elf.update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
+    if acpi_tables_config is not None:
+        with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
+            f.write(acpi_tables_config.summary_serialise())
+        elf.update_elf_section("acpi_driver.elf", "acpi_tables_summary", "acpi_tables_summary")
 
     with open(f"{output_dir}/{sdf_path}", "w+") as f:
         f.write(sdf.render())

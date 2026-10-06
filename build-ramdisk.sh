@@ -4,11 +4,11 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source=config/build-defaults.sh
+. "$SCRIPT_DIR/config/build-defaults.sh"
 EXAMPLE_DIR="$SCRIPT_DIR/examples/simple"
-BUILD_DIR=${BUILD_DIR:-"$EXAMPLE_DIR/build"}
+BUILD_DIR=${BUILD_DIR:-"$EXAMPLE_DIR/build/$MICROKIT_BOARD/$MICROKIT_CONFIG"}
 MICROKIT_SDK=${MICROKIT_SDK:-"$SCRIPT_DIR/dep/microkit/release/microkit-sdk-2.3.0-dev"}
-MICROKIT_BOARD=${MICROKIT_BOARD:-x86_64_generic}
-MICROKIT_CONFIG=${MICROKIT_CONFIG:-smp-debug}
 
 if [ ! -f "$BUILD_DIR/Makefile" ]; then
     echo "build-ramdisk.sh: missing $BUILD_DIR/Makefile" >&2
