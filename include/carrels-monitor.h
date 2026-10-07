@@ -18,7 +18,6 @@
 #include <ioutils/pico_vfs.h>
 
 #include <monitor/fault.h>
-#include <monitor/forwarder.h>
 #include <monitor/mcall.h>
 #include <monitor/minit.h>
 #include <monitor/payload.h>

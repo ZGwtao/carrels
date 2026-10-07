@@ -101,12 +101,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void notified(microkit_channel ch)
 {
-    if (ch >= PD_IO_MONITOR_NOTIFY_BASE && ch < PD_IO_MONITOR_NOTIFY_BASE + PD_IO_CLIENT_COUNT) {
-        uint32_t cid = ch - PD_IO_MONITOR_NOTIFY_BASE;
-        monitor_handle_client_payload(cid);
-        return;
-    }
-
     fs_process_completions(NULL);
     microkit_cothread_recv_ntfn(ch);
 }
