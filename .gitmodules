@@ -26,4 +26,4 @@
 [submodule "dep/libvmm"]
 	path = dep/libvmm
 	url = https://github.com/ZGwtao/libvmm.git
-	branch = dev-virtio-vsock
+	branch = virtio-vsock
