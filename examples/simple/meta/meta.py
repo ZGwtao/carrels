@@ -9,7 +9,7 @@ import argparse
 import importlib
 from pathlib import Path
 from dataclasses import dataclass
-from sdfgen import SystemDescription, Sddf, DeviceTree, LionsOs
+from sdfgen import SystemDescription, Sddf, DeviceTree, LionsOs, Vmm
 from typing import Optional
 
 from elf import Elftools
@@ -28,6 +28,76 @@ Channel = SDF.Channel
 IOPORT = SDF.IoPort
 IRQIOAPIC = SDF.IrqIoapic
 IrqIoapic = SDF.IrqIoapic
+
+VSOCK_QUEUE_CAPACITY = 64
+VSOCK_PACKET_BUFFER_SIZE = 4096
+VSOCK_CHANNEL = 20
+VSOCK_G2H_DATA_VADDR = 0x30002000
+VSOCK_H2G_DATA_VADDR = (
+    VSOCK_G2H_DATA_VADDR + VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE
+)
+
+
+def serialise_vsock_config(output_dir, name, tx_queue, tx_data, rx_queue, rx_data):
+    fields = (
+        tx_queue.vaddr, 0x1000,
+        tx_data.vaddr, VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE,
+        rx_queue.vaddr, 0x1000,
+        rx_data.vaddr, VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE,
+    )
+    data = struct.pack(
+        "<5s3x" + "QQ" * 4 + "IIB7x",
+        b"sDDF\x07", *fields,
+        VSOCK_QUEUE_CAPACITY, VSOCK_PACKET_BUFFER_SIZE, VSOCK_CHANNEL,
+    )
+    with open(f"{output_dir}/virtio_vsock_transport_{name}.data", "wb") as output:
+        output.write(data)
+
+
+def init_k8s_vm(sdf: SDF, client_dtb: DeviceTree):
+    vmm_pd = PD("k8s_vmm", "k8s_vmm.elf", priority=62, stack_size=0x4000)
+    vm = SDF.VirtualMachine("k8s_linux", [SDF.VirtualMachine.Vcpu(id=0)])
+    vmm = Vmm(sdf, vmm_pd, vm, client_dtb)
+    sdf.add_pd(vmm_pd)
+    # Keep the VirtualMachine wrapper alive for as long as Vmm is in use.  The
+    # underlying sdfgen Vmm stores a pointer to it rather than taking ownership.
+    return vmm_pd, vm, vmm
+
+
+def connect_vsock_transport(sdf: SDF, output_dir: str, vmm_pd: PD, backend: PD):
+    q_g2h = MR(sdf, "vsock_guest_to_host_queue", 0x1000)
+    q_h2g = MR(sdf, "vsock_host_to_guest_queue", 0x1000)
+    d_g2h = MR(sdf, "vsock_guest_to_host_data",
+               VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE)
+    d_h2g = MR(sdf, "vsock_host_to_guest_data",
+               VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE)
+    for mr in (q_g2h, q_h2g, d_g2h, d_h2g):
+        sdf.add_mr(mr)
+
+    vmm_maps = (
+        MAP(q_g2h, 0x30000000, "rw"), MAP(q_h2g, 0x30001000, "rw"),
+        MAP(d_g2h, VSOCK_G2H_DATA_VADDR, "rw"),
+        MAP(d_h2g, VSOCK_H2G_DATA_VADDR, "rw"),
+    )
+    backend_maps = (
+        MAP(q_h2g, 0x30001000, "rw"), MAP(q_g2h, 0x30000000, "rw"),
+        MAP(d_h2g, VSOCK_H2G_DATA_VADDR, "rw"),
+        MAP(d_g2h, VSOCK_G2H_DATA_VADDR, "rw"),
+    )
+    for mapping in vmm_maps:
+        vmm_pd.add_map(mapping)
+    for mapping in backend_maps:
+        backend.add_map(mapping)
+
+    sdf.add_channel(Channel(vmm_pd, backend, a_id=VSOCK_CHANNEL, b_id=VSOCK_CHANNEL))
+    serialise_vsock_config(
+        output_dir, "k8s_vmm",
+        vmm_maps[0], vmm_maps[2], vmm_maps[1], vmm_maps[3],
+    )
+    serialise_vsock_config(
+        output_dir, "vsock_backend",
+        backend_maps[0], backend_maps[2], backend_maps[1], backend_maps[3],
+    )
 
 
 @dataclass(frozen=True)
@@ -226,7 +296,7 @@ def init_blk_system(sdf: SDF, blk_node, arch, nvme: bool, timer_system,
     return blk_system
 
 
-def init_container_infra(sdf: SDF, protocon_count: int):
+def init_container_infra(sdf: SDF):
     container_infra = Infra(
         sdf=sdf,
         layout_txlo=layout_txlo,
@@ -234,18 +304,32 @@ def init_container_infra(sdf: SDF, protocon_count: int):
         client_limit=16,
     )
     container_infra.connect_orchestrator()
-    protocons = container_infra.add_clients(protocon_count)
     add_pds(sdf, container_infra.pd_engine, container_infra.pd_orchestrator)
-    return container_infra, protocons
+    return container_infra
 
 
 def connect_container_services(serial_system, timer_system, pd_engine, pd_orchestrator,
-                               protocons) -> None:
+                               protocons, vmm_pd) -> None:
     serial_system.add_client(pd_orchestrator)
     serial_system.add_client(pd_engine)
+    serial_system.add_client(vmm_pd)
     for pc in protocons:
         serial_system.add_client(pc, optional=True)
         timer_system.add_client(pc, optional=True)
+
+
+def add_protocon_net_clients(sdf: SDF, net_system, protocons):
+    net_copiers = [
+        PD(f"client{i}_net_copier", f"network_copy{i}.elf",
+           priority=97, budget=20000)
+        for i in range(len(protocons))
+    ]
+    for protocon, net_copier in zip(protocons, net_copiers):
+        net_system.add_client_with_copier(
+            protocon, net_copier, vswitch=True, optional=True
+        )
+    add_pds(sdf, *net_copiers)
+    return net_copiers
 
 
 def fatfs_blk_queue_capacity(protocon_count: int) -> int:
@@ -260,7 +344,7 @@ def init_filesystems(sdf: SDF, blk_system, pd_engine, pd_orchestrator, protocons
                      protocon_count: int):
     blk_queue_capacity = fatfs_blk_queue_capacity(protocon_count)
     pd_fs_engine = PD("engine_fs", "engine_fs.elf", priority=96)
-    pd_fs_orchestrator = PD("orchestrator_fs", "orchestrator_fs.elf", priority=96)
+    pd_fs_orchestrator = PD("vsock_backend_fs", "vsock_backend_fs.elf", priority=96)
     engine_fs = LionsOs.FileSystem.Fat(
         sdf, pd_fs_engine, pd_engine, blk=blk_system, partition=1,
         blk_queue_capacity=blk_queue_capacity,
@@ -290,8 +374,8 @@ def init_filesystems(sdf: SDF, blk_system, pd_engine, pd_orchestrator, protocons
     return engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds
 
 
-def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
-                    protocon_count: int, x86_profile: X86DeviceProfile,
+def init_net_system(sdf: SDF, net_node, arch, pd_engine,
+                    x86_profile: X86DeviceProfile,
                     pci_driver: Optional[PD]):
     eth_driver = PD("eth_driver", "eth_driver.elf",
                     priority=101, budget=100, period=400)
@@ -333,21 +417,12 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
         vswitch=net_vswitch,
         vswitch_orchestrator=pd_engine,
     )
-    net_copiers = [
-        PD(
-            f"client{i}_net_copier",
-            f"network_copy{i}.elf",
-            priority=97,
-            budget=20000,
-        )
-        for i in range(protocon_count)
-    ]
-    for protocon, net_copier in zip(protocons, net_copiers):
-        net_system.add_client_with_copier(
-            protocon, net_copier, vswitch=True, optional=True
-        )
-
-    add_pds(sdf, eth_driver, net_virt_rx, net_virt_tx, net_vswitch, *net_copiers)
+    k8s_net_copier = PD(
+        "k8s_vmm_net_copier", "k8s_vmm_network_copy.elf",
+        priority=97, budget=20000,
+    )
+    add_pds(sdf, eth_driver, net_virt_rx, net_virt_tx, net_vswitch,
+            k8s_net_copier)
 
     if arch == SystemDescription.Arch.X86_64:
         assert pci_driver is not None
@@ -355,12 +430,13 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine, protocons,
         pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, eth_driver, None, 3))
         sdf.add_channel(Channel(pci_driver, eth_driver, a_id=1, b_id=10))
 
-    return net_system, net_virt_tx, net_copiers
+    return net_system, net_virt_tx, k8s_net_copier
 
 
 def connect_and_serialise(output_dir: str, engine_fs, orchestrator_fs,
                           protocon_filesystems, serial_system, timer_system,
-                          blk_system, net_system, protocons, net_virt_tx) -> None:
+                          blk_system, net_system, protocons, net_virt_tx,
+                          vmm) -> None:
     assert orchestrator_fs.connect()
     assert orchestrator_fs.serialise_config(output_dir)
     assert engine_fs.connect()
@@ -381,9 +457,10 @@ def connect_and_serialise(output_dir: str, engine_fs, orchestrator_fs,
     for src in protocons:
         net_system.add_acl_rule(src, net_virt_tx, True, True)
     assert net_system.serialise_config(output_dir)
+    assert vmm.serialise_config(output_dir)
 
 
-def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
+def update_generated_elfs(protocon_fs_pds, net_copiers, k8s_net_copier) -> None:
     # Each client gets an independent copier ELF and its matching config.
     for i, net_copier in enumerate(net_copiers):
         elf.copy_elf("network_copy", f"network_copy{i}")
@@ -393,12 +470,18 @@ def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
             f"net_copy_{net_copier.name}",
         )
 
-    elf.copy_elf("fat", "orchestrator_fs", None)
+    elf.copy_elf("network_copy", "k8s_vmm_network_copy")
+    elf.update_elf_section(
+        "k8s_vmm_network_copy.elf", "net_copy_config",
+        f"net_copy_{k8s_net_copier.name}",
+    )
+
+    elf.copy_elf("fat", "vsock_backend_fs", None)
     elf.copy_elf("fat", "engine_fs", None)
     for fs_pd in protocon_fs_pds:
         elf.copy_elf("fat", fs_pd.name, None)
 
-    for name in ("orchestrator_fs", "engine_fs"):
+    for name in ("vsock_backend_fs", "engine_fs"):
         elf.update_elf_section(name + ".elf", "blk_client_config", "blk_client_" + name)
         elf.update_elf_section(name + ".elf", "fs_server_config", "fs_server_" + name)
     for fs_pd in protocon_fs_pds:
@@ -514,6 +597,7 @@ def generate(
     sdf_path: str,
     output_dir: str,
     dtb: Optional[DeviceTree],
+    client_dtb: DeviceTree,
     nvme: bool,
     protocon_count: int,
     x86_device_profile: str,
@@ -526,30 +610,48 @@ def generate(
         _, pci_driver, acpi_tables_config = init_acpi_pci()
 
     serial_node, blk_node, timer_node, net_node = resolve_device_nodes(dtb)
+    vmm_pd, k8s_vm, vmm = init_k8s_vm(sdf, client_dtb)
     timer_system, _ = init_timer_system(sdf, timer_node, board.arch, x86_profile)
     serial_system = init_serial_system(sdf, serial_node, board.arch, x86_profile)
     blk_system = init_blk_system(
         sdf, blk_node, board.arch, nvme, timer_system, x86_profile, pci_driver
     )
-    container_infra, protocons = init_container_infra(sdf, protocon_count)
+    container_infra = init_container_infra(sdf)
     pd_engine = container_infra.pd_engine
     pd_orchestrator = container_infra.pd_orchestrator
-    connect_container_services(
-        serial_system, timer_system, pd_engine, pd_orchestrator, protocons
+    serial_system.add_client(pd_orchestrator)
+    serial_system.add_client(pd_engine)
+    serial_system.add_client(vmm_pd)
+    blk_system.add_client(vmm_pd, partition=protocon_count + 2)
+    net_system, net_virt_tx, k8s_net_copier = init_net_system(
+        sdf, net_node, board.arch, pd_engine, x86_profile, pci_driver
     )
+    # Complete the VMM's device maps/channels before vmm.connect(), matching
+    # libvmm's virtio_pci topology. A direct client does not consume a vSwitch
+    # port, so proto-container port IDs remain 0..N-1.
+    net_system.add_client_with_copier(vmm_pd, k8s_net_copier)
+    connect_vsock_transport(sdf, output_dir, vmm_pd, pd_orchestrator)
+    # Complete all VMM-local mappings before connecting it. Doing this before
+    # the large dynamic-PD regions also keeps libvmm's current 32-bit AArch64
+    # guest-RAM intermediate below 4 GiB.
+    assert vmm.connect()
+
+    protocons = container_infra.add_clients(protocon_count)
+    for pc in protocons:
+        serial_system.add_client(pc, optional=True)
+        timer_system.add_client(pc, optional=True)
+    net_copiers = add_protocon_net_clients(sdf, net_system, protocons)
     engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds = init_filesystems(
         sdf, blk_system, pd_engine, pd_orchestrator, protocons, protocon_count
-    )
-    net_system, net_virt_tx, net_copiers = init_net_system(
-        sdf, net_node, board.arch, pd_engine, protocons, protocon_count, x86_profile, pci_driver
     )
     connect_and_serialise(
         output_dir, engine_fs, orchestrator_fs, protocon_filesystems,
         serial_system, timer_system, blk_system, net_system, protocons, net_virt_tx,
+        vmm,
     )
     # Generate all LionsOS service descriptors after optional services exist.
     assert sdf.gensvc(output_dir)
-    update_generated_elfs(protocon_fs_pds, net_copiers)
+    update_generated_elfs(protocon_fs_pds, net_copiers, k8s_net_copier)
 
     if acpi_tables_config is not None:
         with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
@@ -576,6 +678,7 @@ if __name__ == "__main__":
     BOARDS = load_boards(board_args.sddf)
     parser = argparse.ArgumentParser(parents=[board_parser])
     parser.add_argument("--dtb", required=False)
+    parser.add_argument("--client-dtb", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
@@ -609,6 +712,9 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
+    with open(args.client_dtb, "rb") as f:
+        client_dtb = DeviceTree(f.read())
+
     if args.protocon_count <= 0 or args.protocon_count > 16:
         parser.error("--protocon-count must be in the range 1..16")
 
@@ -616,6 +722,7 @@ if __name__ == "__main__":
         args.sdf,
         args.output,
         dtb,
+        client_dtb,
         args.nvme,
         args.protocon_count,
         args.x86_device_profile,
