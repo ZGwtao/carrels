@@ -1,7 +1,7 @@
 # Kubernetes guest
 
-This directory builds the arm64 Linux/initramfs used by the `k8s_vmm` PD.  It
-reuses the guest sources in `dep/libvmm/examples/virtio_pci/guest`.
+This directory owns and builds the arm64 Linux/initramfs used by the `k8s_vmm`
+PD. Kubernetes guest policy and configuration live here rather than in libvmm.
 
 Generate the kubelet's least-privilege kubeconfig as described in
 [`KUBELET_CREDENTIALS_TUTORIAL.md`](KUBELET_CREDENTIALS_TUTORIAL.md), then run:

@@ -6,7 +6,7 @@ EXTERNAL_DIR := $(CURDIR)
 include versions.mk
 
 CARRELS := $(abspath ..)
-CRI_STUB_SOURCE := $(CARRELS)/dep/libvmm/examples/virtio_pci/guest/cri_stub.go
+CRI_STUB_SOURCE := $(CARRELS)/guest/k8s/cri_stub.go
 GO_STAMP := $(GO_ROOT)/.installed
 KUBERNETES_STAMP := $(KUBERNETES_SRC)/.extracted
 KUBERNETES_SEMVER := $(patsubst v%,%,$(KUBERNETES_VERSION))
