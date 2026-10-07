@@ -29,13 +29,16 @@ fi
 
 export SCRIPT_DIR EXAMPLE_DIR BUILD_DIR MICROKIT_SDK MICROKIT_BOARD MICROKIT_CONFIG
 
-nix develop "$SCRIPT_DIR" --command bash -lc 'make -C guest/k8s && \
+nix develop "$SCRIPT_DIR" --command bash -lc '
+    make -C "$SCRIPT_DIR/guest/k8s" kubelet-credentials &&
+    make -C "$SCRIPT_DIR/guest/k8s" rootfs &&
     make -C "$EXAMPLE_DIR" \
-    "BUILD_DIR=$BUILD_DIR" \
-    "MICROKIT_SDK=$MICROKIT_SDK" \
-    "MICROKIT_BOARD=$MICROKIT_BOARD" \
-    "MICROKIT_CONFIG=$MICROKIT_CONFIG" \
-    infra'
+        "BUILD_DIR=$BUILD_DIR" \
+        "MICROKIT_SDK=$MICROKIT_SDK" \
+        "MICROKIT_BOARD=$MICROKIT_BOARD" \
+        "MICROKIT_CONFIG=$MICROKIT_CONFIG" \
+        infra
+'
 
 IMAGE_FILE="$BUILD_DIR/container.img"
 if [ ! -f "$IMAGE_FILE" ]; then
