@@ -190,14 +190,15 @@ $(K8S_VM_PACKED_INITRD): $(K8S_VM_INITRD) blk_client_init $(K8S_VM_NET_INIT) | $
 		$(K8S_VM_DIR)/rootfs_staging -o $@ \
 		--startup blk_client_init $(K8S_VM_NET_INIT)
 
-$(K8S_VM_DTS): $(K8S_VM_CLIENT)/linux.dts $(K8S_VM_CLIENT)/gic_v2_overlay.dts \
+$(K8S_VM_DTS): $(K8S_VM_CLIENT)/linux.dts $(K8S_VM_CLIENT)/gic_v2_overlay.dts $(CONTAINER_DIR)/container.mk \
 		$(K8S_VM_PACKED_INITRD) | $(K8S_VM_DIR)
 	$(LIBVMM)/tools/dtscat $(word 1,$^) $(word 2,$^) > $@
 	@initrd_size=$$(stat -c %s $(K8S_VM_PACKED_INITRD)); \
-	initrd_end=$$((0x50000000 + initrd_size)); \
-	test $$initrd_end -lt $$((0x5f000000)) || { echo "k8s initramfs overlaps guest DTB"; exit 1; }; \
+	initrd_end=$$((0x47000000 + initrd_size)); \
+	test $$initrd_end -lt $$((0x50000000)) || { echo "k8s initramfs does not fit in guest RAM"; exit 1; }; \
 	initrd_end_hex=$$(printf '0x%x' $$initrd_end); \
-	sed -i "s/linux,initrd-end = <0x5f000000>/linux,initrd-end = <$$initrd_end_hex>/" $@
+	sed -i "s/linux,initrd-end = <0x48000000>/linux,initrd-end = <$$initrd_end_hex>/" $@; \
+	grep -q "linux,initrd-end = <$$initrd_end_hex>" $@ || { echo "failed to update k8s initramfs end in $@"; exit 1; }
 
 $(K8S_VM_DTB): $(K8S_VM_DTS)
 	$(DTC) -q -I dts -O dtb $< > $@
