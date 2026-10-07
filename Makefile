@@ -26,6 +26,9 @@ help:
 	@echo "  make shell          Open an ephemeral development shell"
 	@echo "  make dev            Open/reuse a persistent container for dev"
 	@echo "  make check          Check the container environment"
+	@echo "  make external       Download/build Kubernetes guest dependencies"
+	@echo "  make external-src   Download/extract third-party sources"
+	@echo "  make k8s-guest      Build the arm64 Kubernetes guest"
 	@echo "  make build          Build the simple example"
 	@echo "  make qemu           Run the simple example under QEMU"
 	@echo "  make qemu-clean     Clean-run the simple example under QEMU"
@@ -77,6 +80,16 @@ check:
 			python -c "import sdfgen"; \
 			echo "carrels environment check passed" \
 		'
+
+.PHONY: external external-src k8s-guest
+external:
+	$(MAKE) -C external
+
+external-src:
+	$(MAKE) -C external sources
+
+k8s-guest:
+	$(MAKE) -C guest/k8s
 
 .PHONY: build
 build:

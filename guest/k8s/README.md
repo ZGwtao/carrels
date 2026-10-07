@@ -11,9 +11,10 @@ make -C guest/k8s
 ```
 
 The infrastructure build consumes `build/linux/arch/arm64/boot/Image` and
-`build/rootfs.cpio.gz`. The first build downloads pinned Linux 6.12 and BusyBox
-1.37.0 source archives, verifies their SHA-256 checksums, and caches them under
-`build/downloads`. Later builds reuse the cached sources.
+`build/rootfs.cpio.gz`. Third-party versions, downloads, sources, the Go
+toolchain, and the kubelet build are managed by [`../../external`](../../external/README.md).
+The first build downloads and verifies the pinned inputs; later builds reuse
+the ignored caches under `external/`.
 
 For the current PoC, `carrels.local/c-hello:latest` maps explicitly to
 `c-hello.img` in the first qemu disk partition. `PullImage` succeeds only when
