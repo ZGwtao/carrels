@@ -30,7 +30,9 @@ all build infra apps app-native app-uk ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
 ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy: ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
-${BUILD_DIR}/Makefile: container.mk Makefile $(BUILD_DEFAULTS) $(ROOT)/uk-on-mk.mk
+${BUILD_DIR}/Makefile: container.mk Makefile $(BUILD_DEFAULTS) \
+		$(ROOT)/mk/components.mk $(ROOT)/mk/k8s-vmm.mk \
+		$(ROOT)/mk/unikernels.mk
 	mkdir -p ${BUILD_DIR}
 	echo "ROOT ?= ${ROOT}" > $@
 	echo "CARRELS ?= ${CARRELS}" >> $@

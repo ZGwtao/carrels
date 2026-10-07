@@ -57,107 +57,11 @@ build:
 	$(MAKE) apps
 	$(MAKE) ramdisk
 
-include ${SDDF}/tools/make/board/common.mk
+include $(ROOT)/mk/components.mk
 
-ifneq ($(MICROKIT_BOARD),qemu_virt_aarch64)
-$(error Kubernetes VM PoC currently supports MICROKIT_BOARD=qemu_virt_aarch64 only)
-endif
-
-ifeq ($(ARCH),aarch64)
-CFLAGS += -include $(CARRELS)/include/sddf-arch-compat.h
-endif
-
-VSWITCH:= ${SDDF}/examples/vswitch
-LIONSOS := $(CARRELS)/dep/lionsos
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
-ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
 RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
-FAT := $(CARRELS)/components/fat
-NETWORK_COMPONENTS := $(SDDF)/network/components
-
-# Match the storage device exposed by qemu.sh unless explicitly overridden.
-ifeq ($(ARCH),x86_64)
-NVME ?= 1
-else
-NVME ?= 0
-endif
-ifeq ($(NVME),1)
-ifneq ($(ARCH),x86_64)
-$(error NVME=1 is currently supported only on x86_64)
-endif
-BLK_DRIV_DIR := nvme
-QEMU_BLK_ARGS := -device nvme,drive=hd,serial=carrels,addr=0x4.0
-BLK_META_ARGS := --nvme
-CFLAGS += -DCARRELS_BLK_NVME
-else ifeq ($(NVME),0)
-BLK_META_ARGS :=
-CFLAGS += -DCARRELS_BLK_BOARD_DEFAULT
-else
-$(error NVME must be either 0 or 1)
-endif
-
-vpath %.c ${SDDF} ${VSWITCH} ${LIBVMM}
-
-CFLAGS += \
-	-DSDDF_VIRTIO_PCI_TRANSPORT_SKIP_BUS_CHECK \
-	-DCARRELS_PROTOCON_COUNT=$(PROTOCON_COUNT) \
-	-I$(CARRELS)/include \
-	-I$(LIONSOS)/include \
-	-I$(SDDF)/include/sddf/util/custom_libc \
-	-I$(SDDF)/include \
-	-I$(SDDF)/include/microkit \
-	-I$(VSWITCH)/include \
-	-I$(LIBMICROKITCO_PATH) \
-	-I$(LIBVMM)/include \
-	-I$(LIBVMM_EXAMPLE)
-
-LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := -lmicrokit -Tmicrokit.ld libsddf_util_debug.a
-
-BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
-BLK_COMPONENTS := $(SDDF)/blk/components
-
-SDDF_CUSTOM_LIBC := 1
-SDDF_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
-include ${SDDF}/util/util.mk
-include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
-include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
-include ${SDDF}/serial/components/serial_components.mk
-include ${SDDF}/libco/libco.mk
-include ${BLK_DRIVER}/blk_driver.mk
-include ${BLK_COMPONENTS}/blk_components.mk
-ifeq ($(ARCH),x86_64)
-include ${SDDF}/drivers/acpi/acpi_driver.mk
-include ${SDDF}/drivers/pci/pci_driver.mk
-endif
-
-include ${SDDF}/network/components/network_components.mk
-include ${ETHERNET_DRIVER}/eth_driver.mk
-
-LIBVMM_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
-include $(LIBVMM)/vmm.mk
-include $(LIBVMM)/tools/linux/blk/blk_init.mk
-include $(LIBVMM)/tools/linux/net/net_init.mk
-
-%.py: ${CONTAINER_DIR}/%.py
-	cp $< $@
-
-LIBTRUSTEDLO_PATH ?= $(CARRELS)/dep/libtrustedlo
-PROTOCON_VM_LAYOUT := $(LIBTRUSTEDLO_PATH)/config/vm_layout.py
-MONITOR_VM_LAYOUT := $()
-
-FAT_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
-include $(FAT)/fat.mk
-
-CONTAINER_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
-CONTAINER_COMPONENT_DIR := $(CARRELS)
-include $(CONTAINER_COMPONENT_DIR)/pc.mk
-
-LIBMICROKITCO_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
-include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
-
-
-include $(ROOT)/uk-on-mk.mk
+include $(ROOT)/mk/k8s-vmm.mk
 
 INFRA_IMAGES := \
 	timer_driver.elf \
@@ -173,55 +77,6 @@ INFRA_IMAGES := \
 	serial_virt_tx.elf \
 	blk_virt.elf \
 	blk_driver.elf
-
-K8S_VM_DIR := k8s_vm
-K8S_VM_CLIENT := $(LIBVMM_EXAMPLE)/client_vm/aarch64
-K8S_GUEST_OUT ?= $(CARRELS)/guest/k8s/build
-K8S_VM_LINUX ?= $(K8S_GUEST_OUT)/linux/arch/arm64/boot/Image
-K8S_VM_INITRD ?= $(K8S_GUEST_OUT)/rootfs.cpio.gz
-K8S_VM_NET_INIT := $(CARRELS)/guest/k8s/net_client_init
-K8S_VM_PACKED_INITRD := $(K8S_VM_DIR)/rootfs.cpio.gz
-K8S_VM_DTS := $(K8S_VM_DIR)/vm.dts
-K8S_VM_DTB := $(K8S_VM_DIR)/vm.dtb
-
-$(K8S_VM_DIR):
-	mkdir -p $@
-
-$(K8S_VM_PACKED_INITRD): $(K8S_VM_INITRD) blk_client_init $(K8S_VM_NET_INIT) | $(K8S_VM_DIR)
-	$(LIBVMM)/tools/packrootfs $(K8S_VM_INITRD) \
-		$(K8S_VM_DIR)/rootfs_staging -o $@ \
-		--startup blk_client_init $(K8S_VM_NET_INIT)
-
-$(K8S_VM_DTS): $(K8S_VM_CLIENT)/linux.dts $(K8S_VM_CLIENT)/gic_v2_overlay.dts $(CONTAINER_DIR)/container.mk \
-		$(K8S_VM_PACKED_INITRD) | $(K8S_VM_DIR)
-	$(LIBVMM)/tools/dtscat $(word 1,$^) $(word 2,$^) > $@
-	@initrd_size=$$(stat -c %s $(K8S_VM_PACKED_INITRD)); \
-	initrd_end=$$((0x47000000 + initrd_size)); \
-	test $$initrd_end -lt $$((0x50000000)) || { echo "k8s initramfs does not fit in guest RAM"; exit 1; }; \
-	initrd_end_hex=$$(printf '0x%x' $$initrd_end); \
-	sed -i "s/linux,initrd-end = <0x48000000>/linux,initrd-end = <$$initrd_end_hex>/" $@; \
-	grep -q "linux,initrd-end = <$$initrd_end_hex>" $@ || { echo "failed to update k8s initramfs end in $@"; exit 1; }
-
-$(K8S_VM_DTB): $(K8S_VM_DTS)
-	$(DTC) -q -I dts -O dtb $< > $@
-
-$(K8S_VM_DIR)/vmm.o: $(LIBVMM_EXAMPLE)/client_vmm.c | $(K8S_VM_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(K8S_VM_DIR)/guest_arch_init.o: $(K8S_VM_CLIENT)/guest_arch_init.c | $(K8S_VM_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(K8S_VM_DIR)/images.o: $(LIBVMM)/tools/package_guest_images.S \
-		$(K8S_VM_LINUX) $(K8S_VM_DTB) $(K8S_VM_PACKED_INITRD) | $(K8S_VM_DIR)
-	$(CC) -c -g3 -x assembler-with-cpp \
-		-DGUEST_KERNEL_IMAGE_PATH=\"$(K8S_VM_LINUX)\" \
-		-DGUEST_DTB_IMAGE_PATH=\"$(K8S_VM_DTB)\" \
-		-DGUEST_INITRD_IMAGE_PATH=\"$(K8S_VM_PACKED_INITRD)\" \
-		-target $(TARGET) $< -o $@
-
-k8s_vmm.elf: $(K8S_VM_DIR)/vmm.o $(K8S_VM_DIR)/guest_arch_init.o \
-		$(K8S_VM_DIR)/images.o libvmm.a libsddf_util_debug.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 ifeq ($(ARCH),x86_64)
 INFRA_IMAGES += acpi_driver.elf pci_driver.elf
@@ -317,8 +172,3 @@ qemu: ramdisk
 		-netdev user,id=netdev0,hostfwd=tcp::8080-10.0.2.15:80,hostfwd=tcp::8081-10.0.2.16:80 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors -smp 4
-
-${SDDF}/tools/make/board/common.mk ${SDDF_MAKEFILES} ${CARRELS}/dep/sddf/include &:
-	cd $(CARRELS) && git submodule update --init --recursive
-	@test ! -e $(CARRELS)/dep/uk-on-mk/dep/sddf || test -L $(CARRELS)/dep/uk-on-mk/dep/sddf || { echo "refusing to replace non-symlink $(CARRELS)/dep/uk-on-mk/dep/sddf" >&2; exit 1; }
-	ln -sfn ../../sddf $(CARRELS)/dep/uk-on-mk/dep/sddf

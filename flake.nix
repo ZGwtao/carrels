@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 {
-  description = "A flake for building libvmm and its examples";
+  description = "A flake for building Carrels and its dependencies";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
