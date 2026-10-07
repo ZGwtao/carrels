@@ -27,9 +27,13 @@ ln -sfn ../../sddf "$SCRIPT_DIR/dep/uk-on-mk/dep/sddf"
 mkdir -p "$SCRIPT_DIR/dep/uk-on-mk/dep/catalog-core/repos"
 (cd "$SCRIPT_DIR/dep/uk-on-mk/dep/catalog-core" && ./setup.sh)
 
-(cd "$SCRIPT_DIR/dep/microkit" && \
-    nix develop "$SCRIPT_DIR" --command python build_sdk.py \
+export SCRIPT_DIR MICROKIT_BOARD MICROKIT_CONFIG
+nix develop "$SCRIPT_DIR" --command bash -lc '
+    cd "$SCRIPT_DIR/dep/microkit"
+    python build_sdk.py \
         --skip-tar \
         "--boards=$MICROKIT_BOARD" \
         --sel4=../sel4 \
-        "--configs=$MICROKIT_CONFIG")
+        "--configs=$MICROKIT_CONFIG"
+    make -C "$SCRIPT_DIR/external"
+'
