@@ -157,7 +157,7 @@ LIBMICROKITCO_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 
-include $(ROOT)/uk-on-mk.mk
+include $(ROOT)/mk/unikernels.mk
 
 INFRA_IMAGES := \
 	timer_driver.elf \
