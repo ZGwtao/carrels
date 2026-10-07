@@ -28,12 +28,6 @@ vpath monitor/init/%.c $(PC_SRC_DIR)/src
 vpath monitor/io/%.c $(PC_SRC_DIR)/src
 vpath monitor/request/%.c $(PC_SRC_DIR)/src
 
-protocon.elf: pc/$(PC_LIBTRUSTEDLO_OBJ)
-	cp $(BUILD_DIR)/pc/libtrustedlo/loader.elf $@
-
-trampoline.elf: pc/$(PC_LIBTRUSTEDLO_OBJ)
-	cp $(BUILD_DIR)/pc/libtrustedlo/trampoline.elf $@
-
 payloads.o: protocon.elf trampoline.elf
 	cp $(PC_SRC_DIR)/src/monitor/package_payloads.S .
 	$(CC) -c $(CFLAGS) \
