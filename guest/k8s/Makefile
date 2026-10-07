@@ -4,6 +4,11 @@ CARRELS := $(abspath ../..)
 EXTERNAL_DIR := $(CARRELS)/external
 include $(EXTERNAL_DIR)/versions.mk
 
+# The guest targets depend on the external recursive make having completed.
+# Keep this makefile serial even when the caller supplies -j; the expensive
+# kernel and BusyBox builds still use $(JOBS) internally.
+.NOTPARALLEL:
+
 ARCH := arm64
 CROSS_COMPILE ?= aarch64-linux-gnu-
 JOBS ?= $(shell nproc)

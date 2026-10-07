@@ -8,6 +8,8 @@ include versions.mk
 CARRELS := $(abspath ..)
 CRI_STUB_SOURCE := $(CARRELS)/guest/k8s/cri_stub.go
 GO_STAMP := $(GO_ROOT)/.installed
+LINUX_STAMP := $(LINUX_SRC)/.extracted
+BUSYBOX_STAMP := $(BUSYBOX_SRC)/.extracted
 KUBERNETES_STAMP := $(KUBERNETES_SRC)/.extracted
 KUBERNETES_SEMVER := $(patsubst v%,%,$(KUBERNETES_VERSION))
 KUBERNETES_MAJOR := $(word 1,$(subst ., ,$(KUBERNETES_SEMVER)))
@@ -18,8 +20,8 @@ KUBERNETES_MINOR := $(word 2,$(subst ., ,$(KUBERNETES_SEMVER)))
 all: sources kubelet cri-stub
 
 sources: linux busybox go kubernetes
-linux: $(LINUX_SRC)/Makefile
-busybox: $(BUSYBOX_SRC)/Makefile
+linux: $(LINUX_STAMP)
+busybox: $(BUSYBOX_STAMP)
 go: $(GO_STAMP)
 kubernetes: $(KUBERNETES_STAMP)
 kubelet: $(KUBELET)
@@ -31,10 +33,12 @@ $(LINUX_ARCHIVE):
 	echo "$(LINUX_SHA256)  $@.tmp" | sha256sum --check -
 	mv $@.tmp $@
 
-$(LINUX_SRC)/Makefile: $(LINUX_ARCHIVE)
+$(LINUX_STAMP): $(LINUX_ARCHIVE)
+	rm -rf $(LINUX_SRC)
 	mkdir -p $(EXTERNAL_SOURCES)
 	tar -C $(EXTERNAL_SOURCES) -xf $<
-	test -f $@
+	test -f $(LINUX_SRC)/Makefile
+	touch $@
 
 $(BUSYBOX_ARCHIVE):
 	mkdir -p $(dir $@)
@@ -42,10 +46,12 @@ $(BUSYBOX_ARCHIVE):
 	echo "$(BUSYBOX_SHA256)  $@.tmp" | sha256sum --check -
 	mv $@.tmp $@
 
-$(BUSYBOX_SRC)/Makefile: $(BUSYBOX_ARCHIVE)
+$(BUSYBOX_STAMP): $(BUSYBOX_ARCHIVE)
+	rm -rf $(BUSYBOX_SRC)
 	mkdir -p $(EXTERNAL_SOURCES)
 	tar -C $(EXTERNAL_SOURCES) -xf $<
-	test -f $@
+	test -f $(BUSYBOX_SRC)/Makefile
+	touch $@
 
 $(GO_ARCHIVE):
 	mkdir -p $(dir $@)
