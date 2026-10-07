@@ -1,7 +1,7 @@
 [submodule "sddf"]
 	path = dep/sddf
 	url = https://github.com/au-ts/sddf.git
-	branch = checkpoint-demo
+	branch = carrells_demo_rebased_vsock
 [submodule "libtrustedlo"]
 	path = dep/libtrustedlo
 	url = https://github.com/ZGwtao/libtrustedlo.git
@@ -23,3 +23,7 @@
 [submodule "dep/sel4"]
 	path = dep/sel4
 	url = https://github.com/au-ts/seL4.git
+[submodule "dep/libvmm"]
+	path = dep/libvmm
+	url = https://github.com/ZGwtao/libvmm.git
+	branch = dev-virtio-vsock
