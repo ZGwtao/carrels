@@ -32,6 +32,8 @@ IrqIoapic = SDF.IrqIoapic
 VSOCK_QUEUE_CAPACITY = 64
 VSOCK_PACKET_BUFFER_SIZE = 4096
 VSOCK_CHANNEL = 20
+VSOCK_GUEST_CID = 3
+VSOCK_HOST_CID = 2
 VSOCK_G2H_DATA_VADDR = 0x30002000
 VSOCK_H2G_DATA_VADDR = (
     VSOCK_G2H_DATA_VADDR + VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE
@@ -46,10 +48,11 @@ def serialise_vsock_config(output_dir, name, tx_queue, tx_data, rx_queue, rx_dat
         rx_data.vaddr, VSOCK_QUEUE_CAPACITY * VSOCK_PACKET_BUFFER_SIZE,
     )
     data = struct.pack(
-        "<5s3x" + "QQ" * 4 + "IIB7x",
-        b"sDDF\x07", *fields,
+        "<5s3xQQ" + "QQ" * 4 + "IIB7x",
+        b"sDDF\x07", VSOCK_GUEST_CID, VSOCK_HOST_CID, *fields,
         VSOCK_QUEUE_CAPACITY, VSOCK_PACKET_BUFFER_SIZE, VSOCK_CHANNEL,
     )
+    assert len(data) == 104
     with open(f"{output_dir}/virtio_vsock_transport_{name}.data", "wb") as output:
         output.write(data)
 
