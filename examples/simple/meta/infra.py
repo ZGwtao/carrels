@@ -29,7 +29,7 @@ class CarrelsContainerInfra:
 
         self.pd_orchestrator = PD(
             "vsock_backend",
-            "orchestrator.elf",
+            "vsock_backend.elf",
             priority=60,
             stack_size=0x10000,
         )

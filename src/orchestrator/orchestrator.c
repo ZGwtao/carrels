@@ -13,6 +13,7 @@
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
+#include <libvmm/virtio/vsock_config.h>
 
 #include <libtrustedlo.h>
 #include <libmicrokitco.h>
@@ -21,23 +22,25 @@
 #include <carrels-user.h>
 #include <pcmcall/error.h>
 #include <misc.h>
+#include "cri_runtime.h"
 
 #define PROGNAME "[@orchestrator] "
 
 #define SHELL_INPUT_BUFFER_SIZE 64
 
+#define K8S_C_HELLO_IMAGE "carrels.local/c-hello:latest"
+#define K8S_C_HELLO_IMAGE_REF "carrels-image://" K8S_C_HELLO_IMAGE
+#define K8S_C_HELLO_FILE "c-hello.img"
+
 #define FNAME_BUF_SIZE 64
-#define MIN_REQ_PC_NUM 1U
-#define MAX_REQ_PC_NUM 4U
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-
 uintptr_t shared1 = 0x4000000;
 uintptr_t shared2 = 0xb000000;
 uintptr_t shared3 = 0x6000000;
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 __attribute__((__section__(".fs_client_config"))) fs_client_config_t fs_config;
+__attribute__((__section__(".virtio_vsock_transport_config")))
+virtio_vsock_transport_config_t vsock_config;
 
 static char mp_stack1[0x10000];
 static char mp_stack2[0x10000];
@@ -59,13 +62,21 @@ bool fs_init;
 
 #define MIN_REQ_PC_NUM 1U
 #define MAX_REQ_PC_NUM 16U
-#define MAX_PROTOCON_PORTS MAX_REQ_PC_NUM
+#ifndef CARRELS_PROTOCON_COUNT
+#define CARRELS_PROTOCON_COUNT 4U
+#endif
+#define MAX_PROTOCON_PORTS CARRELS_PROTOCON_COUNT
 
 uint32_t req_pc_num = MIN_REQ_PC_NUM;
 static uint32_t deploy_pc_id;
 static uint32_t deploy_peer_mask;
 static bool deploy_peers_all;
 static bool deploy_pending;
+static bool deploy_from_cri;
+static uint32_t cri_slots_in_use;
+static bool cri_c_hello_available;
+
+static int monitor_protocon_is_running(uint32_t pc_id, bool *running);
 
 static microrl_t shell;
 static char fname_buf[FNAME_BUF_SIZE];
@@ -234,6 +245,11 @@ void orchestrator_prologue(void)
     }
     fs_init = true;
 
+    cri_c_hello_available = pico_vfs_file_exists(K8S_C_HELLO_FILE);
+    sddf_printf("%sKubernetes image %s is %s\r\n", PROGNAME,
+                K8S_C_HELLO_IMAGE,
+                cri_c_hello_available ? "available" : "missing");
+
     TSLDR_DBG_PRINT(PROGNAME "(fs mount) finished fs initialisation\n");
 
     pico_vfs_readfile2buf((void *)shared1, "protocon.elf", &err);
@@ -317,7 +333,6 @@ static int cmd_start(int argc, const char *const *argv)
         return 1;
     }
 
-    microkit_cothread_yield();
     return 0;
 }
 
@@ -428,6 +443,11 @@ static void load_targeted_elf_payload(void)
     pico_vfs_readfile2buf((void *)shared2, fname_buf, &fs_error);
     if (fs_error != seL4_NoError) {
         sddf_printf("Failed to load application image %s\r\n", fname_buf);
+        if (deploy_from_cri) {
+            cri_runtime_deploy_complete(deploy_pc_id, 1);
+            cri_slots_in_use &= ~((uint32_t)1U << deploy_pc_id);
+            deploy_from_cri = false;
+        }
         deploy_pending = false;
         shell_inst_epilogue();
         return;
@@ -444,6 +464,11 @@ static void load_targeted_elf_payload(void)
                     fname_buf,
                     deploy_pc_id,
                     monitor_error);
+        if (deploy_from_cri) {
+            cri_runtime_deploy_complete(deploy_pc_id, 1);
+            cri_slots_in_use &= ~((uint32_t)1U << deploy_pc_id);
+            deploy_from_cri = false;
+        }
         deploy_pending = false;
         shell_inst_epilogue();
     }
@@ -484,8 +509,121 @@ static void print_deploy_result(void)
         print_peer_ports(unavailable);
         sddf_printf("\r\n");
     }
+    if (deploy_from_cri) {
+        bool monitor_running = false;
+        int query_error = error == MON_NO_ERROR
+                              ? monitor_protocon_is_running(pc_id, &monitor_running)
+                              : -1;
+        bool failed = error != MON_NO_ERROR || query_error || !monitor_running;
+
+        if (error == MON_NO_ERROR && failed) {
+            sddf_printf("Deployment result was successful, but monitor does not report "
+                        "protocon %u running\r\n", pc_id);
+        }
+        cri_runtime_deploy_complete(pc_id, failed);
+        if (failed) {
+            cri_slots_in_use &= ~((uint32_t)1U << pc_id);
+        }
+        deploy_from_cri = false;
+    }
     deploy_pending = false;
     shell_inst_epilogue();
+}
+
+static bool image_to_filename(const char *image, char *filename, size_t size)
+{
+    if (image == NULL ||
+        (strcmp(image, K8S_C_HELLO_IMAGE) != 0 &&
+         strcmp(image, K8S_C_HELLO_IMAGE_REF) != 0) ||
+        sizeof(K8S_C_HELLO_FILE) > size) {
+        return false;
+    }
+    memcpy(filename, K8S_C_HELLO_FILE, sizeof(K8S_C_HELLO_FILE));
+    return true;
+}
+
+int orchestrator_cri_image_exists(const char *image)
+{
+    return image != NULL &&
+           (strcmp(image, K8S_C_HELLO_IMAGE) == 0 ||
+            strcmp(image, K8S_C_HELLO_IMAGE_REF) == 0) &&
+           cri_c_hello_available;
+}
+
+static int monitor_protocon_is_running(uint32_t pc_id, bool *running)
+{
+    microkit_msginfo info;
+    seL4_Word active_or_suspended;
+
+    if (running == NULL || pc_id >= MAX_PROTOCON_PORTS) {
+        return -1;
+    }
+    microkit_mr_set(0, PC_MONITOR_CALL_QUERY_PROTOCONS);
+    info = microkit_ppcall(1, microkit_msginfo_new(0, 1));
+    if (microkit_msginfo_get_label(info) != MON_NO_ERROR) {
+        return -1;
+    }
+    active_or_suspended = microkit_mr_get(0);
+    *running = (active_or_suspended & ((seL4_Word)1U << pc_id)) != 0;
+    return 0;
+}
+
+int orchestrator_cri_start(const char *image, uint32_t *pc_id)
+{
+    uint32_t id;
+
+    if (deploy_pending || pc_id == NULL || !orchestrator_cri_image_exists(image) ||
+        !image_to_filename(image, fname_buf, sizeof(fname_buf))) {
+        return -1;
+    }
+    for (id = 0; id < MAX_PROTOCON_PORTS; ++id) {
+        if (!(cri_slots_in_use & ((uint32_t)1U << id))) {
+            break;
+        }
+    }
+    if (id == MAX_PROTOCON_PORTS) {
+        return -1;
+    }
+    deploy_pc_id = id;
+    deploy_peer_mask = 0;
+    deploy_peers_all = false;
+    deploy_pending = true;
+    deploy_from_cri = true;
+    cri_slots_in_use |= (uint32_t)1U << id;
+    *pc_id = id;
+    if (microkit_cothread_spawn(load_targeted_elf_payload, NULL) == LIBMICROKITCO_NULL_HANDLE) {
+        cri_slots_in_use &= ~((uint32_t)1U << id);
+        deploy_pending = false;
+        deploy_from_cri = false;
+        return -1;
+    }
+    /* Run the loader in this notification's coroutine scheduling cycle.
+     * Deferring it to the next vsock notification can consume the notification
+     * needed to complete the outstanding StartContainer exchange. */
+    microkit_cothread_yield();
+    return 0;
+}
+
+int orchestrator_cri_stop(uint32_t pc_id)
+{
+    microkit_msginfo info;
+    bool running;
+
+    if (pc_id >= MAX_PROTOCON_PORTS || !(cri_slots_in_use & ((uint32_t)1U << pc_id))) {
+        return -1;
+    }
+    microkit_mr_set(0, PC_MONITOR_CALL_TERMINATE_EXT);
+    microkit_mr_set(1, pc_id);
+    info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
+    if (microkit_msginfo_get_label(info) != MON_NO_ERROR) {
+        return -1;
+    }
+    if (monitor_protocon_is_running(pc_id, &running) || running) {
+        sddf_printf("CRI stop: monitor still reports protocon %u running\r\n", pc_id);
+        return -1;
+    }
+    cri_slots_in_use &= ~((uint32_t)1U << pc_id);
+    return 0;
 }
 
 static int cmd_deploy(int argc, const char *const *argv)
@@ -634,6 +772,7 @@ void init(void)
     assert(serial_config_check_magic(&serial_config));
     TSLDR_DBG_PRINT(PROGNAME "check serial config\n");
     assert(fs_config_check_magic(&fs_config));
+    assert(virtio_vsock_transport_config_check_magic(&vsock_config));
     TSLDR_DBG_PRINT(PROGNAME "check fs config\n");
 
     if (serial_config.rx.queue.vaddr != NULL) {
@@ -647,6 +786,7 @@ void init(void)
                       serial_config.tx.data.size,
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    cri_runtime_init();
 
     fs_set_blocking_wait(blocking_wait);
     fs_command_queue = fs_config.server.command_queue.vaddr;
@@ -735,6 +875,8 @@ void notified(microkit_channel ch)
 
     if (ch == serial_config.rx.id) {
         orche_handle_serial_event();
+    } else if (ch == vsock_config.connection.id) {
+        cri_runtime_notified();
     } else if (ch == 30) {
         /* Notification from monitor. */
         if (deploy_pending) {
@@ -743,4 +885,5 @@ void notified(microkit_channel ch)
             shell_inst_epilogue();
         }
     }
+
 }
