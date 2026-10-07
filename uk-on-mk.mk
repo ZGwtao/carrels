@@ -16,7 +16,7 @@ UNIKERNELS := $(addprefix unikraft-,$(addsuffix .img,$(UK_APPS)))
 define UK_APP_template
 
 UK_APP_BUILD_DIR_$(1) := $(BUILD_DIR)/uk/$(1)
-UK_APP_ELF_$(1) := $$(UK_APP_BUILD_DIR_$(1))/$(1)_default-$$(BM_UK_ARCH)
+UK_APP_ELF_$(1) := $$(UK_APP_BUILD_DIR_$(1))/$(1).elf
 
 .PHONY: uk-build-$(1)
 
