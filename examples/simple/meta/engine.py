@@ -133,37 +133,6 @@ class CarrelsContainerEngine:
         pc.add_map(self.create_map_txlo_data_mr(container_stack, "CONTAINER_STACK"))
         pc.add_map(self.create_map_txlo_exec_mr(container_exec, "CONTAINER_PROGRAM"))
 
-    def setup_mr_io_quque(self, pc: PD, cid: int):
-        client_monitor_rx_free = self.create_mr(pc.name, "rx/free", 0x3000)
-        client_monitor_tx_free = self.create_mr(pc.name, "tx/free", 0x3000)
-        client_monitor_rx_active = self.create_mr(pc.name, "rx/active", 0x3000)
-        client_monitor_tx_active = self.create_mr(pc.name, "tx/active", 0x3000)
-        client_monitor_rx_data = self.create_mr(pc.name, "rx/data", 0x100000)
-        client_monitor_tx_data = self.create_mr(pc.name, "tx/data", 0x100000)
-
-        self.sdf.add_mr(client_monitor_rx_free)
-        self.sdf.add_mr(client_monitor_rx_active)
-        self.sdf.add_mr(client_monitor_rx_data)
-        self.sdf.add_mr(client_monitor_tx_free)
-        self.sdf.add_mr(client_monitor_tx_active)
-        self.sdf.add_mr(client_monitor_tx_data)
-
-        pc.add_map(MAP(client_monitor_rx_free, 0x04800000, perms="rw", cached="false"))
-        pc.add_map(MAP(client_monitor_tx_free, 0x04803000, perms="rw", cached="false"))
-        pc.add_map(MAP(client_monitor_rx_active, 0x04806000, perms="rw", cached="false"))
-        pc.add_map(MAP(client_monitor_tx_active, 0x04809000, perms="rw", cached="false"))
-        pc.add_map(MAP(client_monitor_rx_data, 0x0480C000, perms="rw", cached="false"))
-        pc.add_map(MAP(client_monitor_tx_data, 0x0490C000, perms="rw", cached="false"))
-
-        monitor_queue_base = 0x80000000 + cid * 0x400000
-
-        self.engine.add_map(self.create_map_io(client_monitor_tx_free, monitor_queue_base + 0x000000))
-        self.engine.add_map(self.create_map_io(client_monitor_tx_active, monitor_queue_base + 0x006000))
-        self.engine.add_map(self.create_map_io(client_monitor_tx_data, monitor_queue_base + 0x00C000))
-        self.engine.add_map(self.create_map_io(client_monitor_rx_free, monitor_queue_base + 0x003000))
-        self.engine.add_map(self.create_map_io(client_monitor_rx_active, monitor_queue_base + 0x009000))
-        self.engine.add_map(self.create_map_io(client_monitor_rx_data, monitor_queue_base + 0x10C000))
-
     def add_client(self, pc: PD) -> int:
         cid = self.allocate_cid(pc)
         self.engine.add_child_pd(pc, child_id=cid)
@@ -172,10 +141,8 @@ class CarrelsContainerEngine:
         self.setup_mr_txlo(pc, cid)
         self.setup_mr_trampoline(pc)
         self.setup_mr_application(pc)
-        self.setup_mr_io_quque(pc, cid)
 
         self.sdf.add_channel(CHN(a=self.engine, b=pc, a_id=(24 + cid), b_id=15, pp_b=True))
-        self.sdf.add_channel(CHN(a=self.engine, b=pc, a_id=(40 + cid), b_id=16))
 
         """
         the things above are for setting up the regions for a normal conatiner

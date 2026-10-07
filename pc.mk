@@ -39,10 +39,6 @@ LIBMICROKITCO_CFLAGS_pc := ${PC_CFLAGS}
 PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a
 PC_FS_HELPERS_OBJ := pc/fs/helpers.o
 
-
-PC_ECHO_CLIENT_OBJS := \
-	pc/client/client_echo.o
-
 PC_WHOAMI_CLIENT_OBJS := \
 	pc/client/whoami.o
 
@@ -63,7 +59,6 @@ PC_MONITOR_OBJS := \
 	pc/monitor/request/support.o \
 	pc/monitor/request/suspend.o \
 	pc/monitor/init/minit.o \
-	pc/monitor/io/forwarder.o \
 	pc/monitor/service/service_installer.o \
 	pc/monitor/service/service_manifest.o \
 	pc/monitor/service/service_planner.o \
@@ -85,7 +80,6 @@ PC_OBJS := \
 	$(PC_MONITOR_OBJS) \
 	$(PC_PROTOCON_OBJS) \
 	$(PC_TRAMPOLINE_OBJS) \
-	$(PC_ECHO_CLIENT_OBJS) \
 	$(PC_WHOAMI_CLIENT_OBJS) \
 	$(PC_FS_CLIENT_OBJS)
 
@@ -167,7 +161,6 @@ monitor.elf: \
 
 
 PC_CLIENT_NAMES := \
-	client_echo \
 	whoami \
 	client_fs
 
@@ -178,7 +171,6 @@ PC_SERVICE_MANIFEST := $(PC_SRC_DIR)/src/client/service.mf
 
 $(PC_CLIENT_ELFS): LDFLAGS += -L$(BOARD_DIR)/lib
 
-client_echo.elf: $(PC_ECHO_CLIENT_OBJS)
 whoami.elf:      $(PC_WHOAMI_CLIENT_OBJS)
 client_fs.elf:   $(PC_FS_CLIENT_OBJS)
 
