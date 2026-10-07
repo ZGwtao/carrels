@@ -31,6 +31,7 @@ ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: container.mk Makefile $(BUILD_DEFAULTS) \
+		$(ROOT)/mk/components.mk $(ROOT)/mk/k8s-vmm.mk \
 		$(ROOT)/mk/unikernels.mk
 	mkdir -p ${BUILD_DIR}
 	echo "ROOT ?= ${ROOT}" > $@
