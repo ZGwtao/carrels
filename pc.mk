@@ -39,38 +39,9 @@ LIBMICROKITCO_CFLAGS_pc := ${PC_CFLAGS}
 PC_LIBMICROKITCO_OBJ := libmicrokitco_pc.a
 PC_FS_HELPERS_OBJ := pc/fs/helpers.o
 
-PC_WHOAMI_CLIENT_OBJS := \
-	pc/client/whoami.o
-
-PC_FS_CLIENT_OBJS := \
-	$(PC_FS_HELPERS_OBJ) \
-	pc/client/client_fs.o
-
-PC_MONITOR_OBJS := \
-	$(PC_FS_HELPERS_OBJ) \
-	pc/monitor/entry.o \
-	pc/monitor/mcall.o \
-	pc/monitor/fault/fault.o \
-	pc/monitor/request/deploy.o \
-	pc/monitor/request/network.o \
-	pc/monitor/request/query.o \
-	pc/monitor/request/resume.o \
-	pc/monitor/request/stop.o \
-	pc/monitor/request/support.o \
-	pc/monitor/request/suspend.o \
-	pc/monitor/init/minit.o \
-	pc/monitor/service/service_installer.o \
-	pc/monitor/service/service_manifest.o \
-	pc/monitor/service/service_planner.o \
-	pc/monitor/service/service_registry.o \
-	pc/util/pico_vfs.o
-
-PC_ORCHESTRATOR_OBJS := \
-	$(PC_FS_HELPERS_OBJ) \
-	pc/orchestrator/orchestrator.o \
-	pc/orchestrator/cri_runtime.o \
-	pc/util/pico_vfs.o \
-	pc/microrl.o
+include $(PC_SRC_DIR)/src/client/client.mk
+include $(PC_SRC_DIR)/src/monitor/monitor.mk
+include $(PC_SRC_DIR)/src/orchestrator/orchestrator.mk
 
 PC_PROTOCON_OBJS :=
 PC_TRAMPOLINE_OBJS :=
@@ -102,15 +73,7 @@ pc/$(PC_LIBTRUSTEDLO_OBJ): pc
 			CPU:=$(CPU) \
 			LLVM:=1
 
-vpath client/%.c $(PC_SRC_DIR)/src
 vpath util/%.c $(PC_SRC_DIR)/src
-vpath monitor/%.c $(PC_SRC_DIR)/src
-vpath monitor/service/%.c $(PC_SRC_DIR)/src
-vpath monitor/fault/%.c $(PC_SRC_DIR)/src
-vpath monitor/init/%.c $(PC_SRC_DIR)/src
-vpath monitor/io/%.c $(PC_SRC_DIR)/src
-vpath monitor/request/%.c $(PC_SRC_DIR)/src
-vpath orchestrator/%.c $(PC_SRC_DIR)/src
 
 pc/%.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS)
 
@@ -122,73 +85,6 @@ pc/fs/helpers.o: $(PC_SRC_DIR)/lib/fs/helpers/helpers.c | pc \
 	$(PC_MONITOR_VM_LAYOUT_HEADER) pc/$(PC_LIBTRUSTEDLO_OBJ)
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
-
-pc/microrl.o: CFLAGS := $(PC_CFLAGS) $(CFLAGS) \
-	-I$(PC_MICRORL_SRC_DIR)/include
-
-pc/microrl.o: $(PC_MICRORL_SRC_DIR)/microrl.c | pc
-	@mkdir -p $(dir $@)
-	$(CC) -c $(CFLAGS) $< -o $@
-
-vsock_backend.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-vsock_backend.elf: $(PC_ORCHESTRATOR_OBJS) \
-	$(PC_LIBMICROKITCO_OBJ) pc/$(PC_LIBTRUSTEDLO_OBJ) libsddf_util.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-
-protocon.elf: pc/$(PC_LIBTRUSTEDLO_OBJ)
-	cp $(BUILD_DIR)/pc/libtrustedlo/loader.elf $@
-
-trampoline.elf: pc/$(PC_LIBTRUSTEDLO_OBJ)
-	cp $(BUILD_DIR)/pc/libtrustedlo/trampoline.elf $@
-
-payloads.o: \
-		protocon.elf \
-		trampoline.elf
-	cp $(PC_SRC_DIR)/src/monitor/package_payloads.S .
-	$(CC) -c $(CFLAGS) \
-		-DCARRELS_PROTOCON_PATH=\"$(BUILD_DIR)/protocon.elf\" \
-		-DCARRELS_TRAMPOLINE_PATH=\"$(BUILD_DIR)/trampoline.elf\" \
-		package_payloads.S -o $@
-
-monitor.elf: LDFLAGS += -L$(BOARD_DIR)/lib
-monitor.elf: \
-		$(PC_MONITOR_OBJS) \
-		pc/$(PC_LIBTRUSTEDLO_OBJ) \
-		$(PC_LIBMICROKITCO_OBJ) \
-		libsddf_util.a payloads.o
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-
-PC_CLIENT_NAMES := \
-	whoami \
-	client_fs
-
-PC_CLIENT_ELFS := $(addsuffix .elf,$(PC_CLIENT_NAMES))
-PC_CLIENT_IMGS := $(addsuffix .img,$(PC_CLIENT_NAMES))
-
-PC_SERVICE_MANIFEST := $(PC_SRC_DIR)/src/client/service.mf
-
-$(PC_CLIENT_ELFS): LDFLAGS += -L$(BOARD_DIR)/lib
-
-whoami.elf:      $(PC_WHOAMI_CLIENT_OBJS)
-client_fs.elf:   $(PC_FS_CLIENT_OBJS)
-
-$(PC_CLIENT_ELFS): libsddf_util.a pc/$(PC_LIBTRUSTEDLO_OBJ)
-	$(LD) $(LDFLAGS) -Ttext=0x2800000 $^ $(LIBS) -o $@
-
-PC_SERVICE_IMGS := $(PC_CLIENT_IMGS)
-
-.PHONY: pc-images
-pc-images: $(PC_SERVICE_IMGS)
-
-$(PC_SERVICE_IMGS): %.img: %.elf $(PC_SERVICE_MANIFEST) \
-		$(PC_TOOL_DIR)/service-helper.py
-	PYTHONPATH=$(SDDF)/tools/meta:$$PYTHONPATH $(PYTHON) \
-		$(PC_TOOL_DIR)/service-helper.py \
-		--mf $(PC_SERVICE_MANIFEST) \
-		--elf $< \
-		-o $@
 
 -include $(PC_OBJS:.o=.d)
 
