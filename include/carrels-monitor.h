@@ -51,7 +51,7 @@ typedef uint8_t protocon_lifecycle_state_t;
 enum {
     PROTOCON_ACTIVE = 1,
     PROTOCON_PASSIVE,
-    PROTOCON_HANG,
+    PROTOCON_SUSPENDED,
 };
 _Static_assert(sizeof(protocon_lifecycle_state_t) == sizeof(uint8_t),
                "protocon_lifecycle_state_t must be uint8_t");
@@ -159,9 +159,9 @@ static inline void protocon_state_memzero_symb_header(uint32_t pc_id)
         protocon_state_set_lifecycle_state(C, PROTOCON_ACTIVE);                                    \
     } while (0);
 
-#define SET_PROTOCON_AS_HANG(C)                                                                    \
+#define SET_PROTOCON_AS_SUSPENDED(C)                                                               \
     do {                                                                                           \
-        protocon_state_set_lifecycle_state(C, PROTOCON_HANG);                                      \
+        protocon_state_set_lifecycle_state(C, PROTOCON_SUSPENDED);                                 \
     } while (0);
 
 #define SET_PROTOCON_AS_AVAILABLE(C)                                                               \
@@ -201,5 +201,9 @@ void service_registry_create(const svc_t *svcdb_list, pc_state_t *protocon_state
 void service_planner_select_protocon(const protocon_svc_req_t *req,
                                      deploy_plan_t *plan,
                                      const pc_state_t *protocon_states);
+void service_planner_select_protocon_by_id(const protocon_svc_req_t *req,
+                                           deploy_plan_t *plan,
+                                           const pc_state_t *protocon_states,
+                                           uint32_t pc_id);
 
 void service_installer_apply(const deploy_plan_t *plan);

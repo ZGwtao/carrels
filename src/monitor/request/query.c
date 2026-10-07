@@ -24,8 +24,8 @@ static inline void monitor_main_list_protocon_states(uint32_t num_protocons)
         case PROTOCON_PASSIVE:
             sddf_printf("avail");
             break;
-        case PROTOCON_HANG:
-            sddf_printf("hang");
+        case PROTOCON_SUSPENDED:
+            sddf_printf("suspended");
             break;
         default:
             sddf_printf("unknown: %d", state);
@@ -49,7 +49,7 @@ seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
     seL4_Word bitmap = 0;
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
         if ((protocon_state_check_lifecycle_state(i, PROTOCON_ACTIVE) ||
-             protocon_state_check_lifecycle_state(i, PROTOCON_HANG)) &&
+             protocon_state_check_lifecycle_state(i, PROTOCON_SUSPENDED)) &&
             i != self_id) {
             bitmap |= (1ULL << i);
         }

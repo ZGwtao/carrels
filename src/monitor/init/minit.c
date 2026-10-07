@@ -165,6 +165,7 @@ void ca_monitor_init_states(void)
 
     ca_monitor_init_get_pcnum(dlg.delegator_count, bootinfo);
     ca_monitor_init_protocon_states(bootinfo->num_pc);
+    monitor_acl_initialise(bootinfo->num_pc);
     monitor_init_all_client_links(bootinfo->num_pc);
 }
 

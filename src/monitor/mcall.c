@@ -20,9 +20,26 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         seL4_Word num_req_pc = microkit_mr_get(1);
         ret = monitor_call_deploy_first_half(num_req_pc);
         break;
+    case PC_MONITOR_CALL_DEPLOY_TO_PROTOCON: {
+        seL4_Word pc_id = microkit_mr_get(1);
+        seL4_Word peer_mask = microkit_mr_get(2);
+        seL4_Word peers_all = microkit_mr_get(3);
+        ret = monitor_call_deploy_to_protocon(pc_id, peer_mask, peers_all);
+        break;
+    }
+    case PC_MONITOR_CALL_DEPLOY_RESULT:
+        ret = monitor_call_deploy_result();
+        break;
     case PC_MONITOR_CALL_FLIP_ACL_RULE:
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
+    case PC_MONITOR_CALL_SET_VSWITCH_ACL: {
+        seL4_Word port0 = microkit_mr_get(1);
+        seL4_Word port1 = microkit_mr_get(2);
+        seL4_Word allow = microkit_mr_get(3);
+        ret = monitor_call_set_vswitch_acl(port0, port1, allow);
+        break;
+    }
     case PC_MONITOR_CALL_BACKUP_CONTEXT:
         TSLDR_DBG_PRINT(PROGNAME "Backing up trusted loading context for dynamic PD with ID: %d\n",
                         monitor_get_pcid_from_ch(ch));
@@ -32,10 +49,10 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         TSLDR_DBG_PRINT(PROGNAME "Exit and uninstantiate a dynamic PD\n");
         ret = monitor_call_stop_and_restore_protocon(ch - PC_MONITOR_PROTOCON_BASE_CHANNEL);
         break;
-    case PC_MONITOR_CALL_HANG: {
+    case PC_MONITOR_CALL_SUSPEND: {
         seL4_Word target_pd_id = seL4_GetMR(1);
-        TSLDR_DBG_PRINT(PROGNAME "Hang dynamic PD with ID: %d\n", target_pd_id);
-        ret = monitor_call_hang_protocon(target_pd_id);
+        TSLDR_DBG_PRINT(PROGNAME "Suspend dynamic PD with ID: %d\n", target_pd_id);
+        ret = monitor_call_suspend_protocon(target_pd_id);
         break;
     }
     case PC_MONITOR_CALL_RESUME: {

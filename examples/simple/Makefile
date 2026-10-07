@@ -19,9 +19,9 @@ export MICROKIT_BOARD ?= qemu_virt_aarch64
 IMAGE_FILE := $(BUILD_DIR)/container.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
-.PHONY: all build infra application ramdisk qemu
+.PHONY: all build infra apps app-native app-uk ramdisk qemu
 
-all build infra application ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
+all build infra apps app-native app-uk ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy: ${BUILD_DIR}/Makefile FORCE
@@ -40,9 +40,8 @@ ${BUILD_DIR}/Makefile: container.mk Makefile $(ROOT)/uk-on-mk.mk
 	cat container.mk >> $@
 
 submodules:
-	git submodule update --init $(CARRELS)/dep/sddf
-	git submodule update --init $(CARRELS)/dep/libmicrokitco
-	git submodule update --init $(CARRELS)/dep/libtrustedlo
-	git submodule update --init --recursive $(CARRELS)/dep/uk-on-mk
+	cd $(CARRELS) && git submodule update --init --recursive
+	@test ! -e $(CARRELS)/dep/uk-on-mk/dep/sddf || test -L $(CARRELS)/dep/uk-on-mk/dep/sddf || { echo "refusing to replace non-symlink $(CARRELS)/dep/uk-on-mk/dep/sddf" >&2; exit 1; }
+	ln -sfn ../../sddf $(CARRELS)/dep/uk-on-mk/dep/sddf
 
 FORCE:

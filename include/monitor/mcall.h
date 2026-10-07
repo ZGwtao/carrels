@@ -9,6 +9,7 @@
 #include <carrels-services.h>
 
 #include <pcmcall/deploy.h>
+#include <pcmcall/network.h>
 #include <pcmcall/query.h>
 #include <pcmcall/resume.h>
 #include <pcmcall/stop.h>

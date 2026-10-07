@@ -1,7 +1,7 @@
 [submodule "sddf"]
 	path = dep/sddf
-	url = https://github.com/ZGwtao/sddf.git
-	branch = dynamic-vswitch-dev
+	url = https://github.com/au-ts/sddf.git
+	branch = checkpoint-demo
 [submodule "libtrustedlo"]
 	path = dep/libtrustedlo
 	url = https://github.com/ZGwtao/libtrustedlo.git
@@ -12,3 +12,14 @@
 [submodule "dep/uk-on-mk"]
 	path = dep/uk-on-mk
 	url = https://github.com/ZGwtao/uk-on-mk.git
+	branch = checkpoint-demo
+[submodule "dep/microkit_sdf_gen"]
+	path = dep/microkit_sdf_gen
+	url = https://github.com/au-ts/microkit_sdf_gen.git
+	branch = checkpoint-demo
+[submodule "dep/microkit"]
+	path = dep/microkit
+	url = https://github.com/au-ts/dynamic-microkit
+[submodule "dep/sel4"]
+	path = dep/sel4
+	url = https://github.com/au-ts/seL4.git

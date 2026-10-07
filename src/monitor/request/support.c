@@ -31,7 +31,12 @@ void monitor_main_load_trustedlo(uint32_t cid)
     memset((void *)protocon_base, 0, protocon_size);
     memset((void *)trampoline_base, 0, trampoline_size);
 
-    tsldr_miscutil_load_elf((void *)protocon_base, (const Elf64_Ehdr *)(__carrels_protocon_start));
+    const Elf64_Ehdr *protocon = (const Elf64_Ehdr *)__carrels_protocon_start;
+    TSLDR_ASSERT(tsldr_miscutil_load_elf(protocon,
+                                         monitor_protocon_capacity(),
+                                         (void *)protocon_base,
+                                         TSLDR_VM_LOADER_PROGRAM_BASE,
+                                         monitor_vm_layout.loader_program.size));
     memcpy((void *)trampoline_base, (const char *)(__carrels_trampoline_start), trampoline_size);
 
     /* clean up client payload region entirely. */
