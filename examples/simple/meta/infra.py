@@ -28,8 +28,8 @@ class CarrelsContainerInfra:
         self.client_limit = client_limit
 
         self.pd_orchestrator = PD(
-            "orchestrator",
-            "orchestrator.elf",
+            "vsock_backend",
+            "vsock_backend.elf",
             priority=60,
             stack_size=0x10000,
         )

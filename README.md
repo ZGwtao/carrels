@@ -14,3 +14,22 @@ Other make targets are visible via `make help`, which prints out all available b
 
 
 For detail information, see [carrels-docs](https://github.com/ZGwtao/carrels-docs).
+
+The direct Nix-based workflow targets `qemu_virt_aarch64` with the
+`smp-debug` configuration by default:
+
+```sh
+./build_sdk.sh
+./build-infra.sh
+./build-ramdisk.sh
+./qemu.sh
+```
+
+`./run.sh` performs a clean infrastructure/application/ramdisk build and then
+starts QEMU. To build one application incrementally, use
+`./build-app.sh <application-name>`. The defaults can be overridden with
+`MICROKIT_BOARD`, `MICROKIT_CONFIG`, and `MICROKIT_SDK` where supported.
+The shared board/config defaults live in `config/build-defaults.sh`.
+Build artifacts are isolated under
+`examples/simple/build/<board>/<configuration>/`, so ARM and x86 builds can
+coexist.

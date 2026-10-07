@@ -102,6 +102,17 @@ static void closefile(uint64_t fd)
                         });
 }
 
+bool pico_vfs_file_exists(const char *path)
+{
+    uint64_t fd = openfile(path);
+
+    if (fd == (uint64_t)-1) {
+        return false;
+    }
+    closefile(fd);
+    return true;
+}
+
 uint64_t pico_vfs_readfile2buf(void *buf, const char *path, int *err)
 {
     *err = seL4_NoError;

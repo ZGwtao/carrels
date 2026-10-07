@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: carrels-c-hello
+spec:
+  nodeName: sel4-worker
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  containers:
+    - name: c-hello
+      image: carrels.local/c-hello:latest
+      imagePullPolicy: IfNotPresent

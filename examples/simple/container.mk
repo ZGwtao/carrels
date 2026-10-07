@@ -15,6 +15,8 @@ TOOLCHAIN ?= clang
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 SDDF ?= $(CARRELS)/dep/sddf
 LIBMICROKITCO_PATH := $(CARRELS)/dep/libmicrokitco
+LIBVMM := $(CARRELS)/dep/libvmm
+LIBVMM_EXAMPLE := $(LIBVMM)/examples/virtio_pci
 SYSTEM_FILE := container.system
 IMAGE_FILE := container.img
 DLG_FILE := container_monitor.dlg
@@ -36,7 +38,7 @@ endif
 # Each FATFS has an exclusive partition: orchestrator, monitor, then one per
 # protocon. Keep all partitions at 64 MiB so the monitor ramdisk remains large
 # enough for the infrastructure and application configuration files.
-QEMU_DISK_PARTITION_COUNT := $(shell expr $(PROTOCON_COUNT) + 2)
+QEMU_DISK_PARTITION_COUNT := $(shell expr $(PROTOCON_COUNT) + 3)
 QEMU_DISK_PARTITION_BYTES ?= 67108864
 QEMU_DISK_SIZE_BYTES := $(shell expr $(QEMU_DISK_PARTITION_COUNT) \* $(QEMU_DISK_PARTITION_BYTES))
 
@@ -57,6 +59,14 @@ build:
 
 include ${SDDF}/tools/make/board/common.mk
 
+ifneq ($(MICROKIT_BOARD),qemu_virt_aarch64)
+$(error Kubernetes VM PoC currently supports MICROKIT_BOARD=qemu_virt_aarch64 only)
+endif
+
+ifeq ($(ARCH),aarch64)
+CFLAGS += -include $(CARRELS)/include/sddf-arch-compat.h
+endif
+
 VSWITCH:= ${SDDF}/examples/vswitch
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
@@ -64,9 +74,12 @@ RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
 FAT := $(CARRELS)/components/fs/fat
 NETWORK_COMPONENTS := $(SDDF)/network/components
 
-# Use the board's default block device unless NVMe is explicitly requested.
-# For x86_64/QEMU: make ... NVME=1
+# Match the storage device exposed by qemu.sh unless explicitly overridden.
+ifeq ($(ARCH),x86_64)
 NVME ?= 1
+else
+NVME ?= 0
+endif
 ifeq ($(NVME),1)
 ifneq ($(ARCH),x86_64)
 $(error NVME=1 is currently supported only on x86_64)
@@ -82,16 +95,19 @@ else
 $(error NVME must be either 0 or 1)
 endif
 
-vpath %.c ${SDDF} ${VSWITCH}
+vpath %.c ${SDDF} ${VSWITCH} ${LIBVMM}
 
 CFLAGS += \
 	-DSDDF_VIRTIO_PCI_TRANSPORT_SKIP_BUS_CHECK \
+	-DCARRELS_PROTOCON_COUNT=$(PROTOCON_COUNT) \
 	-I$(CARRELS)/include \
 	-I$(SDDF)/include/sddf/util/custom_libc \
 	-I$(SDDF)/include \
 	-I$(SDDF)/include/microkit \
 	-I$(VSWITCH)/include \
-	-I$(LIBMICROKITCO_PATH)
+	-I$(LIBMICROKITCO_PATH) \
+	-I$(LIBVMM)/include \
+	-I$(LIBVMM_EXAMPLE)
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := -lmicrokit -Tmicrokit.ld libsddf_util_debug.a
@@ -108,11 +124,18 @@ include ${SDDF}/serial/components/serial_components.mk
 include ${SDDF}/libco/libco.mk
 include ${BLK_DRIVER}/blk_driver.mk
 include ${BLK_COMPONENTS}/blk_components.mk
+ifeq ($(ARCH),x86_64)
 include ${SDDF}/drivers/acpi/acpi_driver.mk
 include ${SDDF}/drivers/pci/pci_driver.mk
+endif
 
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
+
+LIBVMM_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
+include $(LIBVMM)/vmm.mk
+include $(LIBVMM)/tools/linux/blk/blk_init.mk
+include $(LIBVMM)/tools/linux/net/net_init.mk
 
 %.py: ${CONTAINER_DIR}/%.py
 	cp $< $@
@@ -138,9 +161,9 @@ INFRA_IMAGES := \
 	timer_driver.elf \
 	eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_vswitch.elf network_copy.elf \
 	monitor.elf \
-	orchestrator.elf \
+	vsock_backend.elf \
+	k8s_vmm.elf \
 	fat.elf \
-	acpi_driver.elf pci_driver.elf \
 	trampoline.elf \
 	protocon.elf \
 	serial_driver.elf \
@@ -149,9 +172,66 @@ INFRA_IMAGES := \
 	blk_virt.elf \
 	blk_driver.elf
 
+K8S_VM_DIR := k8s_vm
+K8S_VM_CLIENT := $(LIBVMM_EXAMPLE)/client_vm/aarch64
+K8S_GUEST_OUT ?= $(CARRELS)/guest/k8s/build
+K8S_VM_LINUX ?= $(K8S_GUEST_OUT)/linux/arch/arm64/boot/Image
+K8S_VM_INITRD ?= $(K8S_GUEST_OUT)/rootfs.cpio.gz
+K8S_VM_NET_INIT := $(CARRELS)/guest/k8s/net_client_init
+K8S_VM_PACKED_INITRD := $(K8S_VM_DIR)/rootfs.cpio.gz
+K8S_VM_DTS := $(K8S_VM_DIR)/vm.dts
+K8S_VM_DTB := $(K8S_VM_DIR)/vm.dtb
+
+$(K8S_VM_DIR):
+	mkdir -p $@
+
+$(K8S_VM_PACKED_INITRD): $(K8S_VM_INITRD) blk_client_init $(K8S_VM_NET_INIT) | $(K8S_VM_DIR)
+	$(LIBVMM)/tools/packrootfs $(K8S_VM_INITRD) \
+		$(K8S_VM_DIR)/rootfs_staging -o $@ \
+		--startup blk_client_init $(K8S_VM_NET_INIT)
+
+$(K8S_VM_DTS): $(K8S_VM_CLIENT)/linux.dts $(K8S_VM_CLIENT)/gic_v2_overlay.dts \
+		$(K8S_VM_PACKED_INITRD) | $(K8S_VM_DIR)
+	$(LIBVMM)/tools/dtscat $(word 1,$^) $(word 2,$^) > $@
+	@initrd_size=$$(stat -c %s $(K8S_VM_PACKED_INITRD)); \
+	initrd_end=$$((0x50000000 + initrd_size)); \
+	test $$initrd_end -lt $$((0x5f000000)) || { echo "k8s initramfs overlaps guest DTB"; exit 1; }; \
+	initrd_end_hex=$$(printf '0x%x' $$initrd_end); \
+	sed -i "s/linux,initrd-end = <0x5f000000>/linux,initrd-end = <$$initrd_end_hex>/" $@
+
+$(K8S_VM_DTB): $(K8S_VM_DTS)
+	$(DTC) -q -I dts -O dtb $< > $@
+
+$(K8S_VM_DIR)/vmm.o: $(LIBVMM_EXAMPLE)/client_vmm.c | $(K8S_VM_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(K8S_VM_DIR)/guest_arch_init.o: $(K8S_VM_CLIENT)/guest_arch_init.c | $(K8S_VM_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(K8S_VM_DIR)/images.o: $(LIBVMM)/tools/package_guest_images.S \
+		$(K8S_VM_LINUX) $(K8S_VM_DTB) $(K8S_VM_PACKED_INITRD) | $(K8S_VM_DIR)
+	$(CC) -c -g3 -x assembler-with-cpp \
+		-DGUEST_KERNEL_IMAGE_PATH=\"$(K8S_VM_LINUX)\" \
+		-DGUEST_DTB_IMAGE_PATH=\"$(K8S_VM_DTB)\" \
+		-DGUEST_INITRD_IMAGE_PATH=\"$(K8S_VM_PACKED_INITRD)\" \
+		-target $(TARGET) $< -o $@
+
+k8s_vmm.elf: $(K8S_VM_DIR)/vmm.o $(K8S_VM_DIR)/guest_arch_init.o \
+		$(K8S_VM_DIR)/images.o libvmm.a libsddf_util_debug.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+ifeq ($(ARCH),x86_64)
+INFRA_IMAGES += acpi_driver.elf pci_driver.elf
+endif
+
 NATIVE_APPLICATION_IMAGES := $(PC_SERVICE_IMGS)
 UNIKRAFT_APPLICATION_IMAGES := $(UNIKERNELS)
-APPLICATION_IMAGES := $(NATIVE_APPLICATION_IMAGES) $(UNIKRAFT_APPLICATION_IMAGES)
+K8S_APPLICATION_IMAGES := c-hello.img
+APPLICATION_IMAGES := $(NATIVE_APPLICATION_IMAGES) $(UNIKRAFT_APPLICATION_IMAGES) \
+	$(K8S_APPLICATION_IMAGES)
+
+c-hello.img: unikraft-c-hello.img
+	cp $< $@
 
 $(INFRA_IMAGES) $(APPLICATION_IMAGES): libsddf_util_debug.a
 
@@ -162,17 +242,17 @@ LAYOUT_CMD := \
 	--monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py
 
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
+$(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB) $(K8S_VM_DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(META_BOARD) $(LAYOUT_CMD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
+	    --dtb $(DTB) --client-dtb $(K8S_VM_DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 else
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(META_BOARD) $(LAYOUT_CMD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
+	    --client-dtb $(K8S_VM_DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 endif
@@ -190,13 +270,19 @@ endif
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_orchestrator.data orchestrator.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_vsock_backend.data vsock_backend.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_k8s_vmm.data k8s_vmm.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_container_monitor.data monitor.elf
-	$(OBJCOPY) --update-section .fs_client_config=fs_client_orchestrator.data orchestrator.elf
+	$(OBJCOPY) --update-section .fs_client_config=fs_client_vsock_backend.data vsock_backend.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_container_monitor.data monitor.elf
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
+	$(OBJCOPY) --update-section .blk_client_config=blk_client_k8s_vmm.data k8s_vmm.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_k8s_vmm.data k8s_vmm.elf
+	$(OBJCOPY) --update-section .vmm_config=vmm_k8s_vmm.data k8s_vmm.elf
+	$(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_k8s_vmm.data k8s_vmm.elf
+	$(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_vsock_backend.data vsock_backend.elf
 
 SPEC = capdl_spec.json
 $(IMAGE_FILE) $(REPORT_FILE) $(DLG_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)

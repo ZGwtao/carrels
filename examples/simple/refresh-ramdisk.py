@@ -24,10 +24,14 @@ def main() -> int:
     copy_script = script_dir / "copy2ramdisk.sh"
     env = os.environ | {"RAMDISK_DISK": str(build_dir / "qemu_disk")}
 
+    application_images = [
+        f for f in sorted(build_dir.glob("*.img"))
+        if f.name != "container.img"
+    ]
     copy_table = STATIC_COPY_TABLE + \
         [(f, 2) for f in sorted(build_dir.glob("*.data"))] + \
         [(f, 2) for f in sorted(build_dir.glob("symbols/*.mktsym"))] + \
-        [(f, 1) for f in sorted(build_dir.glob("*.img"))]
+        [(f, 1) for f in application_images]
 
     for x in range(2, 2 + protocon_count):
         copy_table += [(f, x) for f in sorted(build_dir.glob("disk-test.txt"))]

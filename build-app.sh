@@ -18,7 +18,9 @@ case "$APP_NAME" in
 esac
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-BUILD_DIR=${BUILD_DIR:-"$SCRIPT_DIR/examples/simple/build"}
+# shellcheck source=config/build-defaults.sh
+. "$SCRIPT_DIR/config/build-defaults.sh"
+BUILD_DIR=${BUILD_DIR:-"$SCRIPT_DIR/examples/simple/build/$MICROKIT_BOARD/$MICROKIT_CONFIG"}
 MICROKIT_SDK=${MICROKIT_SDK:-"$SCRIPT_DIR/dep/microkit/release/microkit-sdk-2.3.0-dev"}
 IMAGE_FILE="$BUILD_DIR/$APP_NAME.img"
 
@@ -28,14 +30,17 @@ if [ ! -f "$BUILD_DIR/Makefile" ]; then
     exit 1
 fi
 
-if [ ! -d "$MICROKIT_SDK/board/x86_64_generic/smp-debug" ]; then
-    echo "build-app.sh: invalid Microkit SDK: $MICROKIT_SDK" >&2
+if [ ! -d "$MICROKIT_SDK/board/$MICROKIT_BOARD/$MICROKIT_CONFIG" ]; then
+    echo "build-app.sh: invalid Microkit SDK/configuration:" >&2
+    echo "  $MICROKIT_SDK/board/$MICROKIT_BOARD/$MICROKIT_CONFIG" >&2
     exit 1
 fi
 
 nix develop "$SCRIPT_DIR" --command make \
     -C "$BUILD_DIR" \
     "MICROKIT_SDK=$MICROKIT_SDK" \
+    "MICROKIT_BOARD=$MICROKIT_BOARD" \
+    "MICROKIT_CONFIG=$MICROKIT_CONFIG" \
     "$APP_NAME.img"
 
 if [ ! -f "$IMAGE_FILE" ]; then
@@ -46,4 +51,4 @@ fi
 echo "Application image built successfully:"
 ls -lh "$IMAGE_FILE"
 echo "To update the existing QEMU disk (with QEMU stopped), run:"
-echo "  nix develop --command examples/simple/copy2ramdisk.sh examples/simple/build/$APP_NAME.img 1"
+echo "  RAMDISK_DISK=$BUILD_DIR/qemu_disk nix develop --command \"$SCRIPT_DIR/examples/simple/copy2ramdisk.sh\" \"$IMAGE_FILE\" 1"

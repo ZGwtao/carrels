@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# QEMU user networking reserves 10.0.2.2 for the host gateway.  Use the same
+# deterministic guest address as qemu.sh's host-forward rules so kubelet does
+# not have to wait for DHCP before contacting the kind API server.
+ip link set eth0 up
+ip addr add 10.0.2.15/24 dev eth0
+ip route add default via 10.0.2.2 dev eth0
+
+# The guest has no RTC. Time synchronisation is best-effort and must not delay
+# kubelet startup when external DNS/NTP is unavailable.
+ntpd -q -n -p 0.pool.ntp.org &
