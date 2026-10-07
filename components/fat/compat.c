@@ -5,6 +5,7 @@
 
 #include <string.h>
 
+/* Missing from the sDDF custom libc, but required by FatFs. */
 char *strchr(const char *s, int c)
 {
     while (*s != (char)c) {

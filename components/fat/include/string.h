@@ -7,4 +7,5 @@
 
 #include_next <string.h>
 
+/* Missing from the sDDF custom libc. */
 char *strchr(const char *s, int c);

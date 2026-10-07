@@ -5,5 +5,6 @@
 
 #pragma once
 
+/* File type bits used by the LionsOS filesystem server. */
 #define S_IFDIR 0040000
 #define S_IFREG 0100000

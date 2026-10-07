@@ -5,4 +5,5 @@
 
 #pragma once
 
+/* Minimal compatibility required by FatFs. */
 #define INFINITY (__builtin_inff())

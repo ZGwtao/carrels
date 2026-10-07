@@ -16,6 +16,17 @@ if [ ! -d "$MICROKIT_SDK/board/$MICROKIT_BOARD/$MICROKIT_CONFIG" ]; then
     exit 1
 fi
 
+# Filesystem sources and public headers moved first out of the repository and
+# then into components/fat. Remove only stale dependency metadata and its
+# corresponding object so existing build directories migrate incrementally.
+if [ -d "$BUILD_DIR" ]; then
+    find "$BUILD_DIR" -type f -name '*.d' -exec \
+        grep -l -E "$SCRIPT_DIR/(components/(fs/fat|lionsos-fs-sddf)|include/lions/fs|lib/fs/server)/" {} + 2>/dev/null |
+    while IFS= read -r dependency_file; do
+        rm -f "$dependency_file" "${dependency_file%.d}.o"
+    done
+fi
+
 nix develop "$SCRIPT_DIR" --command make \
     -C "$EXAMPLE_DIR" \
     "BUILD_DIR=$BUILD_DIR" \

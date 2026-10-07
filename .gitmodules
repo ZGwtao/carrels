@@ -27,3 +27,7 @@
 	path = dep/libvmm
 	url = https://github.com/ZGwtao/libvmm.git
 	branch = virtio-vsock
+[submodule "dep/lionsos"]
+	path = dep/lionsos
+	url = https://github.com/au-ts/lionsos.git
+	branch = main

@@ -68,10 +68,11 @@ CFLAGS += -include $(CARRELS)/include/sddf-arch-compat.h
 endif
 
 VSWITCH:= ${SDDF}/examples/vswitch
+LIONSOS := $(CARRELS)/dep/lionsos
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
 RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
-FAT := $(CARRELS)/components/fs/fat
+FAT := $(CARRELS)/components/fat
 NETWORK_COMPONENTS := $(SDDF)/network/components
 
 # Match the storage device exposed by qemu.sh unless explicitly overridden.
@@ -101,6 +102,7 @@ CFLAGS += \
 	-DSDDF_VIRTIO_PCI_TRANSPORT_SKIP_BUS_CHECK \
 	-DCARRELS_PROTOCON_COUNT=$(PROTOCON_COUNT) \
 	-I$(CARRELS)/include \
+	-I$(LIONSOS)/include \
 	-I$(SDDF)/include/sddf/util/custom_libc \
 	-I$(SDDF)/include \
 	-I$(SDDF)/include/microkit \
