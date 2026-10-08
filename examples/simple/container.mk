@@ -61,6 +61,7 @@ include $(ROOT)/mk/components.mk
 
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
+VIRT_DISK_TOOL := $(CARRELS)/tools/virt_disk.py
 include $(ROOT)/mk/k8s-vmm.mk
 
 INFRA_IMAGES := \
@@ -161,7 +162,11 @@ refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
 		$(RAMDISK_INITIALISER) $(BUILD_DIR) $(PROTOCON_COUNT)
 
 qemu_disk: FORCE
-	$(SDDF)/tools/mkvirtdisk $@ $(QEMU_DISK_PARTITION_COUNT) 512 $(QEMU_DISK_SIZE_BYTES) GPT
+	$(PYTHON) $(VIRT_DISK_TOOL) create $@ \
+		--partitions $(QEMU_DISK_PARTITION_COUNT) \
+		--sector-size 512 --disk-size $(QEMU_DISK_SIZE_BYTES) \
+		--schema GPT --filesystem fat \
+		--mkvirtdisk $(SDDF)/tools/mkvirtdisk
 
 ramdisk: refresh-ramdisk
 

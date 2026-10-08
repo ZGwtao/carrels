@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from pathlib import Path
-import os
 import subprocess
 import sys
 
@@ -20,9 +19,8 @@ STATIC_COPY_TABLE = [
 def main() -> int:
     build_dir = Path(sys.argv[1]).resolve()
     protocon_count = int(sys.argv[2])
-    script_dir = Path(__file__).resolve().parent
-    copy_script = script_dir / "copy2ramdisk.sh"
-    env = os.environ | {"RAMDISK_DISK": str(build_dir / "qemu_disk")}
+    disk_tool = Path(__file__).resolve().parents[2] / "tools/virt_disk.py"
+    disk = build_dir / "qemu_disk"
 
     application_images = [
         f for f in sorted(build_dir.glob("*.img"))
@@ -38,11 +36,17 @@ def main() -> int:
 
     for source, partition in copy_table:
         print(f"Copying {source} to partition {partition}")
-        result = subprocess.run([str(copy_script), str(source), str(partition)], env=env)
+        result = subprocess.run(
+            [sys.executable, str(disk_tool), "copy",
+             "--file", str(source), "--disk", str(disk),
+             "--partition", str(partition)]
+        )
         if result.returncode: return result.returncode
 
     print("All files copied successfully.")
-    return subprocess.run([str(script_dir / "listramdisk.sh")], env=env).returncode
+    return subprocess.run(
+        [sys.executable, str(disk_tool), "list", "--disk", str(disk)]
+    ).returncode
 
 
 if __name__ == "__main__":
