@@ -111,25 +111,106 @@ def cmd_create_virt_disk(args: argparse.Namespace) -> None:
     )
 
 
-def cmd_copy_file(args: argparse.Namespace) -> None:
-    require_file(args.file, "source file")
+def copy_file(source: Path, disk: Path, partition_number: int) -> None:
+    require_file(source, "source file")
     require_command("mcopy")
-    table = read_partition_table(args.disk)
+    table = read_partition_table(disk)
     # Sanity check: FAT-only
-    require_fat_partition(args.disk, table, args.partition)
-    partition = partition_details(table, args.partition)
+    require_fat_partition(disk, table, partition_number)
+    partition = partition_details(table, partition_number)
     subprocess.run(
         [
             "mcopy",
             "-o",
             "-i",
-            f"{args.disk}@@{partition.offset}",
-            str(args.file),
-            f"::/{args.file.name}",
+            f"{disk}@@{partition.offset}",
+            str(source),
+            f"::/{source.name}",
         ],
         check=True,
     )
-    print(f"Copied {args.file.name} to partition {args.partition}")
+    print(f"Copied {source.name} to partition {partition_number}")
+
+
+def cmd_copy_file(args: argparse.Namespace) -> None:
+    copy_file(args.file, args.disk, args.partition)
+
+
+def read_init_config(config_file: Path) -> tuple[str, list[dict]]:
+    require_file(config_file, "configuration file")
+    try:
+        config = json.loads(config_file.read_text())
+    except OSError as error:
+        raise RuntimeError(f"unable to read configuration: {error}") from error
+
+    if not isinstance(config, dict):
+        raise RuntimeError("configuration root must be an object")
+
+    disk_value = config.get("disk")
+    copies = config.get("copies")
+
+    if not isinstance(disk_value, str) or not disk_value:
+        raise RuntimeError("configuration field 'disk' must be a non-empty string")
+    if not isinstance(copies, list):
+        raise RuntimeError("configuration field 'copies' must be a list")
+    if not all(isinstance(entry, dict) for entry in copies):
+        raise RuntimeError("every 'copies' entry must be an object")
+
+    return disk_value, copies
+
+
+# @gt ?? Now we lack a way that generate the config file automatically,
+#        so we need to hand-write which file is needed and which is not,
+#        this is very inefficient.
+#        When the config file generator is ready, this function could be
+#        simpler.
+def resolve_sources(entry: dict, base_dir: Path, index: int) -> list[Path]:
+    if "file" in entry:
+        file_value = entry["file"]
+        if not isinstance(file_value, str) or not file_value:
+            raise RuntimeError(f"copies entry {index} has an invalid file")
+        return [base_dir / file_value]
+
+    if "glob" not in entry:
+        raise RuntimeError(f"copies entry {index} needs 'file' or 'glob'")
+
+    glob_value = entry["glob"]
+    excluded = entry.get("exclude", [])
+    if not isinstance(glob_value, str) or not glob_value:
+        raise RuntimeError(f"copies entry {index} has an invalid glob")
+    if not isinstance(excluded, list) or not all(
+        isinstance(name, str) for name in excluded
+    ):
+        raise RuntimeError(f"copies entry {index} has an invalid exclude list")
+
+    return [
+        path for path in sorted(base_dir.glob(glob_value))
+        if path.name not in excluded
+    ]
+
+
+def resolve_partition(entry: dict, index: int) -> int:
+    partition = entry.get("partition")
+    if not isinstance(partition, int) or partition <= 0:
+        raise RuntimeError(
+            f"copies entry {index} needs a positive integer partition"
+        )
+    return partition
+
+
+def cmd_init_disk(args: argparse.Namespace) -> None:
+    disk_value, copies = read_init_config(args.config)
+    base_dir = args.base_dir.resolve()
+    disk = base_dir / disk_value
+
+    for index, entry in enumerate(copies, start=1):
+        sources = resolve_sources(entry, base_dir, index)
+        partition = resolve_partition(entry, index)
+        for source in sources:
+            copy_file(source, disk, partition)
+
+    if args.list:
+        cmd_list_disk(argparse.Namespace(disk=disk, partition=None))
 
 
 def cmd_list_disk(args: argparse.Namespace) -> None:
@@ -239,6 +320,20 @@ def parse_args() -> argparse.Namespace:
     copy.set_defaults(handler=cmd_copy_file)
 
     # cmd3:
+    #   virt_disk.py init -c CONFIG [-b BASE_DIR] [--list]
+    #
+    init = subparsers.add_parser("init", help="populate a disk from a configuration")
+    init.add_argument("-c", "--config", type=Path, required=True)
+    init.add_argument(
+        "-b", "--base-dir", type=Path, default=Path.cwd(),
+        help="directory used to resolve disk and source paths (default: current directory)",
+    )
+    init.add_argument(
+        "--list", action="store_true", help="list the disk after populating it",
+    )
+    init.set_defaults(handler=cmd_init_disk)
+
+    # cmd4:
     #   virt_disk.py list -d VIRT_DISK [-p PARTITION_ID]
     #
     list_parser = subparsers.add_parser("list", help="list partitions and files")
