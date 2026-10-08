@@ -51,4 +51,4 @@ fi
 echo "Application image built successfully:"
 ls -lh "$IMAGE_FILE"
 echo "To update the existing QEMU disk (with QEMU stopped), run:"
-echo "  RAMDISK_DISK=$BUILD_DIR/qemu_disk nix develop --command \"$SCRIPT_DIR/examples/simple/copy2ramdisk.sh\" \"$IMAGE_FILE\" 1"
+echo "  nix develop --command python \"$SCRIPT_DIR/tools/virt_disk.py\" copy -f \"$IMAGE_FILE\" -d \"$BUILD_DIR/qemu_disk\" -p 1"

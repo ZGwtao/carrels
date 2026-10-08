@@ -1,0 +1,12 @@
+{
+  "disk": "qemu_disk",
+  "copies": [
+    { "file": "protocon.elf", "partition": 1 },
+    { "file": "trampoline.elf", "partition": 1 },
+    { "file": "container_monitor.svc", "partition": 2 },
+    { "file": "container_monitor.dlg", "partition": 2 },
+    { "glob": "*.data", "partition": 2 },
+    { "glob": "symbols/*.mktsym", "partition": 2 },
+    { "glob": "*.img", "exclude": ["container.img"], "partition": 1 }
+  ]
+}

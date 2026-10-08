@@ -60,7 +60,8 @@ build:
 include $(ROOT)/mk/components.mk
 
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
-RAMDISK_INITIALISER := $(CONTAINER_DIR)/refresh-ramdisk.py
+RAMDISK_CONFIG := $(CONTAINER_DIR)/virt_disk.json
+VIRT_DISK_TOOL := $(CARRELS)/tools/virt_disk.py
 include $(ROOT)/mk/k8s-vmm.mk
 
 INFRA_IMAGES := \
@@ -155,13 +156,16 @@ apps: app-native app-uk
 app-native: $(NATIVE_APPLICATION_IMAGES)
 app-uk: $(UNIKRAFT_APPLICATION_IMAGES)
 
-refresh-ramdisk: $(RAMDISK_INITIALISER) qemu_disk
-	cp $(CONTAINER_DIR)/disk-test.txt $(BUILD_DIR)/disk-test.txt
-	PYTHONPATH=${SDDF}/tools/meta:$$PYTHONPATH $(PYTHON) \
-		$(RAMDISK_INITIALISER) $(BUILD_DIR) $(PROTOCON_COUNT)
+refresh-ramdisk: $(RAMDISK_CONFIG) qemu_disk
+	$(PYTHON) $(VIRT_DISK_TOOL) init \
+		--config $(RAMDISK_CONFIG) --base-dir $(BUILD_DIR) --list
 
 qemu_disk: FORCE
-	$(SDDF)/tools/mkvirtdisk $@ $(QEMU_DISK_PARTITION_COUNT) 512 $(QEMU_DISK_SIZE_BYTES) GPT
+	$(PYTHON) $(VIRT_DISK_TOOL) create $@ \
+		--partitions $(QEMU_DISK_PARTITION_COUNT) \
+		--sector-size 512 --disk-size $(QEMU_DISK_SIZE_BYTES) \
+		--schema GPT --filesystem fat \
+		--mkvirtdisk $(SDDF)/tools/mkvirtdisk
 
 ramdisk: refresh-ramdisk
 
