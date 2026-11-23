@@ -420,12 +420,12 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine,
         vswitch=net_vswitch,
         vswitch_orchestrator=pd_engine,
     )
-    k8s_net_copier = PD(
-        "k8s_vmm_net_copier", "k8s_vmm_network_copy.elf",
-        priority=97, budget=20000,
-    )
-    add_pds(sdf, eth_driver, net_virt_rx, net_virt_tx, net_vswitch,
-            k8s_net_copier)
+    # k8s_net_copier = PD(
+    #     "k8s_vmm_net_copier", "k8s_vmm_network_copy.elf",
+    #     priority=97, budget=20000,
+    # )
+    add_pds(sdf, eth_driver, net_virt_rx, net_virt_tx, net_vswitch)
+    # sdf.add_pd(k8s_net_copier)
 
     if arch == SystemDescription.Arch.X86_64:
         assert pci_driver is not None
@@ -433,13 +433,12 @@ def init_net_system(sdf: SDF, net_node, arch, pd_engine,
         pci_driver.add_cap_map(CapMap(CapMap.CapType.Cspace, eth_driver, None, 3))
         sdf.add_channel(Channel(pci_driver, eth_driver, a_id=1, b_id=10))
 
-    return net_system, net_virt_tx, k8s_net_copier
+    return net_system, net_virt_tx
 
 
 def connect_and_serialise(output_dir: str, engine_fs, orchestrator_fs,
                           protocon_filesystems, serial_system, timer_system,
-                          blk_system, net_system, protocons, net_virt_tx,
-                          vmm) -> None:
+                          blk_system, net_system, protocons, net_virt_tx) -> None:
     assert orchestrator_fs.connect()
     assert orchestrator_fs.serialise_config(output_dir)
     assert engine_fs.connect()
@@ -460,10 +459,10 @@ def connect_and_serialise(output_dir: str, engine_fs, orchestrator_fs,
     for src in protocons:
         net_system.add_acl_rule(src, net_virt_tx, True, True)
     assert net_system.serialise_config(output_dir)
-    assert vmm.serialise_config(output_dir)
+    # assert vmm.serialise_config(output_dir)
 
 
-def update_generated_elfs(protocon_fs_pds, net_copiers, k8s_net_copier) -> None:
+def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
     # Each client gets an independent copier ELF and its matching config.
     for i, net_copier in enumerate(net_copiers):
         elf.copy_elf("network_copy", f"network_copy{i}")
@@ -473,11 +472,11 @@ def update_generated_elfs(protocon_fs_pds, net_copiers, k8s_net_copier) -> None:
             f"net_copy_{net_copier.name}",
         )
 
-    elf.copy_elf("network_copy", "k8s_vmm_network_copy")
-    elf.update_elf_section(
-        "k8s_vmm_network_copy.elf", "net_copy_config",
-        f"net_copy_{k8s_net_copier.name}",
-    )
+    # elf.copy_elf("network_copy", "k8s_vmm_network_copy")
+    # elf.update_elf_section(
+    #     "k8s_vmm_network_copy.elf", "net_copy_config",
+    #     f"net_copy_{k8s_net_copier.name}",
+    # )
 
     elf.copy_elf("fat", "vsock_backend_fs", None)
     elf.copy_elf("fat", "engine_fs", None)
@@ -600,7 +599,7 @@ def generate(
     sdf_path: str,
     output_dir: str,
     dtb: Optional[DeviceTree],
-    client_dtb: DeviceTree,
+    # client_dtb: DeviceTree,
     nvme: bool,
     protocon_count: int,
     x86_device_profile: str,
@@ -613,7 +612,7 @@ def generate(
         _, pci_driver, acpi_tables_config = init_acpi_pci()
 
     serial_node, blk_node, timer_node, net_node = resolve_device_nodes(dtb)
-    vmm_pd, k8s_vm, vmm = init_k8s_vm(sdf, client_dtb)
+    # vmm_pd, k8s_vm, vmm = init_k8s_vm(sdf, client_dtb)
     timer_system, _ = init_timer_system(sdf, timer_node, board.arch, x86_profile)
     serial_system = init_serial_system(sdf, serial_node, board.arch, x86_profile)
     blk_system = init_blk_system(
@@ -624,20 +623,14 @@ def generate(
     pd_orchestrator = container_infra.pd_orchestrator
     serial_system.add_client(pd_orchestrator)
     serial_system.add_client(pd_engine)
-    serial_system.add_client(vmm_pd)
-    blk_system.add_client(vmm_pd, partition=protocon_count + 2)
-    net_system, net_virt_tx, k8s_net_copier = init_net_system(
+    # serial_system.add_client(vmm_pd)
+    # blk_system.add_client(vmm_pd, partition=protocon_count + 2)
+    net_system, net_virt_tx = init_net_system(
         sdf, net_node, board.arch, pd_engine, x86_profile, pci_driver
     )
-    # Complete the VMM's device maps/channels before vmm.connect(), matching
-    # libvmm's virtio_pci topology. A direct client does not consume a vSwitch
-    # port, so proto-container port IDs remain 0..N-1.
-    net_system.add_client_with_copier(vmm_pd, k8s_net_copier)
-    connect_vsock_transport(sdf, output_dir, vmm_pd, pd_orchestrator)
-    # Complete all VMM-local mappings before connecting it. Doing this before
-    # the large dynamic-PD regions also keeps libvmm's current 32-bit AArch64
-    # guest-RAM intermediate below 4 GiB.
-    assert vmm.connect()
+    # net_system.add_client_with_copier(vmm_pd, k8s_net_copier)
+    # connect_vsock_transport(sdf, output_dir, vmm_pd, pd_orchestrator)
+    # assert vmm.connect()
 
     protocons = container_infra.add_clients(protocon_count)
     for pc in protocons:
@@ -649,12 +642,12 @@ def generate(
     )
     connect_and_serialise(
         output_dir, engine_fs, orchestrator_fs, protocon_filesystems,
-        serial_system, timer_system, blk_system, net_system, protocons, net_virt_tx,
-        vmm,
+        serial_system, timer_system, blk_system, net_system, protocons, net_virt_tx
+        # vmm,
     )
     # Generate all LionsOS service descriptors after optional services exist.
     assert sdf.gensvc(output_dir)
-    update_generated_elfs(protocon_fs_pds, net_copiers, k8s_net_copier)
+    update_generated_elfs(protocon_fs_pds, net_copiers)
 
     if acpi_tables_config is not None:
         with open(f"{output_dir}/acpi_tables_summary.data", "wb+") as f:
@@ -681,7 +674,7 @@ if __name__ == "__main__":
     BOARDS = load_boards(board_args.sddf)
     parser = argparse.ArgumentParser(parents=[board_parser])
     parser.add_argument("--dtb", required=False)
-    parser.add_argument("--client-dtb", required=True)
+    # parser.add_argument("--client-dtb", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
@@ -715,8 +708,8 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    with open(args.client_dtb, "rb") as f:
-        client_dtb = DeviceTree(f.read())
+    # with open(args.client_dtb, "rb") as f:
+    #     client_dtb = DeviceTree(f.read())
 
     if args.protocon_count <= 0 or args.protocon_count > 16:
         parser.error("--protocon-count must be in the range 1..16")
@@ -725,7 +718,7 @@ if __name__ == "__main__":
         args.sdf,
         args.output,
         dtb,
-        client_dtb,
+        # client_dtb,
         args.nvme,
         args.protocon_count,
         args.x86_device_profile,

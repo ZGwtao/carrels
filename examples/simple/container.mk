@@ -62,14 +62,14 @@ include $(ROOT)/mk/components.mk
 METAPROGRAM := $(CONTAINER_DIR)/meta/meta.py
 RAMDISK_CONFIG := $(CONTAINER_DIR)/virt_disk.json
 VIRT_DISK_TOOL := $(CARRELS)/tools/virt_disk.py
-include $(ROOT)/mk/k8s-vmm.mk
+# include $(ROOT)/mk/k8s-vmm.mk
 
+# k8s_vmm.elf is temporarily disabled.
 INFRA_IMAGES := \
 	timer_driver.elf \
 	eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_vswitch.elf network_copy.elf \
 	monitor.elf \
 	vsock_backend.elf \
-	k8s_vmm.elf \
 	fat.elf \
 	trampoline.elf \
 	protocon.elf \
@@ -101,17 +101,17 @@ LAYOUT_CMD := \
 	--monitor-vm-layout $(CONTAINER_COMPONENT_DIR)/config/monitor_vm_layout.py
 
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB) $(K8S_VM_DTB)
+$(SYSTEM_FILE): $(METAPROGRAM) $(INFRA_IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(META_BOARD) $(LAYOUT_CMD) \
-	    --dtb $(DTB) --client-dtb $(K8S_VM_DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 else
 	$(PYTHON) -B \
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(META_BOARD) $(LAYOUT_CMD) \
-	    --client-dtb $(K8S_VM_DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) \
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 endif
@@ -130,18 +130,18 @@ endif
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_vsock_backend.data vsock_backend.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_k8s_vmm.data k8s_vmm.elf
+# $(OBJCOPY) --update-section .serial_client_config=serial_client_k8s_vmm.data k8s_vmm.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_container_monitor.data monitor.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_vsock_backend.data vsock_backend.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_container_monitor.data monitor.elf
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
-	$(OBJCOPY) --update-section .blk_client_config=blk_client_k8s_vmm.data k8s_vmm.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_k8s_vmm.data k8s_vmm.elf
-	$(OBJCOPY) --update-section .vmm_config=vmm_k8s_vmm.data k8s_vmm.elf
-	$(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_k8s_vmm.data k8s_vmm.elf
-	$(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_vsock_backend.data vsock_backend.elf
+# $(OBJCOPY) --update-section .blk_client_config=blk_client_k8s_vmm.data k8s_vmm.elf
+# $(OBJCOPY) --update-section .net_client_config=net_client_k8s_vmm.data k8s_vmm.elf
+# $(OBJCOPY) --update-section .vmm_config=vmm_k8s_vmm.data k8s_vmm.elf
+# $(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_k8s_vmm.data k8s_vmm.elf
+# $(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_vsock_backend.data vsock_backend.elf
 
 SPEC = capdl_spec.json
 $(IMAGE_FILE) $(REPORT_FILE) $(DLG_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
