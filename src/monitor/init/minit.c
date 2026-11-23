@@ -17,11 +17,6 @@ uintptr_t dlg_buffer_vaddr;
 uintptr_t sym_buffer_vaddr;
 uintptr_t sym_buffer_size;
 
-static void ca_monitor_boot_phase_first(void);
-static void ca_monitor_boot_phase_second(void);
-static void ca_monitor_boot_phase_third(void);
-
-
 static void ca_monitor_make_metadata_filepath(char *filepath, size_t capacity, const char *suffix)
 {
     const char *name_end = memchr(microkit_name, '\0', sizeof(microkit_name));
@@ -186,20 +181,12 @@ static void ca_monitor_boot_phase_first(void)
         TSLDR_DBG_PRINT(PROGNAME "Failed to mount\n");
         microkit_internal_crash(-1);
     }
-
-    ca_monitor_init_cothread_spawn(ca_monitor_boot_phase_second,
-                                   microkit_cothread_my_arg(),
-                                   "failed to spawn boot phase second.\n");
 }
 
 static void ca_monitor_boot_phase_second(void)
 {
     ca_monitor_load_and_parse_delegation_info((void *)dlg_buffer_vaddr, &dlg);
     ca_monitor_load_and_parse_service_info((void *)svc_buffer_vaddr, &svc);
-
-    ca_monitor_init_cothread_spawn(ca_monitor_boot_phase_third,
-                                   microkit_cothread_my_arg(),
-                                   "failed to spawn boot phase third.\n");
 }
 
 static void ca_monitor_boot_phase_third(void)
@@ -214,10 +201,19 @@ static void ca_monitor_boot_phase_third(void)
     monitor_acl_initialise(bootinfo->num_pc);
 }
 
+static void ca_monitor_boot(void)
+{
+    /* Filesystem calls suspend this coroutine until their channel completes.
+     * Each phase then returns normally before the next phase begins. */
+    ca_monitor_boot_phase_first();
+    ca_monitor_boot_phase_second();
+    ca_monitor_boot_phase_third();
+}
+
 void ca_monitor_init_system(void *binfo)
 {
-    ca_monitor_init_cothread_spawn(ca_monitor_boot_phase_first,
+    ca_monitor_init_cothread_spawn(ca_monitor_boot,
                                    binfo,
-                                   "failed to spawn boot phase first.\n");
+                                   "failed to spawn boot coroutine.\n");
     microkit_cothread_yield();
 }
