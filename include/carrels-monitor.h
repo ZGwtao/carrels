@@ -25,8 +25,6 @@
 
 #define PROGNAME "[@monitor] "
 
-#define ORC_MONITOR_REGION_SIZE (0x800000)
-
 // maximum 8 os services instances per OS service type
 #define PC_SVC_PER_PD_MAX_NUM (8)
 // maximum 8 os service types

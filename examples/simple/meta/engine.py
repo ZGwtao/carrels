@@ -50,14 +50,16 @@ class CarrelsContainerEngine:
         mr_size = self.layout_txlo.size(mr_name)
         return MR(self.sdf, name=prefix + mr_name.lower(), size=mr_size)
 
-    def create_map_exec(self, mr: MR, vaddr: int) -> MAP:
-        return MAP(mr, vaddr, perms="rwx", cached="true")
+    def create_map_exec(self, mr: MR, vaddr: int, setvar_vaddr: str | None = None) -> MAP:
+        return MAP(mr, vaddr, perms="rwx", cached="true", setvar_vaddr=setvar_vaddr)
 
-    def create_map_uncached_data(self, mr: MR, vaddr: int) -> MAP:
-        return MAP(mr, vaddr, perms="rw", cached="false")
+    def create_map_uncached_data(self, mr: MR, vaddr: int, setvar_vaddr: str | None = None) -> MAP:
+        return MAP(mr, vaddr, perms="rw", cached="false", setvar_vaddr=setvar_vaddr)
 
-    def create_map_cached_data(self, mr: MR, vaddr: int) -> MAP:
-        return MAP(mr, vaddr, perms="rw", cached="true")
+    def create_map_cached_data(self, mr: MR, vaddr: int, setvar_vaddr: str | None = None,
+                               setvar_size: str | None = None) -> MAP:
+        return MAP(mr, vaddr, perms="rw", cached="true", setvar_vaddr=setvar_vaddr,
+                   setvar_size=setvar_size)
 
     def create_map_io(self, mr: MR, vaddr: int) -> MAP:
         return self.create_map_uncached_data(mr, vaddr)
@@ -79,9 +81,11 @@ class CarrelsContainerEngine:
         self.sdf.add_mr(svc_buffer)
         self.sdf.add_mr(dlg_buffer)
         self.sdf.add_mr(sym_buffer)
-        self.engine.add_map(self.create_map_cached_data(svc_buffer, 0xaaaaa00000))
-        self.engine.add_map(self.create_map_cached_data(dlg_buffer, 0xaaaaa10000))
-        self.engine.add_map(self.create_map_cached_data(sym_buffer, 0xaaaaa20000))
+        self.engine.add_map(self.create_map_cached_data(svc_buffer, 0xaaaaa00000, setvar_vaddr="svc_buffer_vaddr"))
+        self.engine.add_map(self.create_map_cached_data(dlg_buffer, 0xaaaaa10000, setvar_vaddr="dlg_buffer_vaddr"))
+        self.engine.add_map(self.create_map_cached_data(sym_buffer, 0xaaaaa20000,
+                                                        setvar_vaddr="sym_buffer_vaddr",
+                                                        setvar_size="sym_buffer_size"))
 
     def setup_mr_images(self, pc: PD, cid: int):
         container_elf = self.create_txlo_mr(pc.name, "CONTAINER_IMAGE")
@@ -167,7 +171,8 @@ class CarrelsContainerEngine:
 
         self.engine.add_map(self.create_map_cached_data(image_txlo, 0x6000000))
         self.engine.add_map(self.create_map_cached_data(image_trampoline, 0x6800000))
-        self.engine.add_map(self.create_map_cached_data(image_application, 0x7000000))
+        self.engine.add_map(self.create_map_cached_data(image_application, 0x7000000,
+                                                        setvar_vaddr="__carrels_payload_start"))
 
         self.orchestrator.add_map(self.create_map_cached_data(image_txlo, 0x4000000))
         self.orchestrator.add_map(self.create_map_cached_data(image_trampoline, 0x6000000))

@@ -12,6 +12,12 @@
 dlg_header_t dlg;
 svc_t svc;
 
+uintptr_t svc_buffer_vaddr;
+uintptr_t dlg_buffer_vaddr;
+uintptr_t sym_buffer_vaddr;
+uintptr_t sym_buffer_size;
+
+
 static inline void ca_monitor_init_storage(void)
 {
     fs_cmpl_t completion;
@@ -28,19 +34,19 @@ static inline void ca_monitor_init_storage(void)
     sddf_snprintf(svc_file, sizeof(svc_file), "%s.svc", microkit_name);
     sddf_snprintf(dlg_file, sizeof(dlg_file), "%s.dlg", microkit_name);
 
-    pico_vfs_readfile2buf((void *)0xaaaaa00000, svc_file, &err);
+    pico_vfs_readfile2buf((void *)svc_buffer_vaddr, svc_file, &err);
     if (err != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "Failed to load svc file\n");
         microkit_internal_crash(-1);
     }
 
-    pico_vfs_readfile2buf((void *)0xaaaaa10000, dlg_file, &err);
+    pico_vfs_readfile2buf((void *)dlg_buffer_vaddr, dlg_file, &err);
     if (err != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "Failed to load dlg file\n");
         microkit_internal_crash(-1);
     }
 
-    if (!dlg_parse((void *)0xaaaaa10000, &dlg)) {
+    if (!dlg_parse((void *)dlg_buffer_vaddr, &dlg)) {
         TSLDR_DBG_PRINT(PROGNAME "failed to parse dlg\n");
         while (1) {
             ;
@@ -56,7 +62,7 @@ static inline void ca_monitor_init_storage(void)
                         delegator->resource_count);
     }
 
-    if (!svc_parse((void *)0xaaaaa00000, &svc)) {
+    if (!svc_parse((void *)svc_buffer_vaddr, &svc)) {
         TSLDR_DBG_PRINT(PROGNAME "failed to parse svc\n");
         while (1) {
             ;
@@ -93,14 +99,12 @@ ca_monitor_init_cothread_spawn(const client_entry_t client_entry, void *arg, cha
     microkit_cothread_yield();
 }
 
-#define PROTOCON_MKTSYMB_BASE 0xaaaaa20000
-#define PROTOCON_MKTSYMB_SLOT_SIZE 0x1000
-
 static inline void protocon_state_init_symb_header(uint32_t pc_id)
 {
     int err;
     char sym_file[80];
-    uintptr_t base = PROTOCON_MKTSYMB_BASE + pc_id * PROTOCON_MKTSYMB_SLOT_SIZE;
+    uintptr_t slot_size = sym_buffer_size / PC_CHILD_PER_MONITOR_MAX_NUM;
+    uintptr_t base = sym_buffer_vaddr + pc_id * slot_size;
     pc_state_t *state = &protocon_states[pc_id];
 
     sddf_snprintf(sym_file, sizeof(sym_file), "protocon%u.mktsym", pc_id);
