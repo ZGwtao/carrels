@@ -171,7 +171,7 @@ int pico_vfs_read_to_cache(void *cache, uint64_t capacity, const char *path, uin
                         file_size,
                         capacity);
         closefile(fd);
-        return -1;
+        return file_size > capacity ? -2 : -1;
     }
 
     uint64_t pos = 0;

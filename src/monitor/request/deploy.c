@@ -349,7 +349,9 @@ pc_monitor_error protocon_deploy(payload_info_t *info)
 
     protocon_pre_instantiate(&plan, info);
 
-    service_installer_apply(&plan);
+    if (!service_installer_apply(&plan)) {
+        return MON_FAIL_TO_DEPLOY;
+    }
 
     protocon_start(&plan);
     return err;
@@ -370,7 +372,9 @@ static pc_monitor_error protocon_deploy_to_protocon(payload_info_t *info, uint32
     }
 
     protocon_pre_instantiate(&plan, info);
-    service_installer_apply(&plan);
+    if (!service_installer_apply(&plan)) {
+        return MON_FAIL_TO_DEPLOY;
+    }
     protocon_start(&plan);
     return MON_NO_ERROR;
 }

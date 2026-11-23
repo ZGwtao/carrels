@@ -7,8 +7,6 @@
 #include <carrels-monitor.h>
 #include <libtrustedlo.h>
 
-#define SVC_MAX_PATH_LEN 128
-
 static seL4_Word
 service_installer_elf_get_sec_with_vaddr(const void *elf_base, uintptr_t vaddr, seL4_Word *sh_size)
 {
@@ -24,7 +22,7 @@ service_installer_elf_get_sec_with_vaddr(const void *elf_base, uintptr_t vaddr, 
                 break;
             }
             if (sh_size) {
-                *sh_size = size;
+                *sh_size = size - (vaddr - start);
             }
             return (seL4_Word)(elf_base + sh[i].sh_offset + (vaddr - start));
         }
@@ -32,37 +30,18 @@ service_installer_elf_get_sec_with_vaddr(const void *elf_base, uintptr_t vaddr, 
     return (seL4_Word)-1;
 }
 
-static inline void
-service_installer_payload_add_service(const void *elf_base, const char data_file[], uintptr_t vaddr)
+static bool service_installer_payload_add_service(const void *elf_base,
+                                                  const svc_cache_buf_t *cached,
+                                                  uintptr_t vaddr,
+                                                  uint64_t manifest_size)
 {
-    int err = 0;
-    seL4_Word target_sh = service_installer_elf_get_sec_with_vaddr(elf_base, vaddr, NULL);
-    if (!target_sh) {
-        // the reason we allow early return in here is:
-        //  a broken client program will only break a dynamic PD's execution
-        //  we can still load a broken elf into a dynamic PD but keep the rest of the system safe
-        // so, if unfortunately the client breaks something in its user-defined section
-        // it is none of the monitor or dynamic PD's business, as we just need to restore a faulting
-        // PD...
-        TSLDR_DBG_PRINT(LIB_NAME_MACRO
-                        "Failed to find the target section (vaddr '%x') to patch with\n",
-                        vaddr);
-        return;
-    }
-    pico_vfs_readfile2buf((void *)target_sh, data_file, &err);
-    if (err != seL4_NoError) {
-        TSLDR_DBG_PRINT(LIB_NAME_MACRO "Failed to patch payload with datafile '%s' at: %x",
-                        data_file,
-                        vaddr);
-        // FIXME: we do nothing here, but should it behave like this?
-    }
-}
-
-static inline bool service_installer_check_svc(const protocon_svc_t *svc)
-{
-    if (svc->svc_init != true) {
+    seL4_Word available = 0;
+    seL4_Word target = service_installer_elf_get_sec_with_vaddr(elf_base, vaddr, &available);
+    if (target == (seL4_Word)-1 || cached->size > available || cached->size > manifest_size) {
+        TSLDR_DBG_PRINT(PROGNAME "Service data does not fit target section at %lx\n", vaddr);
         return false;
     }
+    memcpy((void *)target, cached->data, cached->size);
     return true;
 }
 
@@ -127,7 +106,7 @@ static inline void *protocon_image_elf(uintptr_t image_base)
     return (void *)(image_base + header->elf_offset);
 }
 
-void service_installer_apply(const deploy_plan_t *plan)
+bool service_installer_apply(const deploy_plan_t *plan)
 {
     trustedlo_xrtreq_t xrt_req_list = {};
     void *elf_base = protocon_image_elf(plan->pc_base);
@@ -136,30 +115,30 @@ void service_installer_apply(const deploy_plan_t *plan)
         const protocon_svc_req_t *req = plan->req;
         const svc_service_t *curr_svc = plan->service_sources[i];
 
-        if (curr_svc->path_len >= SVC_MAX_PATH_LEN) {
-            TSLDR_DBG_PRINT(PROGNAME "service path too long: %u\n", curr_svc->path_len);
-            continue;
+        const svc_cache_buf_t *cached = svc_cache_get_or_load(&svc_cache, curr_svc);
+        if (cached == NULL) {
+            TSLDR_DBG_PRINT(PROGNAME "Missing cached service data\n");
+            return false;
         }
 
-        char path[SVC_MAX_PATH_LEN];
-        memcpy(path, svc_service_path(curr_svc), curr_svc->path_len);
-        path[curr_svc->path_len] = '\0';
-
-        TSLDR_DBG_PRINT(PROGNAME "image_base: %x, elf_base: %x, service vaddr: %x, datapath: %s\n",
+        TSLDR_DBG_PRINT(PROGNAME "image_base: %x, elf_base: %x, service vaddr: %x\n",
                         (uintptr_t)plan->pc_base,
                         (uintptr_t)elf_base,
                         (uintptr_t)req->service_entries[i]->offset +
-                            (uintptr_t)req->payload_e_entry,
-                        path);
+                            (uintptr_t)req->payload_e_entry);
 
-        service_installer_payload_add_service(elf_base,
-                                              path,
-                                              (uintptr_t)req->service_entries[i]->offset +
-                                                  (uintptr_t)req->payload_e_entry);
+        if (!service_installer_payload_add_service(
+                elf_base,
+                cached,
+                (uintptr_t)req->service_entries[i]->offset + (uintptr_t)req->payload_e_entry,
+                req->service_entries[i]->size)) {
+            return false;
+        }
 
         service_installer_append_acrtreq(&xrt_req_list, curr_svc);
     }
 
     service_installer_initialise_ac_rt_req_header((char *)plan->base_serialised_service,
                                                   &xrt_req_list);
+    return true;
 }

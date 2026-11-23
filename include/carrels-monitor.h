@@ -13,6 +13,7 @@
 #include <monitor_vm_layout.h>
 
 #include <carrels-services.h>
+#include <service/cache.h>
 #include <carrels-user.h>
 
 #include <ioutils/pico_vfs.h>
@@ -203,4 +204,4 @@ void service_planner_select_protocon_by_id(const protocon_svc_req_t *req,
                                            const pc_state_t *protocon_states,
                                            uint32_t pc_id);
 
-void service_installer_apply(const deploy_plan_t *plan);
+bool service_installer_apply(const deploy_plan_t *plan);

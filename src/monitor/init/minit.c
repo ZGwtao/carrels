@@ -17,9 +17,19 @@ uintptr_t dlg_buffer_vaddr;
 uintptr_t sym_buffer_vaddr;
 uintptr_t sym_buffer_size;
 
+static const char *ca_monitor_find_terminator(const char *text, size_t capacity)
+{
+    for (size_t i = 0; i < capacity; ++i) {
+        if (text[i] == '\0') {
+            return text + i;
+        }
+    }
+    return NULL;
+}
+
 static void ca_monitor_make_metadata_filepath(char *filepath, size_t capacity, const char *suffix)
 {
-    const char *name_end = memchr(microkit_name, '\0', sizeof(microkit_name));
+    const char *name_end = ca_monitor_find_terminator(microkit_name, sizeof(microkit_name));
     if (name_end == NULL) {
         TSLDR_DBG_PRINT(PROGNAME "Microkit name is not terminated\n");
         microkit_internal_crash(-1);
@@ -32,7 +42,7 @@ static void ca_monitor_make_metadata_filepath(char *filepath, size_t capacity, c
     }
 
     size_t suffix_space = capacity - name_len - 1;
-    if (memchr(suffix, '\0', suffix_space) == NULL) {
+    if (ca_monitor_find_terminator(suffix, suffix_space) == NULL) {
         TSLDR_DBG_PRINT(PROGNAME "Metadata filename is too long\n");
         microkit_internal_crash(-1);
     }
@@ -174,6 +184,7 @@ static inline void ca_monitor_init_protocon_states(uint64_t pc_num)
 
 static void ca_monitor_boot_phase_first(void)
 {
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase first: mounting storage\n");
     fs_cmpl_t completion;
     int err = fs_command_blocking(&completion, (fs_cmd_t){.type = FS_CMD_INITIALISE});
 
@@ -181,16 +192,22 @@ static void ca_monitor_boot_phase_first(void)
         TSLDR_DBG_PRINT(PROGNAME "Failed to mount\n");
         microkit_internal_crash(-1);
     }
+
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase first: storage ready\n");
 }
 
 static void ca_monitor_boot_phase_second(void)
 {
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase second: loading metadata\n");
     ca_monitor_load_and_parse_delegation_info((void *)dlg_buffer_vaddr, &dlg);
     ca_monitor_load_and_parse_service_info((void *)svc_buffer_vaddr, &svc);
+
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase second: metadata ready\n");
 }
 
 static void ca_monitor_boot_phase_third(void)
 {
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase third: initialising states\n");
     void *binfo = microkit_cothread_my_arg();
 
     assert(binfo);
@@ -199,6 +216,7 @@ static void ca_monitor_boot_phase_third(void)
     ca_monitor_init_get_pcnum(dlg.delegator_count, bootinfo);
     ca_monitor_init_protocon_states(bootinfo->num_pc);
     monitor_acl_initialise(bootinfo->num_pc);
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase third: %lu protocons ready\n", bootinfo->num_pc);
 }
 
 static void ca_monitor_boot(void)
