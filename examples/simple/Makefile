@@ -32,7 +32,7 @@ ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy
 
 ${BUILD_DIR}/Makefile: container.mk Makefile $(BUILD_DEFAULTS) \
 		$(ROOT)/mk/components.mk $(ROOT)/mk/k8s-vmm.mk \
-		$(ROOT)/mk/unikernels.mk
+		$(ROOT)/mk/unikraft.mk
 	mkdir -p ${BUILD_DIR}
 	echo "ROOT ?= ${ROOT}" > $@
 	echo "CARRELS ?= ${CARRELS}" >> $@

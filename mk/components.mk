@@ -95,7 +95,7 @@ include $(CONTAINER_COMPONENT_DIR)/pc.mk
 LIBMICROKITCO_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
-include $(ROOT)/mk/unikernels.mk
+include $(ROOT)/mk/unikraft.mk
 
 $(SDDF)/tools/make/board/common.mk $(SDDF_MAKEFILES) \
 		$(CARRELS)/dep/sddf/include &:
