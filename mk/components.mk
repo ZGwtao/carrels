@@ -4,10 +4,6 @@
 
 include $(SDDF)/tools/make/board/common.mk
 
-ifneq ($(MICROKIT_BOARD),qemu_virt_aarch64)
-$(error Kubernetes VM PoC currently supports MICROKIT_BOARD=qemu_virt_aarch64 only)
-endif
-
 ifeq ($(ARCH),aarch64)
 CFLAGS += -include $(CARRELS)/include/sddf-arch-compat.h
 endif
