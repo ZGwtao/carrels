@@ -154,7 +154,12 @@ class CarrelsContainerEngine:
         """
         uk_heap = self.create_mr(pc.name, "uk_heap", 0x4000000)
         self.sdf.add_mr(uk_heap)
-        pc.add_map(MAP(uk_heap, 0x200000000, perms="rw", cached="true"))
+        pc.add_map(self.create_map_cached_data(
+            uk_heap,
+            0x200000000,
+            setvar_vaddr="carrels_heap_base",
+            setvar_size="carrels_heap_size",
+        ))
 
         return cid
 
