@@ -338,7 +338,7 @@ def add_protocon_net_clients(sdf: SDF, net_system, protocons):
 def fatfs_blk_queue_capacity(protocon_count: int) -> int:
     # sDDF blk_virt supports at most 1024 concurrent requests across all
     # block clients. Each FATFS instance contributes one such client.
-    fatfs_client_count = protocon_count + 2
+    fatfs_client_count = protocon_count
     capacity_limit = 1024 // fatfs_client_count
     return min(128, 1 << (capacity_limit.bit_length() - 1))
 
@@ -346,15 +346,13 @@ def fatfs_blk_queue_capacity(protocon_count: int) -> int:
 def init_filesystems(sdf: SDF, blk_system, pd_engine, pd_orchestrator, protocons,
                      protocon_count: int):
     blk_queue_capacity = fatfs_blk_queue_capacity(protocon_count)
-    pd_fs_engine = PD("engine_fs", "engine_fs.elf", priority=96)
-    pd_fs_orchestrator = PD("vsock_backend_fs", "vsock_backend_fs.elf", priority=96)
-    engine_fs = LionsOs.FileSystem.Fat(
-        sdf, pd_fs_engine, pd_engine, blk=blk_system, partition=1,
-        blk_queue_capacity=blk_queue_capacity,
-    )
-    orchestrator_fs = LionsOs.FileSystem.Fat(
-        sdf, pd_fs_orchestrator, pd_orchestrator, blk=blk_system, partition=0,
-        blk_queue_capacity=blk_queue_capacity,
+    pd_fs_engine = PD("engine_fs", "engine_fs.elf", priority=96,
+                      stack_size=0x20000)
+    pd_fs_orchestrator = PD("vsock_backend_fs", "vsock_backend_fs.elf",
+                            priority=96, stack_size=0x20000)
+    engine_fs = LionsOs.FileSystem.Ram(sdf, pd_fs_engine, pd_engine)
+    orchestrator_fs = LionsOs.FileSystem.Ram(
+        sdf, pd_fs_orchestrator, pd_orchestrator
     )
     protocon_fs_pds = [
         PD(f"protocon{i}_fs", f"protocon{i}_fs.elf", priority=96)
@@ -478,14 +476,15 @@ def update_generated_elfs(protocon_fs_pds, net_copiers) -> None:
     #     f"net_copy_{k8s_net_copier.name}",
     # )
 
-    elf.copy_elf("fat", "vsock_backend_fs", None)
-    elf.copy_elf("fat", "engine_fs", None)
+    elf.copy_elf("ramfs_server", "vsock_backend_fs", None)
+    elf.copy_elf("ramfs_server", "engine_fs", None)
     for fs_pd in protocon_fs_pds:
         elf.copy_elf("fat", fs_pd.name, None)
 
     for name in ("vsock_backend_fs", "engine_fs"):
-        elf.update_elf_section(name + ".elf", "blk_client_config", "blk_client_" + name)
         elf.update_elf_section(name + ".elf", "fs_server_config", "fs_server_" + name)
+        elf.update_elf_section(name + ".elf", "serial_client_config", "serial_client_" + name)
+        elf.update_elf_section(name + ".elf", "timer_client_config", "timer_client_" + name)
     for fs_pd in protocon_fs_pds:
         elf.update_elf_section(
             f"{fs_pd.name}.elf", "blk_client_config", f"blk_client_{fs_pd.name}"
@@ -640,6 +639,10 @@ def generate(
     engine_fs, orchestrator_fs, protocon_filesystems, protocon_fs_pds = init_filesystems(
         sdf, blk_system, pd_engine, pd_orchestrator, protocons, protocon_count
     )
+    for fs_pd in (engine_fs.fs_pd, orchestrator_fs.fs_pd):
+        serial_system.add_client(fs_pd)
+        timer_system.add_client(fs_pd)
+
     connect_and_serialise(
         output_dir, engine_fs, orchestrator_fs, protocon_filesystems,
         serial_system, timer_system, blk_system, net_system, protocons, net_virt_tx

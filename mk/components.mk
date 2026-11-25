@@ -96,6 +96,10 @@ LIBMICROKITCO_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
 include $(ROOT)/mk/unikraft.mk
+# Carrels provides its own application-image targets above and consumes
+# uk-on-mk here only for its service framework (currently RAMFS).
+UKF_ENABLE_APPS :=
+include $(UK_ON_MK_DIR)/Makefile
 
 $(SDDF)/tools/make/board/common.mk $(SDDF_MAKEFILES) \
 		$(CARRELS)/dep/sddf/include &:

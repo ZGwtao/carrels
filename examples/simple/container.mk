@@ -71,6 +71,7 @@ INFRA_IMAGES := \
 	monitor.elf \
 	vsock_backend.elf \
 	fat.elf \
+	ramfs_server.elf \
 	trampoline.elf \
 	protocon.elf \
 	serial_driver.elf \
@@ -88,6 +89,41 @@ UNIKRAFT_APPLICATION_IMAGES := $(UKF_IMGS)
 K8S_APPLICATION_IMAGES := c-hello.img
 APPLICATION_IMAGES := $(NATIVE_APPLICATION_IMAGES) $(UNIKRAFT_APPLICATION_IMAGES) \
 	$(K8S_APPLICATION_IMAGES)
+
+# Application images are optional RAMFS contents. They deliberately are not
+# prerequisites of ramfs-phase2: applications can be built separately, then
+# phase two can be rerun to package whichever images now exist.
+RAMFS_APPLICATION_IMAGES = $(wildcard $(APPLICATION_IMAGES))
+
+RAMFS_MONITOR_ROOTFS := $(BUILD_DIR)/uk/ramfs-monitor-rootfs
+RAMFS_ORCHESTRATOR_ROOTFS := $(BUILD_DIR)/uk/ramfs-orchestrator-rootfs
+
+# Phase 1 uses the service's empty rootfs solely to let Microkit emit the
+# generated delegation and symbol metadata needed by the real RAMFS images.
+.PHONY: ramfs-phase1 ramfs-phase2
+ramfs-phase1: $(SYSTEM_FILE) ramfs_server.elf
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
+		--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
+		-o container.seed.img -r report.seed.txt
+	cp build/delegation/container_monitor.dlg container_monitor.dlg
+
+ramfs-phase2: ramfs-phase1
+	$(PYTHON) $(CARRELS)/tools/prepare_ramfs_rootfs.py \
+		monitor $(BUILD_DIR) $(RAMFS_MONITOR_ROOTFS)
+	$(call ukf_build_svc, 	\
+		ramfs, 				\
+		LIONSOS=$(LIONSOS) 	\
+		UKF_SVC_BUILD=$(BUILD_DIR)/uk/ramfs-monitor \
+		UKF_SVC_ROOTFS=$(RAMFS_MONITOR_ROOTFS))
+	cp $(BUILD_DIR)/uk/ramfs-monitor/ramfs-server.elf engine_fs.elf
+	$(PYTHON) $(CARRELS)/tools/prepare_ramfs_rootfs.py \
+		orchestrator $(BUILD_DIR) $(RAMFS_ORCHESTRATOR_ROOTFS) $(RAMFS_APPLICATION_IMAGES)
+	$(call ukf_build_svc,	\
+		ramfs,				\
+		LIONSOS=$(LIONSOS) 	\
+		UKF_SVC_BUILD=$(BUILD_DIR)/uk/ramfs-orchestrator \
+		UKF_SVC_ROOTFS=$(RAMFS_ORCHESTRATOR_ROOTFS))
+	cp $(BUILD_DIR)/uk/ramfs-orchestrator/ramfs-server.elf vsock_backend_fs.elf
 
 c-hello.img: unikraft-c-hello.img
 	cp $< $@
@@ -115,6 +151,12 @@ else
 	    --protocon-count $(PROTOCON_COUNT) \
 	    --x86-device-profile $(X86_DEVICE_PROFILE) $(BLK_META_ARGS)
 endif
+
+# The metaprogram first emits every generated configuration blob.  Apply all
+# blobs afterwards in one Carrels-owned stage, including service ELFs.  This
+# keeps section patching independent from individual service build recipes.
+.PHONY: patch-elfs
+patch-elfs: $(SYSTEM_FILE) ramfs-phase2
 ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
 endif
@@ -134,6 +176,12 @@ endif
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_container_monitor.data monitor.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_vsock_backend.data vsock_backend.elf
 	$(OBJCOPY) --update-section .fs_client_config=fs_client_container_monitor.data monitor.elf
+	$(OBJCOPY) --update-section .fs_server_config=fs_server_engine_fs.data engine_fs.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_engine_fs.data engine_fs.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_engine_fs.data engine_fs.elf
+	$(OBJCOPY) --update-section .fs_server_config=fs_server_vsock_backend_fs.data vsock_backend_fs.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_vsock_backend_fs.data vsock_backend_fs.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_vsock_backend_fs.data vsock_backend_fs.elf
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
@@ -144,7 +192,7 @@ endif
 # $(OBJCOPY) --update-section .virtio_vsock_transport_config=virtio_vsock_transport_vsock_backend.data vsock_backend.elf
 
 SPEC = capdl_spec.json
-$(IMAGE_FILE) $(REPORT_FILE) $(DLG_FILE): $(INFRA_IMAGES) $(SYSTEM_FILE)
+$(IMAGE_FILE) $(REPORT_FILE) $(DLG_FILE): $(INFRA_IMAGES) patch-elfs
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) \
 		--search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) 	\
 		--config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE) --capdl-json ${SPEC}
