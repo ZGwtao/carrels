@@ -1,0 +1,11 @@
+[[service]]
+type = "device_ethernet"
+target = ".net_client_config"
+
+[[service]]
+type = "device_serial"
+target = ".serial_client_config"
+
+[[service]]
+type = "device_timer"
+target = ".timer_client_config"
