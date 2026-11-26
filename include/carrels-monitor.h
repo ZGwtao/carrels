@@ -99,6 +99,10 @@ typedef struct pc_state {
         const svc_service_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
     } resource_quota;
     mktsymb_header_t sym_header;
+
+    /* Record the size to avoid memzero-ing redundant payload region */
+    size_t loaded_image_size;
+
 } pc_state_t;
 
 extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];

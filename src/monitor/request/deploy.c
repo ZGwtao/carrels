@@ -78,6 +78,8 @@ protocon_load_payload(uint32_t pc_id, uintptr_t dest, uintptr_t src, uint64_t el
     memcpy((void *)(dest + sym_offset), sym->base, sym_size);
     memcpy((void *)(dest + elf_offset), (const void *)src, elf_size);
 
+    protocon_states[pc_id].loaded_image_size = elf_offset + elf_size;
+
     TSLDR_DBG_PRINT(PROGNAME "pc=%d image=%x sym_off=%x sym_size=%d elf_off=%x elf_size=%d\n",
                     pc_id,
                     dest,

@@ -39,6 +39,6 @@ void monitor_main_load_trustedlo(uint32_t cid)
                                          monitor_vm_layout.loader_program.size));
     memcpy((void *)trampoline_base, (const char *)(__carrels_trampoline_start), trampoline_size);
 
-    /* clean up client payload region entirely. */
-    memset((void *)payload_base, 0, monitor_vm_layout.container_image.size);
+    memset((void *)payload_base, 0, protocon_states[cid].loaded_image_size);
+    protocon_states[cid].loaded_image_size = 0;
 }
