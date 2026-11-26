@@ -9,6 +9,7 @@ PC_MONITOR_OBJS := \
 	pc/monitor/fault/fault.o \
 	pc/monitor/request/deploy.o \
 	pc/monitor/request/network.o \
+	pc/monitor/request/profile.o \
 	pc/monitor/request/query.o \
 	pc/monitor/request/resume.o \
 	pc/monitor/request/stop.o \

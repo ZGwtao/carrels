@@ -30,6 +30,11 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
     case PC_MONITOR_CALL_DEPLOY_RESULT:
         ret = monitor_call_deploy_result();
         break;
+    case PC_MONITOR_CALL_PROFILE:
+        seL4_Word pc_id = microkit_mr_get(1);
+        seL4_Word lifecycle_metric = microkit_mr_get(2);
+        ret = monitor_call_profile(pc_id, lifecycle_metric);
+        break;
     case PC_MONITOR_CALL_FLIP_ACL_RULE:
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
