@@ -339,6 +339,7 @@ pc_monitor_error protocon_deploy(payload_info_t *info)
     deploy_plan_t plan = {0};
     protocon_svc_req_t req = {0};
     pc_monitor_error err;
+    uint64_t started_at = monitor_profile_counter();
 
     (void)service_manifest_parse(info, &req);
 
@@ -349,13 +350,35 @@ pc_monitor_error protocon_deploy(payload_info_t *info)
         return err;
     }
 
-    protocon_pre_instantiate(&plan, info);
+    unsigned int pc_id = (unsigned int)plan.pc_id;
+    monitor_profile_begin_deploy(pc_id, started_at);
+    monitor_profile_record(pc_id, PC_PROFILE_DEPLOY_PARSE_PLAN, started_at);
 
-    if (!service_installer_apply(&plan)) {
-        return MON_FAIL_TO_DEPLOY;
+    /* Copy the payload and symbol metadata into the Protocon image region. */
+    MONITOR_PROFILE_TRACE_SET(payload_copy);
+    {
+        protocon_pre_instantiate(&plan, info);
     }
+    MONITOR_PROFILE_TRACE_RECORD(payload_copy, pc_id, PC_PROFILE_DEPLOY_PAYLOAD_COPY);
 
-    protocon_start(&plan);
+    /* Resolve and install the services requested by the payload. */
+    MONITOR_PROFILE_TRACE_SET(service_install);
+    {
+        if (!service_installer_apply(&plan)) {
+            monitor_profile_fail(pc_id);
+            return MON_FAIL_TO_DEPLOY;
+        }
+    }
+    MONITOR_PROFILE_TRACE_RECORD(service_install, pc_id, PC_PROFILE_DEPLOY_SERVICE_INSTALL);
+
+    /* Initialise the trusted loader state and start the Protocon. */
+    MONITOR_PROFILE_TRACE_SET(protocon_start);
+    {
+        protocon_start(&plan);
+    }
+    MONITOR_PROFILE_TRACE_RECORD(protocon_start, pc_id, PC_PROFILE_DEPLOY_START);
+
+    monitor_profile_mark_running(pc_id);
     return err;
 }
 
@@ -364,19 +387,43 @@ static pc_monitor_error protocon_deploy_to_protocon(payload_info_t *info, uint32
     deploy_plan_t plan = {0};
     protocon_svc_req_t req = {0};
     pc_monitor_error err;
+    uint64_t started_at = monitor_profile_counter();
 
+    monitor_profile_begin_deploy(pc_id, started_at);
     service_manifest_parse(info, &req);
     service_planner_select_protocon_by_id(&req, &plan, protocon_states, pc_id);
 
     err = protocon_deploy_plan_check(&plan);
     if (err != MON_NO_ERROR) {
+        monitor_profile_fail(pc_id);
         return err;
     }
+    monitor_profile_record(pc_id, PC_PROFILE_DEPLOY_PARSE_PLAN, started_at);
 
-    protocon_pre_instantiate(&plan, info);
-    if (!service_installer_apply(&plan)) {
-        return MON_FAIL_TO_DEPLOY;
+    /* Copy the payload and symbol metadata into the Protocon image region. */
+    MONITOR_PROFILE_TRACE_SET(payload_copy);
+    {
+        protocon_pre_instantiate(&plan, info);
     }
-    protocon_start(&plan);
+    MONITOR_PROFILE_TRACE_RECORD(payload_copy, pc_id, PC_PROFILE_DEPLOY_PAYLOAD_COPY);
+
+    /* Resolve and install the services requested by the payload. */
+    MONITOR_PROFILE_TRACE_SET(service_install);
+    {
+        if (!service_installer_apply(&plan)) {
+            monitor_profile_fail(pc_id);
+            return MON_FAIL_TO_DEPLOY;
+        }
+    }
+    MONITOR_PROFILE_TRACE_RECORD(service_install, pc_id, PC_PROFILE_DEPLOY_SERVICE_INSTALL);
+
+    /* Initialise the trusted loader state and start the Protocon. */
+    MONITOR_PROFILE_TRACE_SET(protocon_start);
+    {
+        protocon_start(&plan);
+    }
+    MONITOR_PROFILE_TRACE_RECORD(protocon_start, pc_id, PC_PROFILE_DEPLOY_START);
+
+    monitor_profile_mark_running(pc_id);
     return MON_NO_ERROR;
 }
