@@ -110,16 +110,14 @@ ramfs-phase1: $(SYSTEM_FILE) ramfs_server.elf
 ramfs-phase2: ramfs-phase1
 	$(PYTHON) $(CARRELS)/tools/prepare_ramfs_rootfs.py \
 		monitor $(BUILD_DIR) $(RAMFS_MONITOR_ROOTFS)
-	$(call ukf_build_svc, 	\
-		ramfs, 				\
+	$(call ukf_build_svc,ramfs, \
 		LIONSOS=$(LIONSOS) 	\
 		UKF_SVC_BUILD=$(BUILD_DIR)/uk/ramfs-monitor \
 		UKF_SVC_ROOTFS=$(RAMFS_MONITOR_ROOTFS))
 	cp $(BUILD_DIR)/uk/ramfs-monitor/ramfs-server.elf engine_fs.elf
 	$(PYTHON) $(CARRELS)/tools/prepare_ramfs_rootfs.py \
 		orchestrator $(BUILD_DIR) $(RAMFS_ORCHESTRATOR_ROOTFS) $(RAMFS_APPLICATION_IMAGES)
-	$(call ukf_build_svc,	\
-		ramfs,				\
+	$(call ukf_build_svc,ramfs, \
 		LIONSOS=$(LIONSOS) 	\
 		UKF_SVC_BUILD=$(BUILD_DIR)/uk/ramfs-orchestrator \
 		UKF_SVC_ROOTFS=$(RAMFS_ORCHESTRATOR_ROOTFS))
