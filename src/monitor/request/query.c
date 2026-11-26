@@ -27,6 +27,9 @@ static inline void monitor_main_list_protocon_states(uint32_t num_protocons)
         case PROTOCON_SUSPENDED:
             sddf_printf("suspended");
             break;
+        case PROTOCON_RESERVED:
+            sddf_printf("reserved");
+            break;
         default:
             sddf_printf("unknown: %d", state);
         };

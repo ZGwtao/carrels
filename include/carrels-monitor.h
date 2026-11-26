@@ -51,6 +51,7 @@ enum {
     PROTOCON_ACTIVE = 1,
     PROTOCON_PASSIVE,
     PROTOCON_SUSPENDED,
+    PROTOCON_RESERVED,
 };
 _Static_assert(sizeof(protocon_lifecycle_state_t) == sizeof(uint8_t),
                "protocon_lifecycle_state_t must be uint8_t");

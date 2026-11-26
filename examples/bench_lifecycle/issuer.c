@@ -147,7 +147,18 @@ static void wait_for_deployment(unsigned int pc_id)
         if (error == MON_DEPLOY_IN_PROGRESS) {
             continue;
         }
-        if (error != MON_NO_ERROR || microkit_mr_get(0) != pc_id) {
+
+        pc_deploy_result_t result = {
+            .requested_count =
+                (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_REQUESTED_COUNT),
+            .deployed_count =
+                (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_DEPLOYED_COUNT),
+            .protocon_mask =
+                (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_PROTOCON_MASK),
+        };
+
+        if (error != MON_NO_ERROR || result.requested_count != 1 ||
+            result.deployed_count != 1 || result.protocon_mask != ((uint32_t)1U << pc_id)) {
             sddf_printf("BENCH|ERROR|deploy-result|pc=%u|error=%lu\n",
                         pc_id,
                         error);

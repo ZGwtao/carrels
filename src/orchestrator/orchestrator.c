@@ -72,6 +72,7 @@ static uint32_t deploy_pc_id;
 static uint32_t deploy_peer_mask;
 static bool deploy_peers_all;
 static bool deploy_pending;
+static bool deploy_targeted;
 static bool deploy_from_cri;
 static uint32_t cri_slots_in_use;
 static bool cri_c_hello_available;
@@ -80,6 +81,30 @@ static int monitor_protocon_is_running(uint32_t pc_id, bool *running);
 
 static microrl_t shell;
 static char fname_buf[FNAME_BUF_SIZE];
+
+static void deploy_request_clear(void)
+{
+    deploy_pending = false;
+    deploy_targeted = false;
+}
+
+static pc_deploy_result_t deploy_result_read(void)
+{
+    return (pc_deploy_result_t){
+        .requested_count =
+            (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_REQUESTED_COUNT),
+        .deployed_count =
+            (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_DEPLOYED_COUNT),
+        .protocon_mask =
+            (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_PROTOCON_MASK),
+        .connected_peer_mask =
+            (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_CONNECTED_PEER_MASK),
+        .rejected_peer_mask =
+            (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_REJECTED_PEER_MASK),
+        .unavailable_peer_mask =
+            (uint32_t)microkit_mr_get(PC_DEPLOY_RESULT_UNAVAILABLE_PEER_MASK),
+    };
+}
 
 static const char *const shell_commands[] = {
     "start",
@@ -271,17 +296,19 @@ void orchestrator_prologue(void)
 
 void load_elf_payload(void)
 {
+    microkit_msginfo info;
+    seL4_Word monitor_error;
+    int fs_error;
+
     while (!fs_init) {
         microkit_cothread_yield();
     }
     TSLDR_DBG_PRINT(PROGNAME "entry of load_elf_payload\n");
 
-    microkit_msginfo info;
-    seL4_Error error;
-
-    pico_vfs_readfile2buf((void *)shared2, fname_buf, &error);
-    if (error != seL4_NoError) {
+    pico_vfs_readfile2buf((void *)shared2, fname_buf, &fs_error);
+    if (fs_error != seL4_NoError) {
         TSLDR_DBG_PRINT(PROGNAME "Failed to read %s\n", fname_buf);
+        deploy_request_clear();
         shell_inst_epilogue();
         return;
     }
@@ -290,11 +317,14 @@ void load_elf_payload(void)
     microkit_mr_set(0, (PC_MONITOR_CALL_DEPLOY));
     microkit_mr_set(1, req_pc_num);
     info = microkit_ppcall(1, microkit_msginfo_new(0, 2));
-    error = microkit_msginfo_get_label(info);
-    if (error != seL4_NoError) {
-        TSLDR_DBG_PRINT(PROGNAME "call %d fail with error id: %d\n", PC_MONITOR_CALL_DEPLOY, error);
+    monitor_error = microkit_msginfo_get_label(info);
+    if (monitor_error != MON_NO_ERROR) {
+        TSLDR_DBG_PRINT(PROGNAME "call %d fail with error id: %lu\n",
+                        PC_MONITOR_CALL_DEPLOY,
+                        monitor_error);
+        deploy_request_clear();
+        shell_inst_epilogue();
     }
-    shell_output(&shell, "orche@>$ ");
 }
 
 static int cmd_start(int argc, const char *const *argv)
@@ -304,6 +334,11 @@ static int cmd_start(int argc, const char *const *argv)
 
     if (argc != 2 && argc != 3) {
         sddf_printf("Usage: start <elf> [pc_num]\r\n");
+        return 1;
+    }
+
+    if (deploy_pending) {
+        sddf_printf("A deployment is already in progress\r\n");
         return 1;
     }
 
@@ -326,12 +361,20 @@ static int cmd_start(int argc, const char *const *argv)
 
     memcpy(fname_buf, argv[1], filename_len + 1);
     req_pc_num = requested_pc_num;
+    deploy_pending = true;
+    deploy_targeted = false;
 
     if (microkit_cothread_spawn(load_elf_payload, NULL) == LIBMICROKITCO_NULL_HANDLE) {
+        deploy_request_clear();
         TSLDR_DBG_PRINT(PROGNAME "Cannot spawn cothread to load payload\n");
         sddf_printf("Failed to start payload loader\r\n");
         return 1;
     }
+
+    /* Run the loader in this notification cycle. It may then yield while the
+     * filesystem request is outstanding, but must not depend on an unrelated
+     * future notification merely to begin the deployment. */
+    microkit_cothread_yield();
 
     return 0;
 }
@@ -448,7 +491,7 @@ static void load_targeted_elf_payload(void)
             cri_slots_in_use &= ~((uint32_t)1U << deploy_pc_id);
             deploy_from_cri = false;
         }
-        deploy_pending = false;
+        deploy_request_clear();
         shell_inst_epilogue();
         return;
     }
@@ -469,7 +512,7 @@ static void load_targeted_elf_payload(void)
             cri_slots_in_use &= ~((uint32_t)1U << deploy_pc_id);
             deploy_from_cri = false;
         }
-        deploy_pending = false;
+        deploy_request_clear();
         shell_inst_epilogue();
     }
 }
@@ -478,10 +521,8 @@ static void print_deploy_result(void)
 {
     microkit_msginfo info;
     seL4_Word error;
-    uint32_t pc_id;
-    uint32_t connected;
-    uint32_t rejected;
-    uint32_t unavailable;
+    pc_deploy_result_t result;
+    uint32_t pc_id = deploy_pc_id;
 
     microkit_mr_set(0, PC_MONITOR_CALL_DEPLOY_RESULT);
     info = microkit_ppcall(1, microkit_msginfo_new(0, 1));
@@ -490,25 +531,41 @@ static void print_deploy_result(void)
         return;
     }
 
-    pc_id = (uint32_t)microkit_mr_get(0);
-    connected = (uint32_t)microkit_mr_get(1);
-    rejected = (uint32_t)microkit_mr_get(2);
-    unavailable = (uint32_t)microkit_mr_get(3);
+    result = deploy_result_read();
+
+    /* A targeted request must resolve to exactly the Protocon selected by the
+     * caller. Monitor-selected requests may legitimately return any mask with
+     * the requested population. */
+    if (error == MON_NO_ERROR && deploy_targeted &&
+        (result.requested_count != 1 || result.deployed_count != 1 ||
+         result.protocon_mask != ((uint32_t)1U << pc_id))) {
+        error = MON_FAIL_TO_DEPLOY;
+    }
+
     if (error != MON_NO_ERROR) {
-        sddf_printf("Deployment of %s on protocon %u failed (monitor error %lu)\r\n",
+        sddf_printf("Deployment of %s failed after starting %u of %u instances "
+                    "(monitor error %lu)\r\n",
                     fname_buf,
-                    pc_id,
+                    result.deployed_count,
+                    result.requested_count,
                     error);
-    } else {
+    } else if (deploy_targeted) {
         sddf_printf("Deployed %s on protocon %u\r\n", fname_buf, pc_id);
         sddf_printf("Connected peers: ");
-        print_peer_ports(connected);
+        print_peer_ports(result.connected_peer_mask);
         sddf_printf("\r\nRejected peers: ");
-        print_peer_ports(rejected);
+        print_peer_ports(result.rejected_peer_mask);
         sddf_printf("\r\nUnavailable peers: ");
-        print_peer_ports(unavailable);
+        print_peer_ports(result.unavailable_peer_mask);
+        sddf_printf("\r\n");
+    } else {
+        sddf_printf("Deployed %u instances of %s on protocons: ",
+                    result.deployed_count,
+                    fname_buf);
+        print_peer_ports(result.protocon_mask);
         sddf_printf("\r\n");
     }
+
     if (deploy_from_cri) {
         bool monitor_running = false;
         int query_error = error == MON_NO_ERROR
@@ -526,7 +583,7 @@ static void print_deploy_result(void)
         }
         deploy_from_cri = false;
     }
-    deploy_pending = false;
+    deploy_request_clear();
     shell_inst_epilogue();
 }
 
@@ -588,12 +645,13 @@ int orchestrator_cri_start(const char *image, uint32_t *pc_id)
     deploy_peer_mask = 0;
     deploy_peers_all = false;
     deploy_pending = true;
+    deploy_targeted = true;
     deploy_from_cri = true;
     cri_slots_in_use |= (uint32_t)1U << id;
     *pc_id = id;
     if (microkit_cothread_spawn(load_targeted_elf_payload, NULL) == LIBMICROKITCO_NULL_HANDLE) {
         cri_slots_in_use &= ~((uint32_t)1U << id);
-        deploy_pending = false;
+        deploy_request_clear();
         deploy_from_cri = false;
         return -1;
     }
@@ -663,8 +721,9 @@ static int cmd_deploy(int argc, const char *const *argv)
     deploy_peer_mask = peer_mask;
     deploy_peers_all = peers_all;
     deploy_pending = true;
+    deploy_targeted = true;
     if (microkit_cothread_spawn(load_targeted_elf_payload, NULL) == LIBMICROKITCO_NULL_HANDLE) {
-        deploy_pending = false;
+        deploy_request_clear();
         sddf_printf("Failed to start targeted payload loader\r\n");
         return 1;
     }

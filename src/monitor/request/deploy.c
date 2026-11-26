@@ -15,6 +15,79 @@ monitor_deploy_result_t deploy_result;
 
 static pc_monitor_error protocon_deploy_to_protocon(payload_info_t *info, uint32_t pc_id);
 static pc_monitor_error protocon_deploy_execute(payload_info_t *info, deploy_plan_t *plan);
+static inline pc_monitor_error protocon_deploy_plan_check(deploy_plan_t *plan);
+
+static void monitor_deploy_result_begin(uint32_t requested_count)
+{
+    deploy_result = (monitor_deploy_result_t){
+        .response.requested_count = requested_count,
+        .error = MON_DEPLOY_IN_PROGRESS,
+        .ready = false,
+    };
+}
+
+static void monitor_deploy_result_record(uint32_t pc_id)
+{
+    deploy_result.response.deployed_count++;
+    deploy_result.response.protocon_mask |= (uint32_t)1U << pc_id;
+}
+
+static void monitor_deploy_result_complete(pc_monitor_error error)
+{
+    deploy_result.error = error;
+    deploy_result.ready = true;
+}
+
+static void release_batch_reservations(deploy_plan_t plans[], uint32_t count)
+{
+    for (uint32_t i = 0; i < count; i++) {
+        SET_PROTOCON_AS_AVAILABLE(plans[i].pc_id)
+    }
+}
+
+static pc_monitor_error plan_batch_deployment(const protocon_svc_req_t *request,
+                                               deploy_plan_t plans[],
+                                               uint32_t count)
+{
+    for (uint32_t i = 0; i < count; i++) {
+        service_planner_select_protocon(request, &plans[i], protocon_states);
+        pc_monitor_error error = protocon_deploy_plan_check(&plans[i]);
+        if (error != MON_NO_ERROR) {
+            release_batch_reservations(plans, i);
+            return error;
+        }
+
+        /* Reserve every target before starting any payload. This prevents a
+         * fast-exiting instance from being selected twice within one batch. */
+        protocon_state_set_lifecycle_state(plans[i].pc_id, PROTOCON_RESERVED);
+    }
+
+    return MON_NO_ERROR;
+}
+
+static pc_monitor_error execute_batch_deployment(payload_info_t *payload,
+                                                  deploy_plan_t plans[],
+                                                  uint32_t count)
+{
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t pc_id = plans[i].pc_id;
+        uint64_t started_at = monitor_profile_counter();
+
+        monitor_profile_begin_deploy(pc_id, started_at);
+        monitor_profile_record(pc_id, PC_PROFILE_DEPLOY_PARSE_PLAN, started_at);
+
+        pc_monitor_error error = protocon_deploy_execute(payload, &plans[i]);
+        if (error != MON_NO_ERROR) {
+            SET_PROTOCON_AS_AVAILABLE(pc_id)
+            release_batch_reservations(&plans[i + 1], count - i - 1);
+            return error;
+        }
+
+        monitor_deploy_result_record(pc_id);
+    }
+
+    return MON_NO_ERROR;
+}
 
 static inline pc_monitor_error monitor_reset_deploy_request(seL4_Word num_req_pc)
 {
@@ -28,6 +101,7 @@ static inline pc_monitor_error monitor_reset_deploy_request(seL4_Word num_req_pc
     deploy_request.targeted = false;
     req_pc_num = (uint32_t)num_req_pc;
     deploy_request_active = true;
+    monitor_deploy_result_begin((uint32_t)num_req_pc);
     return MON_NO_ERROR;
 }
 
@@ -128,16 +202,14 @@ static inline void monitor_call_deploy_second_half(void)
     TSLDR_DBG_PRINT(PROGNAME "entry of monitor_call_deploy_protocon_second_half\n");
 
     if (!request->targeted && monitor_check_deploy_num(num_req_pc) != MON_NO_ERROR) {
+        monitor_deploy_result_complete(MON_INVALID_REQ_PC_NUM);
         monitor_finish_deploy_request();
         return;
     }
 
     err = service_manifest_header_parse(&payload_info, (__carrels_payload_start));
     if (err != seL4_NoError) {
-        if (request->targeted) {
-            deploy_result.error = MON_FAIL_TO_DEPLOY;
-            deploy_result.ready = true;
-        }
+        monitor_deploy_result_complete(MON_FAIL_TO_DEPLOY);
         monitor_finish_deploy_request();
         return;
     }
@@ -146,23 +218,25 @@ static inline void monitor_call_deploy_second_half(void)
         pc_monitor_error error;
 
         error = protocon_deploy_to_protocon(&payload_info, request->target_pc);
-        deploy_result.error = error;
         if (error == MON_NO_ERROR) {
+            monitor_deploy_result_record(request->target_pc);
             error = monitor_acl_apply_deployment(request->target_pc,
                                                  request->requested_peer_mask,
-                                                 &deploy_result.connected_peer_mask,
-                                                 &deploy_result.rejected_peer_mask,
-                                                 &deploy_result.unavailable_peer_mask);
-            deploy_result.error = error;
+                                                 &deploy_result.response.connected_peer_mask,
+                                                 &deploy_result.response.rejected_peer_mask,
+                                                 &deploy_result.response.unavailable_peer_mask);
         }
-        deploy_result.ready = true;
+        monitor_deploy_result_complete(error);
     } else {
-        for (uint32_t i = 0; i < num_req_pc; ++i) {
-            if (protocon_deploy(&payload_info) != MON_NO_ERROR) {
-                TSLDR_DBG_PRINT(PROGNAME "Failed to deploy container\n");
-                break;
-            }
+        deploy_plan_t plans[PC_CHILD_PER_MONITOR_MAX_NUM] = {0};
+        protocon_svc_req_t service_request = {0};
+        service_manifest_parse(&payload_info, &service_request);
+        pc_monitor_error error = plan_batch_deployment(&service_request, plans, num_req_pc);
+
+        if (error == MON_NO_ERROR) {
+            error = execute_batch_deployment(&payload_info, plans, num_req_pc);
         }
+        monitor_deploy_result_complete(error);
     }
 
     monitor_finish_deploy_request();
@@ -271,6 +345,7 @@ seL4_MessageInfo_t monitor_call_deploy_first_half(seL4_Word num_req_pc)
 
     err = monitor_deploy_second_half();
     if (err != MON_NO_ERROR) {
+        monitor_deploy_result_complete(err);
         goto fh_exit;
     }
 
@@ -315,16 +390,11 @@ seL4_MessageInfo_t monitor_call_deploy_to_protocon(seL4_Word pc_id,
     deploy_request.requested_peer_mask = (uint32_t)peer_mask;
     deploy_request.targeted = true;
     deploy_request_active = true;
-    deploy_result = (monitor_deploy_result_t){
-        .target_pc = (uint32_t)pc_id,
-        .error = MON_DEPLOY_IN_PROGRESS,
-        .ready = false,
-    };
+    monitor_deploy_result_begin(1);
 
     err = monitor_deploy_second_half();
     if (err != MON_NO_ERROR) {
-        deploy_result.error = err;
-        deploy_result.ready = true;
+        monitor_deploy_result_complete(err);
         return microkit_msginfo_new(err, 0);
     }
     microkit_cothread_yield();
@@ -337,31 +407,16 @@ seL4_MessageInfo_t monitor_call_deploy_result(void)
         return microkit_msginfo_new(MON_DEPLOY_IN_PROGRESS, 0);
     }
 
-    microkit_mr_set(0, deploy_result.target_pc);
-    microkit_mr_set(1, deploy_result.connected_peer_mask);
-    microkit_mr_set(2, deploy_result.rejected_peer_mask);
-    microkit_mr_set(3, deploy_result.unavailable_peer_mask);
-    return microkit_msginfo_new(deploy_result.error, 4);
-}
+    const pc_deploy_result_t *response = &deploy_result.response;
 
-pc_monitor_error protocon_deploy(payload_info_t *info)
-{
-    deploy_plan_t plan = {0};
-    protocon_svc_req_t req = {0};
-    uint64_t started_at = monitor_profile_counter();
-
-    service_manifest_parse(info, &req);
-    service_planner_select_protocon(&req, &plan, protocon_states);
-
-    pc_monitor_error err = protocon_deploy_plan_check(&plan);
-    if (err != MON_NO_ERROR) {
-        return err;
-    }
-
-    monitor_profile_begin_deploy(plan.pc_id, started_at);
-    monitor_profile_record(plan.pc_id, PC_PROFILE_DEPLOY_PARSE_PLAN, started_at);
-
-    return protocon_deploy_execute(info, &plan);
+    microkit_mr_set(PC_DEPLOY_RESULT_REQUESTED_COUNT, response->requested_count);
+    microkit_mr_set(PC_DEPLOY_RESULT_DEPLOYED_COUNT, response->deployed_count);
+    microkit_mr_set(PC_DEPLOY_RESULT_PROTOCON_MASK, response->protocon_mask);
+    microkit_mr_set(PC_DEPLOY_RESULT_CONNECTED_PEER_MASK, response->connected_peer_mask);
+    microkit_mr_set(PC_DEPLOY_RESULT_REJECTED_PEER_MASK, response->rejected_peer_mask);
+    microkit_mr_set(PC_DEPLOY_RESULT_UNAVAILABLE_PEER_MASK,
+                    response->unavailable_peer_mask);
+    return microkit_msginfo_new(deploy_result.error, PC_DEPLOY_RESULT_MR_COUNT);
 }
 
 static pc_monitor_error protocon_deploy_to_protocon(payload_info_t *info, uint32_t pc_id)

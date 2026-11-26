@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <carrels-user.h>
 #include <microkit.h>
 #include <pcmcall/error.h>
 
@@ -17,10 +18,7 @@ typedef struct {
 } monitor_deploy_request_t;
 
 typedef struct {
-    uint32_t target_pc;
-    uint32_t connected_peer_mask;
-    uint32_t rejected_peer_mask;
-    uint32_t unavailable_peer_mask;
+    pc_deploy_result_t response;
     pc_monitor_error error;
     bool ready;
 } monitor_deploy_result_t;
@@ -38,7 +36,5 @@ seL4_MessageInfo_t monitor_call_deploy_to_protocon(seL4_Word pc_id,
                                                     seL4_Word peer_mask,
                                                     seL4_Word peers_all);
 
-/* Return the completed targeted deployment result in MR 0..3. */
+/* Return the result shared by targeted and Monitor-selected deployments. */
 seL4_MessageInfo_t monitor_call_deploy_result(void);
-
-pc_monitor_error protocon_deploy(payload_info_t *info);

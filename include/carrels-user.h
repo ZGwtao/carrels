@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #define PC_MONITOR_CALL_DEPLOY (1)
 #define PC_MONITOR_CALL_SUSPEND (3)
 #define PC_MONITOR_CALL_RESUME (4)
@@ -19,6 +21,28 @@
 #define PC_MONITOR_CALL_DEPLOY_TO_PROTOCON (22)
 #define PC_MONITOR_CALL_DEPLOY_RESULT (23)
 #define PC_MONITOR_CALL_PROFILE (24)
+
+/* PC_MONITOR_CALL_DEPLOY_RESULT message-register layout. The same result
+ * describes targeted and Monitor-selected deployments; peer masks are zero
+ * when no peer policy was requested. */
+enum {
+    PC_DEPLOY_RESULT_REQUESTED_COUNT,
+    PC_DEPLOY_RESULT_DEPLOYED_COUNT,
+    PC_DEPLOY_RESULT_PROTOCON_MASK,
+    PC_DEPLOY_RESULT_CONNECTED_PEER_MASK,
+    PC_DEPLOY_RESULT_REJECTED_PEER_MASK,
+    PC_DEPLOY_RESULT_UNAVAILABLE_PEER_MASK,
+    PC_DEPLOY_RESULT_MR_COUNT,
+};
+
+typedef struct {
+    uint32_t requested_count;
+    uint32_t deployed_count;
+    uint32_t protocon_mask;
+    uint32_t connected_peer_mask;
+    uint32_t rejected_peer_mask;
+    uint32_t unavailable_peer_mask;
+} pc_deploy_result_t;
 
 enum {
     PC_PROFILE_DEPLOY_PARSE_PLAN,
