@@ -19,10 +19,13 @@ class CarrelsContainerEngine:
         orchestrator: PD,
         layout_txlo: VSpace,
         layout_monitor: VSpace,
-        cid_limit: int
+        cid_limit: int,
+        uk_heap_size: int = 0x4000000,
     ):
         if cid_limit <= 0 or cid_limit > 16:
             raise ValueError("Invalid cid_limit given")
+        if uk_heap_size <= 0 or uk_heap_size % 0x1000 != 0:
+            raise ValueError("Unikraft heap size must be a positive multiple of 4 KiB")
 
         self.sdf = sdf
         self.engine = engine
@@ -30,6 +33,7 @@ class CarrelsContainerEngine:
         self.layout_txlo = layout_txlo
         self.layout_monitor = layout_monitor
         self.cid_limit = cid_limit
+        self.uk_heap_size = uk_heap_size
         self._free_cids: set[int] = set(range(cid_limit))
         self._client_cids: dict[PD, int] = {}
 
@@ -152,7 +156,7 @@ class CarrelsContainerEngine:
         the things above are for setting up the regions for a normal conatiner
         the things below are for unikernels specifically.
         """
-        uk_heap = self.create_mr(pc.name, "uk_heap", 0x4000000)
+        uk_heap = self.create_mr(pc.name, "uk_heap", self.uk_heap_size)
         self.sdf.add_mr(uk_heap)
         pc.add_map(self.create_map_cached_data(
             uk_heap,
