@@ -23,7 +23,6 @@ void monitor_main_load_trustedlo(uint32_t cid)
 {
     uintptr_t protocon_base = monitor_vm_region_base(&monitor_vm_layout.loader_program, cid);
     uintptr_t trampoline_base = monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
-    uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
 
     size_t trampoline_size = monitor_trampoline_capacity();
 
@@ -42,11 +41,7 @@ void monitor_main_load_trustedlo(uint32_t cid)
     }
     MONITOR_PROFILE_TRACE_RECORD(loader_reset, cid, PC_PROFILE_RECLAIM_LOADER_RESET);
 
-    /* Clear the memory occupied by the reclaimed payload. */
-    MONITOR_PROFILE_TRACE_SET(payload_clear);
-    {
-        memset((void *)payload_base, 0, protocon_states[cid].loaded_image_size);
-        protocon_states[cid].loaded_image_size = 0;
-    }
-    MONITOR_PROFILE_TRACE_RECORD(payload_clear, cid, PC_PROFILE_RECLAIM_PAYLOAD_CLEAR);
+    /* Payload sanitisation is deferred until the next deployment. The new
+     * image overwrites its full range and protocon_load_payload() clears any
+     * remaining tail before the Protocon is restarted. */
 }

@@ -63,9 +63,11 @@ static inline void
 protocon_load_payload(uint32_t pc_id, uintptr_t dest, uintptr_t src, uint64_t elf_size)
 {
     const mktsymb_header_t *sym = &protocon_states[pc_id].sym_header;
+    size_t previous_image_size = protocon_states[pc_id].loaded_image_size;
     uint64_t sym_size = mktsymb_bundle_size(sym);
     uint64_t sym_offset = sizeof(protocon_image_header_t);
     uint64_t elf_offset = sym_offset + sym_size;
+    size_t image_size = elf_offset + elf_size;
 
     protocon_image_header_t *header = (protocon_image_header_t *)dest;
 
@@ -79,7 +81,14 @@ protocon_load_payload(uint32_t pc_id, uintptr_t dest, uintptr_t src, uint64_t el
     memcpy((void *)(dest + sym_offset), sym->base, sym_size);
     memcpy((void *)(dest + elf_offset), (const void *)src, elf_size);
 
-    protocon_states[pc_id].loaded_image_size = elf_offset + elf_size;
+    /* The new image overwrites its entire range. If the previous tenant used
+     * a larger image, clear only the tail that is not overwritten before the
+     * Protocon is restarted. This preserves isolation without performing a
+     * redundant full clear during reclaim. */
+    if (previous_image_size > image_size) {
+        memset((void *)(dest + image_size), 0, previous_image_size - image_size);
+    }
+    protocon_states[pc_id].loaded_image_size = image_size;
 
     TSLDR_DBG_PRINT(PROGNAME "pc=%d image=%x sym_off=%x sym_size=%d elf_off=%x elf_size=%d\n",
                     pc_id,
