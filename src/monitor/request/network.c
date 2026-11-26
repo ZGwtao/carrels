@@ -13,6 +13,15 @@ extern net_vswitch_orchestrator_config_t net_vswitch_orchestrator_config;
 static uint32_t peer_policy[PC_CHILD_PER_MONITOR_MAX_NUM];
 static uint32_t monitored_protocon_count;
 
+static inline bool monitor_acl_peers_connected(uint32_t pc_id, uint32_t peer)
+{
+    uint32_t peer_bit = (uint32_t)1U << peer;
+    uint32_t pc_bit = (uint32_t)1U << pc_id;
+
+    /* The vswitch ACL is installed only after both peers authorise the connection. */
+    return (peer_policy[pc_id] & peer_bit) && (peer_policy[peer] & pc_bit);
+}
+
 seL4_MessageInfo_t monitor_call_set_vswitch_acl(seL4_Word port0,
                                                 seL4_Word port1,
                                                 seL4_Word allow)
@@ -52,7 +61,10 @@ void monitor_acl_release_protocon(uint32_t pc_id)
         if (peer == pc_id) {
             continue;
         }
-        (void)monitor_call_set_vswitch_acl(pc_id, peer, 0);
+        /* Skip peers without an active ACL connection. */
+        if (monitor_acl_peers_connected(pc_id, peer)) {
+            (void)monitor_call_set_vswitch_acl(pc_id, peer, 0);
+        }
         peer_policy[peer] &= ~((uint32_t)1U << pc_id);
     }
     peer_policy[pc_id] = 0;

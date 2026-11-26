@@ -25,15 +25,11 @@ void monitor_main_load_trustedlo(uint32_t cid)
     uintptr_t trampoline_base = monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
     uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
 
-    size_t protocon_size = monitor_protocon_capacity();
     size_t trampoline_size = monitor_trampoline_capacity();
 
     /* Restore the trusted loader and trampoline for the next deployment. */
     MONITOR_PROFILE_TRACE_SET(loader_reset);
     {
-        memset((void *)protocon_base, 0, protocon_size);
-        memset((void *)trampoline_base, 0, trampoline_size);
-
         const Elf64_Ehdr *protocon = (const Elf64_Ehdr *)__carrels_protocon_start;
         TSLDR_ASSERT(tsldr_miscutil_load_elf(protocon,
                                              monitor_protocon_capacity(),
