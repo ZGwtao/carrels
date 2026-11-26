@@ -772,7 +772,8 @@ void init(void)
     assert(serial_config_check_magic(&serial_config));
     TSLDR_DBG_PRINT(PROGNAME "check serial config\n");
     assert(fs_config_check_magic(&fs_config));
-    assert(virtio_vsock_transport_config_check_magic(&vsock_config));
+    /* No vsock transport while the k8s VM is disabled. */
+    /* assert(virtio_vsock_transport_config_check_magic(&vsock_config)); */
     TSLDR_DBG_PRINT(PROGNAME "check fs config\n");
 
     if (serial_config.rx.queue.vaddr != NULL) {
@@ -786,7 +787,7 @@ void init(void)
                       serial_config.tx.data.size,
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
-    cri_runtime_init();
+    /* cri_runtime_init(); */
 
     fs_set_blocking_wait(blocking_wait);
     fs_command_queue = fs_config.server.command_queue.vaddr;
@@ -875,8 +876,8 @@ void notified(microkit_channel ch)
 
     if (ch == serial_config.rx.id) {
         orche_handle_serial_event();
-    } else if (ch == vsock_config.connection.id) {
-        cri_runtime_notified();
+    /* } else if (ch == vsock_config.connection.id) {
+        cri_runtime_notified(); */
     } else if (ch == 30) {
         /* Notification from monitor. */
         if (deploy_pending) {

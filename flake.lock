@@ -103,16 +103,16 @@
         "zig-overlay": "zig-overlay"
       },
       "locked": {
-        "lastModified": 1788930758,
-        "narHash": "sha256-T3fbZWa5IywAEZhsiMFQAOIu2v5x6+p7sjsIRPcNVDA=",
+        "lastModified": 1795585450,
+        "narHash": "sha256-jfbYdNvipsck59XDI/4DdEFbt4hZ7oCeo/4CYab5srU=",
         "owner": "au-ts",
         "repo": "microkit_sdf_gen",
-        "rev": "c0158d889663744f3248032c985d74f1d3973418",
+        "rev": "6b3280beaf0213a9cd37a81d3b2ef8488d6d2116",
         "type": "github"
       },
       "original": {
         "owner": "au-ts",
-        "ref": "checkpoint-demo",
+        "ref": "carrels/ramfs-sdfgen",
         "repo": "microkit_sdf_gen",
         "type": "github"
       }

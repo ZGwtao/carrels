@@ -4,10 +4,6 @@
 
 include $(SDDF)/tools/make/board/common.mk
 
-ifneq ($(MICROKIT_BOARD),qemu_virt_aarch64)
-$(error Kubernetes VM PoC currently supports MICROKIT_BOARD=qemu_virt_aarch64 only)
-endif
-
 ifeq ($(ARCH),aarch64)
 CFLAGS += -include $(CARRELS)/include/sddf-arch-compat.h
 endif
@@ -17,6 +13,7 @@ LIONSOS := $(CARRELS)/dep/lionsos
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
 FAT := $(CARRELS)/components/fat
 NETWORK_COMPONENTS := $(SDDF)/network/components
+COMPONENTS_VMM ?= 1
 
 # Match the storage device exposed by qemu.sh unless explicitly overridden.
 ifeq ($(ARCH),x86_64)
@@ -39,7 +36,10 @@ else
 $(error NVME must be either 0 or 1)
 endif
 
-vpath %.c $(SDDF) $(VSWITCH) $(LIBVMM)
+vpath %.c $(SDDF) $(VSWITCH)
+ifeq ($(COMPONENTS_VMM),1)
+vpath %.c $(LIBVMM)
+endif
 
 CFLAGS += \
 	-DSDDF_VIRTIO_PCI_TRANSPORT_SKIP_BUS_CHECK \
@@ -50,9 +50,11 @@ CFLAGS += \
 	-I$(SDDF)/include \
 	-I$(SDDF)/include/microkit \
 	-I$(VSWITCH)/include \
-	-I$(LIBMICROKITCO_PATH) \
-	-I$(LIBVMM)/include \
-	-I$(LIBVMM_EXAMPLE)
+	-I$(LIBMICROKITCO_PATH)
+
+ifeq ($(COMPONENTS_VMM),1)
+CFLAGS += -I$(LIBVMM)/include -I$(LIBVMM_EXAMPLE)
+endif
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := -lmicrokit -Tmicrokit.ld libsddf_util_debug.a
@@ -77,10 +79,12 @@ endif
 include $(SDDF)/network/components/network_components.mk
 include $(ETHERNET_DRIVER)/eth_driver.mk
 
+ifeq ($(COMPONENTS_VMM),1)
 LIBVMM_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(LIBVMM)/vmm.mk
 include $(LIBVMM)/tools/linux/blk/blk_init.mk
 include $(LIBVMM)/tools/linux/net/net_init.mk
+endif
 
 %.py: $(CONTAINER_DIR)/%.py
 	cp $< $@
@@ -99,7 +103,11 @@ include $(CONTAINER_COMPONENT_DIR)/pc.mk
 LIBMICROKITCO_LIBC_INCLUDE := $(SDDF)/include/sddf/util/custom_libc
 include $(LIBMICROKITCO_PATH)/libmicrokitco.mk
 
-include $(ROOT)/mk/unikernels.mk
+include $(ROOT)/mk/unikraft.mk
+# Carrels provides its own application-image targets above and consumes
+# uk-on-mk here only for its service framework (currently RAMFS).
+UKF_ENABLE_APPS :=
+include $(UK_ON_MK_DIR)/Makefile
 
 $(SDDF)/tools/make/board/common.mk $(SDDF_MAKEFILES) \
 		$(CARRELS)/dep/sddf/include &:

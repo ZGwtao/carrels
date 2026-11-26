@@ -25,20 +25,28 @@ void monitor_main_load_trustedlo(uint32_t cid)
     uintptr_t trampoline_base = monitor_vm_region_base(&monitor_vm_layout.trampoline_image, cid);
     uintptr_t payload_base = monitor_vm_region_base(&monitor_vm_layout.container_image, cid);
 
-    size_t protocon_size = monitor_protocon_capacity();
     size_t trampoline_size = monitor_trampoline_capacity();
 
-    memset((void *)protocon_base, 0, protocon_size);
-    memset((void *)trampoline_base, 0, trampoline_size);
+    /* Restore the trusted loader and trampoline for the next deployment. */
+    MONITOR_PROFILE_TRACE_SET(loader_reset);
+    {
+        const Elf64_Ehdr *protocon = (const Elf64_Ehdr *)__carrels_protocon_start;
+        TSLDR_ASSERT(tsldr_miscutil_load_elf(protocon,
+                                             monitor_protocon_capacity(),
+                                             (void *)protocon_base,
+                                             TSLDR_VM_LOADER_PROGRAM_BASE,
+                                             monitor_vm_layout.loader_program.size));
+        memcpy((void *)trampoline_base,
+               (const char *)(__carrels_trampoline_start),
+               trampoline_size);
+    }
+    MONITOR_PROFILE_TRACE_RECORD(loader_reset, cid, PC_PROFILE_RECLAIM_LOADER_RESET);
 
-    const Elf64_Ehdr *protocon = (const Elf64_Ehdr *)__carrels_protocon_start;
-    TSLDR_ASSERT(tsldr_miscutil_load_elf(protocon,
-                                         monitor_protocon_capacity(),
-                                         (void *)protocon_base,
-                                         TSLDR_VM_LOADER_PROGRAM_BASE,
-                                         monitor_vm_layout.loader_program.size));
-    memcpy((void *)trampoline_base, (const char *)(__carrels_trampoline_start), trampoline_size);
-
-    /* clean up client payload region entirely. */
-    memset((void *)payload_base, 0, ORC_MONITOR_REGION_SIZE);
+    /* Clear the memory occupied by the reclaimed payload. */
+    MONITOR_PROFILE_TRACE_SET(payload_clear);
+    {
+        memset((void *)payload_base, 0, protocon_states[cid].loaded_image_size);
+        protocon_states[cid].loaded_image_size = 0;
+    }
+    MONITOR_PROFILE_TRACE_RECORD(payload_clear, cid, PC_PROFILE_RECLAIM_PAYLOAD_CLEAR);
 }

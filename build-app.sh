@@ -50,5 +50,5 @@ fi
 
 echo "Application image built successfully:"
 ls -lh "$IMAGE_FILE"
-echo "To update the existing QEMU disk (with QEMU stopped), run:"
-echo "  nix develop --command python \"$SCRIPT_DIR/tools/virt_disk.py\" copy -f \"$IMAGE_FILE\" -d \"$BUILD_DIR/qemu_disk\" -p 1"
+echo "To embed this image in the orchestrator RAMFS, rebuild the infra:"
+echo "  ./build-infra.sh"

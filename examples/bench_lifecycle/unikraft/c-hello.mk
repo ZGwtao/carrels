@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: BSD-2-Clause
+
+UKF_APP_LIBS :=
+UKF_APP_MAIN_VAR := APPCHELLO_MAIN
+UKF_APP_NEEDS_INITRD :=

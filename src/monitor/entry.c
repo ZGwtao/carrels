@@ -45,8 +45,7 @@ static void blocking_wait(microkit_channel ch)
 ca_monitor_bootinfo_t ca_bootinfo;
 pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
-#define ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE (0x7000000)
-uintptr_t __carrels_payload_start = (uintptr_t)(ORC_MONITOR_REGION_CLIENT_PAYLOAD_BASE);
+uintptr_t __carrels_payload_start;
 
 seL4_Word pd_io_acl_rule = 0;
 

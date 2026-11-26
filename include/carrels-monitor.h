@@ -13,6 +13,7 @@
 #include <monitor_vm_layout.h>
 
 #include <carrels-services.h>
+#include <service/cache.h>
 #include <carrels-user.h>
 
 #include <ioutils/pico_vfs.h>
@@ -21,11 +22,10 @@
 #include <monitor/mcall.h>
 #include <monitor/minit.h>
 #include <monitor/payload.h>
+#include <monitor/profile.h>
 #include <monitor/delegation.h>
 
 #define PROGNAME "[@monitor] "
-
-#define ORC_MONITOR_REGION_SIZE (0x800000)
 
 // maximum 8 os services instances per OS service type
 #define PC_SVC_PER_PD_MAX_NUM (8)
@@ -99,6 +99,10 @@ typedef struct pc_state {
         const svc_service_t *avail_service_refs[SVC_TYPE_MAX_NUM][SVC_PER_TYPE_MAX_NUM];
     } resource_quota;
     mktsymb_header_t sym_header;
+
+    /* Record the size to avoid memzero-ing redundant payload region */
+    size_t loaded_image_size;
+
 } pc_state_t;
 
 extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
@@ -205,4 +209,4 @@ void service_planner_select_protocon_by_id(const protocon_svc_req_t *req,
                                            const pc_state_t *protocon_states,
                                            uint32_t pc_id);
 
-void service_installer_apply(const deploy_plan_t *plan);
+bool service_installer_apply(const deploy_plan_t *plan);

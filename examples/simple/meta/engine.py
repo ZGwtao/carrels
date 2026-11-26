@@ -19,10 +19,13 @@ class CarrelsContainerEngine:
         orchestrator: PD,
         layout_txlo: VSpace,
         layout_monitor: VSpace,
-        cid_limit: int
+        cid_limit: int,
+        uk_heap_size: int = 0x4000000,
     ):
         if cid_limit <= 0 or cid_limit > 16:
             raise ValueError("Invalid cid_limit given")
+        if uk_heap_size <= 0 or uk_heap_size % 0x1000 != 0:
+            raise ValueError("Unikraft heap size must be a positive multiple of 4 KiB")
 
         self.sdf = sdf
         self.engine = engine
@@ -30,6 +33,7 @@ class CarrelsContainerEngine:
         self.layout_txlo = layout_txlo
         self.layout_monitor = layout_monitor
         self.cid_limit = cid_limit
+        self.uk_heap_size = uk_heap_size
         self._free_cids: set[int] = set(range(cid_limit))
         self._client_cids: dict[PD, int] = {}
 
@@ -50,14 +54,16 @@ class CarrelsContainerEngine:
         mr_size = self.layout_txlo.size(mr_name)
         return MR(self.sdf, name=prefix + mr_name.lower(), size=mr_size)
 
-    def create_map_exec(self, mr: MR, vaddr: int) -> MAP:
-        return MAP(mr, vaddr, perms="rwx", cached="true")
+    def create_map_exec(self, mr: MR, vaddr: int, setvar_vaddr: str | None = None) -> MAP:
+        return MAP(mr, vaddr, perms="rwx", cached="true", setvar_vaddr=setvar_vaddr)
 
-    def create_map_uncached_data(self, mr: MR, vaddr: int) -> MAP:
-        return MAP(mr, vaddr, perms="rw", cached="false")
+    def create_map_uncached_data(self, mr: MR, vaddr: int, setvar_vaddr: str | None = None) -> MAP:
+        return MAP(mr, vaddr, perms="rw", cached="false", setvar_vaddr=setvar_vaddr)
 
-    def create_map_cached_data(self, mr: MR, vaddr: int) -> MAP:
-        return MAP(mr, vaddr, perms="rw", cached="true")
+    def create_map_cached_data(self, mr: MR, vaddr: int, setvar_vaddr: str | None = None,
+                               setvar_size: str | None = None) -> MAP:
+        return MAP(mr, vaddr, perms="rw", cached="true", setvar_vaddr=setvar_vaddr,
+                   setvar_size=setvar_size)
 
     def create_map_io(self, mr: MR, vaddr: int) -> MAP:
         return self.create_map_uncached_data(mr, vaddr)
@@ -79,9 +85,11 @@ class CarrelsContainerEngine:
         self.sdf.add_mr(svc_buffer)
         self.sdf.add_mr(dlg_buffer)
         self.sdf.add_mr(sym_buffer)
-        self.engine.add_map(self.create_map_cached_data(svc_buffer, 0xaaaaa00000))
-        self.engine.add_map(self.create_map_cached_data(dlg_buffer, 0xaaaaa10000))
-        self.engine.add_map(self.create_map_cached_data(sym_buffer, 0xaaaaa20000))
+        self.engine.add_map(self.create_map_cached_data(svc_buffer, 0xaaaaa00000, setvar_vaddr="svc_buffer_vaddr"))
+        self.engine.add_map(self.create_map_cached_data(dlg_buffer, 0xaaaaa10000, setvar_vaddr="dlg_buffer_vaddr"))
+        self.engine.add_map(self.create_map_cached_data(sym_buffer, 0xaaaaa20000,
+                                                        setvar_vaddr="sym_buffer_vaddr",
+                                                        setvar_size="sym_buffer_size"))
 
     def setup_mr_images(self, pc: PD, cid: int):
         container_elf = self.create_txlo_mr(pc.name, "CONTAINER_IMAGE")
@@ -148,9 +156,14 @@ class CarrelsContainerEngine:
         the things above are for setting up the regions for a normal conatiner
         the things below are for unikernels specifically.
         """
-        uk_heap = self.create_mr(pc.name, "uk_heap", 0x4000000)
+        uk_heap = self.create_mr(pc.name, "uk_heap", self.uk_heap_size)
         self.sdf.add_mr(uk_heap)
-        pc.add_map(MAP(uk_heap, 0x200000000, perms="rw", cached="true"))
+        pc.add_map(self.create_map_cached_data(
+            uk_heap,
+            0x200000000,
+            setvar_vaddr="carrels_heap_base",
+            setvar_size="carrels_heap_size",
+        ))
 
         return cid
 
@@ -167,7 +180,8 @@ class CarrelsContainerEngine:
 
         self.engine.add_map(self.create_map_cached_data(image_txlo, 0x6000000))
         self.engine.add_map(self.create_map_cached_data(image_trampoline, 0x6800000))
-        self.engine.add_map(self.create_map_cached_data(image_application, 0x7000000))
+        self.engine.add_map(self.create_map_cached_data(image_application, 0x7000000,
+                                                        setvar_vaddr="__carrels_payload_start"))
 
         self.orchestrator.add_map(self.create_map_cached_data(image_txlo, 0x4000000))
         self.orchestrator.add_map(self.create_map_cached_data(image_trampoline, 0x6000000))

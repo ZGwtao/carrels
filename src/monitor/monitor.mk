@@ -9,6 +9,7 @@ PC_MONITOR_OBJS := \
 	pc/monitor/fault/fault.o \
 	pc/monitor/request/deploy.o \
 	pc/monitor/request/network.o \
+	pc/monitor/request/profile.o \
 	pc/monitor/request/query.o \
 	pc/monitor/request/resume.o \
 	pc/monitor/request/stop.o \
@@ -16,6 +17,7 @@ PC_MONITOR_OBJS := \
 	pc/monitor/request/suspend.o \
 	pc/monitor/init/minit.o \
 	pc/monitor/service/service_installer.o \
+	pc/monitor/service/service_cache.o \
 	pc/monitor/service/service_manifest.o \
 	pc/monitor/service/service_planner.o \
 	pc/monitor/service/service_registry.o \

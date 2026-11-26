@@ -22,9 +22,9 @@ export BUILD_DIR ?= $(abspath build/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))
 IMAGE_FILE := $(BUILD_DIR)/container.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
-.PHONY: all build infra apps app-native app-uk ramdisk qemu
+.PHONY: all build infra apps app-native app-uk ramdisk qemu ramfs-phase2
 
-all build infra apps app-native app-uk ramdisk qemu: ${BUILD_DIR}/Makefile FORCE
+all build infra apps app-native app-uk ramdisk qemu ramfs-phase2: ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy: ${BUILD_DIR}/Makefile FORCE
@@ -32,7 +32,9 @@ ${IMAGE_FILE} ${REPORT_FILE} system clean qemu_disk refresh-ramdisk clobber tidy
 
 ${BUILD_DIR}/Makefile: container.mk Makefile $(BUILD_DEFAULTS) \
 		$(ROOT)/mk/components.mk $(ROOT)/mk/k8s-vmm.mk \
-		$(ROOT)/mk/unikernels.mk
+		$(ROOT)/mk/unikraft.mk \
+		$(ROOT)/dep/uk-on-mk/Makefile \
+		$(ROOT)/dep/uk-on-mk/services/ramfs/ramfs.mk
 	mkdir -p ${BUILD_DIR}
 	echo "ROOT ?= ${ROOT}" > $@
 	echo "CARRELS ?= ${CARRELS}" >> $@

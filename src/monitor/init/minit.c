@@ -12,95 +12,124 @@
 dlg_header_t dlg;
 svc_t svc;
 
-static inline void ca_monitor_init_storage(void)
+uintptr_t svc_buffer_vaddr;
+uintptr_t dlg_buffer_vaddr;
+uintptr_t sym_buffer_vaddr;
+uintptr_t sym_buffer_size;
+
+static const char *ca_monitor_find_terminator(const char *text, size_t capacity)
 {
-    fs_cmpl_t completion;
-    int err = fs_command_blocking(&completion, (fs_cmd_t){.type = FS_CMD_INITIALISE});
+    for (size_t i = 0; i < capacity; ++i) {
+        if (text[i] == '\0') {
+            return text + i;
+        }
+    }
+    return NULL;
+}
 
-    if (err || completion.status != FS_STATUS_SUCCESS) {
-        TSLDR_DBG_PRINT(PROGNAME "Failed to mount\n");
+static void ca_monitor_make_metadata_filepath(char *filepath, size_t capacity, const char *suffix)
+{
+    const char *name_end = ca_monitor_find_terminator(microkit_name, sizeof(microkit_name));
+    if (name_end == NULL) {
+        TSLDR_DBG_PRINT(PROGNAME "Microkit name is not terminated\n");
         microkit_internal_crash(-1);
     }
 
-    char svc_file[80];
-    char dlg_file[80];
+    size_t name_len = (size_t)(name_end - microkit_name);
+    if (capacity <= name_len + 1) {
+        TSLDR_DBG_PRINT(PROGNAME "Metadata filename is too long\n");
+        microkit_internal_crash(-1);
+    }
 
-    sddf_snprintf(svc_file, sizeof(svc_file), "%s.svc", microkit_name);
-    sddf_snprintf(dlg_file, sizeof(dlg_file), "%s.dlg", microkit_name);
+    size_t suffix_space = capacity - name_len - 1;
+    if (ca_monitor_find_terminator(suffix, suffix_space) == NULL) {
+        TSLDR_DBG_PRINT(PROGNAME "Metadata filename is too long\n");
+        microkit_internal_crash(-1);
+    }
 
-    pico_vfs_readfile2buf((void *)0xaaaaa00000, svc_file, &err);
+    int len = sddf_snprintf(filepath, capacity, "%s.%s", microkit_name, suffix);
+    if (len < 0 || (size_t)len >= capacity) {
+        TSLDR_DBG_PRINT(PROGNAME "Metadata filename is too long\n");
+        microkit_internal_crash(-1);
+    }
+}
+
+static void ca_monitor_load_metadata(const char *suffix, void *buffer)
+{
+    char fpath[MICROKIT_PD_NAME_LENGTH + 10];
+    ca_monitor_make_metadata_filepath(fpath, sizeof(fpath), suffix);
+
+    int err;
+    pico_vfs_readfile2buf(buffer, fpath, &err);
     if (err != seL4_NoError) {
-        TSLDR_DBG_PRINT(PROGNAME "Failed to load svc file\n");
+        TSLDR_DBG_PRINT(PROGNAME "Failed to load %s\n", fpath);
         microkit_internal_crash(-1);
     }
+}
 
-    pico_vfs_readfile2buf((void *)0xaaaaa10000, dlg_file, &err);
-    if (err != seL4_NoError) {
-        TSLDR_DBG_PRINT(PROGNAME "Failed to load dlg file\n");
-        microkit_internal_crash(-1);
-    }
-
-    if (!dlg_parse((void *)0xaaaaa10000, &dlg)) {
+static void ca_monitor_load_and_parse_delegation_info(void *buffer, dlg_header_t *delegation_info)
+{
+    ca_monitor_load_metadata("dlg", buffer);
+    if (!dlg_parse(buffer, delegation_info)) {
         TSLDR_DBG_PRINT(PROGNAME "failed to parse dlg\n");
         while (1) {
             ;
         }
     }
+    // for (uint32_t i = 0; i < delegation_info->delegator_count; i++) {
+    //     const dlg_delegator_t *delegator = delegation_info->delegators[i];
 
-    for (uint32_t i = 0; i < dlg.delegator_count; i++) {
-        const dlg_delegator_t *delegator = dlg.delegators[i];
+    //     TSLDR_DBG_PRINT("pd=%d cap=%d resources=%d\n",
+    //                     delegator->pd_id,
+    //                     delegator->delegation_cap,
+    //                     delegator->resource_count);
+    // }
+}
 
-        TSLDR_DBG_PRINT("pd=%d cap=%d resources=%d\n",
-                        delegator->pd_id,
-                        delegator->delegation_cap,
-                        delegator->resource_count);
-    }
-
-    if (!svc_parse((void *)0xaaaaa00000, &svc)) {
+static void ca_monitor_load_and_parse_service_info(void *buffer, svc_t *service_info)
+{
+    ca_monitor_load_metadata("svc", buffer);
+    if (!svc_parse(buffer, service_info)) {
         TSLDR_DBG_PRINT(PROGNAME "failed to parse svc\n");
         while (1) {
             ;
         }
     }
 
-    for (uint32_t i = 0; i < svc.service_count; i++) {
-        const svc_service_t *service = svc.services[i];
+    // for (uint32_t i = 0; i < service_info->service_count; i++) {
+    //     const svc_service_t *service = service_info->services[i];
 
-        TSLDR_DBG_PRINT("pd=%d id=%d type=%d resources=%d path=%.*s\n",
-                        service->pd_id,
-                        service->service_id,
-                        service->service_type,
-                        service->resource_count,
-                        (int)service->path_len,
-                        svc_service_path(service));
+    //     TSLDR_DBG_PRINT("pd=%d id=%d type=%d resources=%d path=%.*s\n",
+    //                     service->pd_id,
+    //                     service->service_id,
+    //                     service->service_type,
+    //                     service->resource_count,
+    //                     (int)service->path_len,
+    //                     svc_service_path(service));
 
-        for (uint32_t j = 0; j < service->resource_count; j++) {
-            const svc_resource_t *resource = svc_service_resource(service, j);
-            TSLDR_DBG_PRINT("  kind=%d value=0x%x\n", resource->kind, resource->value);
-        }
-    }
+    //     for (uint32_t j = 0; j < service->resource_count; j++) {
+    //         const svc_resource_t *resource = svc_service_resource(service, j);
+    //         TSLDR_DBG_PRINT("  kind=%d value=0x%x\n", resource->kind, resource->value);
+    //     }
+    // }
 }
 
-static inline void
-ca_monitor_init_cothread_spawn(const client_entry_t client_entry, void *arg, char err_msg[])
+static void ca_monitor_init_cothread_spawn(const client_entry_t client_entry,
+                                          void *arg,
+                                          const char *err_msg)
 {
     if (microkit_cothread_spawn(client_entry, arg) == LIBMICROKITCO_NULL_HANDLE) {
-        TSLDR_DBG_PRINT(err_msg);
-        while (1) {
-            ;
-        }
+        TSLDR_DBG_PRINT("%s", err_msg);
+        microkit_internal_crash(-1);
     }
-    microkit_cothread_yield();
 }
-
-#define PROTOCON_MKTSYMB_BASE 0xaaaaa20000
-#define PROTOCON_MKTSYMB_SLOT_SIZE 0x1000
 
 static inline void protocon_state_init_symb_header(uint32_t pc_id)
 {
     int err;
     char sym_file[80];
-    uintptr_t base = PROTOCON_MKTSYMB_BASE + pc_id * PROTOCON_MKTSYMB_SLOT_SIZE;
+    uintptr_t slot_size = sym_buffer_size / PC_CHILD_PER_MONITOR_MAX_NUM;
+    uintptr_t base = sym_buffer_vaddr + pc_id * slot_size;
     pc_state_t *state = &protocon_states[pc_id];
 
     sddf_snprintf(sym_file, sizeof(sym_file), "protocon%u.mktsym", pc_id);
@@ -153,30 +182,56 @@ static inline void ca_monitor_init_protocon_states(uint64_t pc_num)
     service_registry_create(&svc, protocon_states, pc_num);
 }
 
-void ca_monitor_init_states(void)
+static void ca_monitor_boot_phase_first(void)
 {
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase first: mounting storage\n");
+    fs_cmpl_t completion;
+    int err = fs_command_blocking(&completion, (fs_cmd_t){.type = FS_CMD_INITIALISE});
+
+    if (err || completion.status != FS_STATUS_SUCCESS) {
+        TSLDR_DBG_PRINT(PROGNAME "Failed to mount\n");
+        microkit_internal_crash(-1);
+    }
+
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase first: storage ready\n");
+}
+
+static void ca_monitor_boot_phase_second(void)
+{
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase second: loading metadata\n");
+    ca_monitor_load_and_parse_delegation_info((void *)dlg_buffer_vaddr, &dlg);
+    ca_monitor_load_and_parse_service_info((void *)svc_buffer_vaddr, &svc);
+
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase second: metadata ready\n");
+}
+
+static void ca_monitor_boot_phase_third(void)
+{
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase third: initialising states\n");
     void *binfo = microkit_cothread_my_arg();
 
     assert(binfo);
     ca_monitor_bootinfo_t *bootinfo = (ca_monitor_bootinfo_t *)binfo;
 
-    while (!dlg.delegator_count)
-        microkit_cothread_yield();
-
     ca_monitor_init_get_pcnum(dlg.delegator_count, bootinfo);
     ca_monitor_init_protocon_states(bootinfo->num_pc);
     monitor_acl_initialise(bootinfo->num_pc);
+    TSLDR_DBG_PRINT(PROGNAME "Boot phase third: %lu protocons ready\n", bootinfo->num_pc);
 }
 
-/* ----------------  Public Below  ------------------- */
+static void ca_monitor_boot(void)
+{
+    /* Filesystem calls suspend this coroutine until their channel completes.
+     * Each phase then returns normally before the next phase begins. */
+    ca_monitor_boot_phase_first();
+    ca_monitor_boot_phase_second();
+    ca_monitor_boot_phase_third();
+}
 
 void ca_monitor_init_system(void *binfo)
 {
-    (void)ca_monitor_init_cothread_spawn(ca_monitor_init_storage,
-                                         NULL,
-                                         "failed to spawn thread for storage initialisation.\n");
-
-    (void)ca_monitor_init_cothread_spawn(ca_monitor_init_states,
-                                         binfo,
-                                         "failed to spawn thread for state initialisation.\n");
+    ca_monitor_init_cothread_spawn(ca_monitor_boot,
+                                   binfo,
+                                   "failed to spawn boot coroutine.\n");
+    microkit_cothread_yield();
 }

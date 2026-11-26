@@ -43,8 +43,6 @@ seL4_MessageInfo_t monitor_call_list_protocons(void)
 
 seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
 {
-    monitor_main_list_protocon_states(ca_bootinfo.num_pc);
-
     microkit_channel self_id = monitor_get_pcid_from_ch(ch);
     seL4_Word bitmap = 0;
     for (int i = 0; i < PC_CHILD_PER_MONITOR_MAX_NUM; ++i) {
@@ -57,8 +55,5 @@ seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
     seL4_MessageInfo_t ret = microkit_msginfo_new(MON_NO_ERROR, 2);
     microkit_mr_set(0, bitmap);
     microkit_mr_set(1, monitor_get_pcid_from_ch(ch));
-    if (bitmap == 0) {
-        sddf_printf("No dynamic PDs are currently available for communication\n");
-    }
     return ret;
 }
