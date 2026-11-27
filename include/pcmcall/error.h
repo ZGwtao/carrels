@@ -20,4 +20,5 @@ typedef enum {
     MON_INVALID_PEER_SET,
     MON_PC_UNAVAILABLE,
     MON_DEPLOY_IN_PROGRESS,
+    MON_INVALID_CALL,
 } pc_monitor_error;

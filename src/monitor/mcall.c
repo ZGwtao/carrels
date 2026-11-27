@@ -83,10 +83,19 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         ret = monitor_call_stop_and_restore_protocon(target_pd_id);
         break;
     }
-    default:
-        /* do nothing for now */
+    default: {
         TSLDR_DBG_PRINT(PROGNAME "Undefined container monitor call: %d\n", call_id);
+        microkit_channel pc_id = monitor_get_pcid_from_ch(ch);
+
+        if (pc_id == INVALID_PC_ID) {
+            ret = microkit_msginfo_new(MON_INVALID_CALL, 0);
+        } else {
+            /* An unknown call from an untrusted payload is a protocol
+             * violation. Do not rely on that payload to terminate itself. */
+            ret = monitor_call_stop_and_restore_protocon(pc_id);
+        }
         break;
+    }
     }
 
     return ret;
