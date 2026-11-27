@@ -10,7 +10,7 @@
 void monitor_main_handle_fault(microkit_child child, microkit_msginfo msginfo)
 {
     seL4_Word label = microkit_msginfo_get_label(msginfo);
-    seL4_Word notify_flag = 0;
+    bool recover = label != seL4_Fault_VMFault;
 
     if (label == seL4_Fault_VMFault) {
         seL4_Word ip = microkit_mr_get(seL4_VMFault_IP);
@@ -18,9 +18,9 @@ void monitor_main_handle_fault(microkit_child child, microkit_msginfo msginfo)
         seL4_Word prefetch_fault = microkit_mr_get(seL4_VMFault_PrefetchFault);
         seL4_Word fsr = microkit_mr_get(seL4_VMFault_FSR);
 
-        notify_flag = ip | address;
+        recover = (ip | address) != 0;
 
-        if (notify_flag) {
+        if (recover) {
             TSLDR_DBG_PRINT(PROGNAME "seL4_Fault_VMFault\n");
             TSLDR_DBG_PRINT(PROGNAME "child: %d\n", child);
             TSLDR_DBG_PRINT(PROGNAME "Fault address: 0x%llx\n", (unsigned long long)address);
@@ -42,12 +42,11 @@ void monitor_main_handle_fault(microkit_child child, microkit_msginfo msginfo)
     }
     microkit_pd_stop(child);
 
-    if (!notify_flag) {
+    if (!recover) {
         return;
     }
 
     TSLDR_DBG_PRINT(PROGNAME "Fault label: %llu\n", (unsigned long long)label);
-    monitor_main_notify_orchestrator();
-
+    monitor_profile_mark_terminate(child);
     monitor_call_restore_protocon(child + PC_MONITOR_PROTOCON_BASE_CHANNEL);
 }

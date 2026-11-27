@@ -109,6 +109,9 @@ seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo
 {
     monitor_main_handle_fault(child, msginfo);
 
-    // Stop the thread explicitly; no need to reply to the fault
+    /* The child has been stopped explicitly and must not be resumed by a
+     * reply to the fault. */
+    (void)reply_msginfo;
+
     return seL4_False;
 }
