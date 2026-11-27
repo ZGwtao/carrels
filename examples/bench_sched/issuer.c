@@ -65,7 +65,6 @@ typedef enum {
     LOAD_BASELINE,
     LOAD_TIMER,
     LOAD_LIFECYCLE,
-    LOAD_SATURATION,
 } load_kind_t;
 
 typedef struct {
@@ -79,6 +78,7 @@ typedef struct {
     uint64_t duration_ns;
     uint64_t operations;
     uint64_t missed_releases;
+    uint32_t target_operations_per_second;
 } trial_result_t;
 
 static const load_config_t loads[] = {
@@ -91,7 +91,8 @@ static const load_config_t loads[] = {
     {.name = "lifecycle-100", .kind = LOAD_LIFECYCLE, .operations_per_second = 100},
     {.name = "timer-500", .kind = LOAD_TIMER, .operations_per_second = 500},
     {.name = "lifecycle-500", .kind = LOAD_LIFECYCLE, .operations_per_second = 500},
-    {.name = "saturation", .kind = LOAD_SATURATION},
+    {.name = "timer-1000", .kind = LOAD_TIMER, .operations_per_second = 1000},
+    {.name = "lifecycle-1000", .kind = LOAD_LIFECYCLE, .operations_per_second = 1000},
 };
 
 #define LOAD_COUNT (sizeof(loads) / sizeof(loads[0]))
@@ -288,14 +289,6 @@ static void run_load(const load_config_t *load,
         return;
     }
 
-    if (load->kind == LOAD_SATURATION) {
-        while (time_now() < deadline) {
-            run_lifecycle_operation();
-            (*operations)++;
-        }
-        return;
-    }
-
     run_periodic_load(load, deadline, operations, missed_releases);
 }
 
@@ -350,6 +343,7 @@ static trial_result_t run_trial(const load_config_t *load, uint32_t generation)
         .duration_ns = finished_at - started_at,
         .operations = operations,
         .missed_releases = missed_releases,
+        .target_operations_per_second = load->operations_per_second,
     };
 }
 
@@ -377,15 +371,20 @@ static void report_results(void)
         for (unsigned int trial = 0; trial < TRIAL_COUNT; trial++) {
             const trial_result_t *result = &results[load][trial];
             uint64_t throughput = throughput_milli(result);
+            uint64_t achieved_rate =
+                result->operations * NS_PER_SECOND / result->duration_ns;
             uint64_t loss_ppm = throughput < baseline
                 ? (baseline - throughput) * 1000000ULL / baseline
                 : 0;
 
-            sddf_printf("SCHED_BENCH|load=%s|trial=%u|iterations=%lu|duration_ns=%lu|"
+            sddf_printf("SCHED_BENCH|load=%s|trial=%u|target_ops_per_s=%u|"
+                        "achieved_ops_per_s=%lu|iterations=%lu|duration_ns=%lu|"
                         "throughput_milli_iter_s=%lu|loss_ppm=%lu|operations=%lu|"
                         "missed_releases=%lu\n",
                         loads[load].name,
                         trial,
+                        result->target_operations_per_second,
+                        achieved_rate,
                         result->iterations,
                         result->duration_ns,
                         throughput,
@@ -423,9 +422,11 @@ static void benchmark_run(void)
     for (unsigned int load = 0; load < LOAD_COUNT; load++) {
         for (unsigned int trial = 0; trial < TRIAL_COUNT; trial++) {
 #ifdef BENCH_PROGRESS
-            sddf_printf("SCHED_BENCH|PROGRESS|load=%s|trial=%u|state=start\n",
+            sddf_printf("SCHED_BENCH|PROGRESS|load=%s|trial=%u|target_ops_per_s=%u|"
+                        "state=start\n",
                         loads[load].name,
-                        trial);
+                        trial,
+                        loads[load].operations_per_second);
 #endif
             results[load][trial] = run_trial(&loads[load], ++generation);
 #ifdef BENCH_PROGRESS
