@@ -46,6 +46,7 @@ ca_monitor_bootinfo_t ca_bootinfo;
 pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
 
 uintptr_t __carrels_payload_start;
+size_t __carrels_payload_capacity;
 
 seL4_Word pd_io_acl_rule = 0;
 

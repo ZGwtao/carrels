@@ -39,10 +39,12 @@ typedef struct {
     service_manifest_entry_t *service_entries;
 } payload_info_t;
 
+#define PROTOCON_MANIFEST_MAX_SERVICES 16
+
 typedef struct {
     uint32_t service_count;
     uint32_t service_count_per_type[SVC_TYPE_MAX_NUM];
-    service_manifest_entry_t *service_entries[16];
+    service_manifest_entry_t *service_entries[PROTOCON_MANIFEST_MAX_SERVICES];
     Elf64_Addr payload_e_entry;
 } protocon_svc_req_t;
 

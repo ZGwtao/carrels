@@ -196,7 +196,9 @@ static inline microkit_channel monitor_get_pcid_from_ch(microkit_channel ch)
     return ch - PC_MONITOR_PROTOCON_BASE_CHANNEL;
 }
 
-seL4_Error service_manifest_header_parse(payload_info_t *info, uintptr_t base);
+seL4_Error service_manifest_header_parse(payload_info_t *info,
+                                         uintptr_t base,
+                                         size_t capacity);
 
 void service_manifest_parse(payload_info_t *payload, protocon_svc_req_t *req);
 

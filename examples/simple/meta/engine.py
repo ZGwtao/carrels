@@ -180,8 +180,12 @@ class CarrelsContainerEngine:
 
         self.engine.add_map(self.create_map_cached_data(image_txlo, 0x6000000))
         self.engine.add_map(self.create_map_cached_data(image_trampoline, 0x6800000))
-        self.engine.add_map(self.create_map_cached_data(image_application, 0x7000000,
-                                                        setvar_vaddr="__carrels_payload_start"))
+        self.engine.add_map(self.create_map_cached_data(
+            image_application,
+            0x7000000,
+            setvar_vaddr="__carrels_payload_start",
+            setvar_size="__carrels_payload_capacity",
+        ))
 
         self.orchestrator.add_map(self.create_map_cached_data(image_txlo, 0x4000000))
         self.orchestrator.add_map(self.create_map_cached_data(image_trampoline, 0x6000000))

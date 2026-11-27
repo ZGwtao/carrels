@@ -207,7 +207,9 @@ static inline void monitor_call_deploy_second_half(void)
         return;
     }
 
-    err = service_manifest_header_parse(&payload_info, (__carrels_payload_start));
+    err = service_manifest_header_parse(&payload_info,
+                                        __carrels_payload_start,
+                                        __carrels_payload_capacity);
     if (err != seL4_NoError) {
         monitor_deploy_result_complete(MON_FAIL_TO_DEPLOY);
         monitor_finish_deploy_request();

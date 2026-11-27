@@ -12,12 +12,25 @@ static inline bool service_manifest_check_type(protocon_svc_type_t svc_type)
     return (svc_type < SERVICE_RESERVED) && (svc_type > SERVICE_DUMMY);
 }
 
-static inline seL4_Error service_manifest_check(service_manifest_header_t *header)
+static inline bool range_fits(uint64_t offset, uint64_t size, uint64_t capacity)
 {
-    size_t expected_size = sizeof(service_manifest_header_t) +
-                           header->service_count * sizeof(service_manifest_entry_t);
+    return offset <= capacity && size <= capacity - offset;
+}
 
-    if (header->magic != MANIFEST_MAGIC || header->manifest_size != expected_size) {
+static inline seL4_Error service_manifest_check(const service_manifest_header_t *header,
+                                                size_t capacity)
+{
+    size_t expected_size;
+
+    if (header->service_count > PROTOCON_MANIFEST_MAX_SERVICES) {
+        return -1;
+    }
+
+    expected_size = sizeof(service_manifest_header_t) +
+                    header->service_count * sizeof(service_manifest_entry_t);
+
+    if (header->magic != MANIFEST_MAGIC || header->manifest_size != expected_size ||
+        !range_fits(header->manifest_size, header->elf_size, capacity)) {
         return -1;
     }
 
@@ -46,7 +59,38 @@ static inline uintptr_t service_manifest_retrieve_elf(service_manifest_header_t 
 
 /* ----------------  Public Below  ------------------- */
 
-seL4_Error service_manifest_header_parse(payload_info_t *info, uintptr_t base)
+static bool elf_header_is_valid(const Elf64_Ehdr *header, uint64_t elf_size)
+{
+    if (elf_size < sizeof(*header) || memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 ||
+        header->e_ident[EI_CLASS] != ELFCLASS64 ||
+        header->e_ident[EI_DATA] != ELFDATA2LSB ||
+        header->e_ident[EI_VERSION] != EV_CURRENT ||
+        header->e_version != EV_CURRENT || header->e_ehsize != sizeof(*header)) {
+        return false;
+    }
+
+    if (header->e_phnum != 0 &&
+        (header->e_phentsize != sizeof(Elf64_Phdr) ||
+         !range_fits(header->e_phoff,
+                     (uint64_t)header->e_phnum * sizeof(Elf64_Phdr),
+                     elf_size))) {
+        return false;
+    }
+
+    if (header->e_shnum == 0 || header->e_shentsize != sizeof(Elf64_Shdr) ||
+        header->e_shstrndx == SHN_UNDEF || header->e_shstrndx >= header->e_shnum ||
+        !range_fits(header->e_shoff,
+                    (uint64_t)header->e_shnum * sizeof(Elf64_Shdr),
+                    elf_size)) {
+        return false;
+    }
+
+    return true;
+}
+
+seL4_Error service_manifest_header_parse(payload_info_t *info,
+                                         uintptr_t base,
+                                         size_t capacity)
 {
     service_manifest_header_t *header_manifest = (service_manifest_header_t *)base;
     service_manifest_entry_t *entries_start = NULL;
@@ -54,7 +98,7 @@ seL4_Error service_manifest_header_parse(payload_info_t *info, uintptr_t base)
     Elf64_Ehdr *header_payload = NULL;
     uint64_t elf_payload_size = 0;
 
-    if (service_manifest_check(header_manifest)) {
+    if (service_manifest_check(header_manifest, capacity)) {
         TSLDR_DBG_PRINT(PROGNAME "img format is not correct\n");
         return -1;
     }
@@ -63,12 +107,8 @@ seL4_Error service_manifest_header_parse(payload_info_t *info, uintptr_t base)
     service_manifest_dump_entries(header_manifest, entries_start);
 
     header_payload = (Elf64_Ehdr *)service_manifest_retrieve_elf(header_manifest, base);
-    if (header_payload->e_shoff == 0 || header_payload->e_shnum == 0 ||
-        header_payload->e_shentsize != sizeof(Elf64_Shdr) ||
-        header_payload->e_shstrndx == SHN_UNDEF ||
-        header_payload->e_shstrndx >= header_payload->e_shnum) {
-        TSLDR_DBG_PRINT(PROGNAME "no section headers present or unexpected shentsize "
-                                 "or invalid e_shstrndx\n");
+    if (!elf_header_is_valid(header_payload, header_manifest->elf_size)) {
+        TSLDR_DBG_PRINT(PROGNAME "invalid ELF header or out-of-bounds ELF table\n");
         return -1;
     }
 

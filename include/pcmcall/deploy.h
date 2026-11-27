@@ -28,6 +28,7 @@ extern bool deploy_request_active;
 extern monitor_deploy_request_t deploy_request;
 extern monitor_deploy_result_t deploy_result;
 extern uintptr_t __carrels_payload_start;
+extern size_t __carrels_payload_capacity;
 
 seL4_MessageInfo_t monitor_call_deploy_first_half(seL4_Word num_req_pc);
 
