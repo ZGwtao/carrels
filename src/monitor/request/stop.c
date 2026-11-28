@@ -6,13 +6,15 @@
 
 #include <carrels-monitor.h>
 
-seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch)
+seL4_MessageInfo_t monitor_call_stop_and_restore_protocon(microkit_channel ch,
+                                                          pc_exit_reason_t reason)
 {
     microkit_channel target_pd_id = ch;
     if (target_pd_id < 0 || target_pd_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
         TSLDR_DBG_PRINT(PROGNAME "Invalid PD id given for stop and restore\n");
         return microkit_msginfo_new(MON_INVALID_PC_ID, 0);
     }
+    protocon_state_set_exit_reason((uint32_t)target_pd_id, reason);
     monitor_profile_mark_terminate((unsigned int)target_pd_id);
 
     /* Remove the Protocon's peer access rules. */

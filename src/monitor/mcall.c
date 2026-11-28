@@ -35,6 +35,9 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         seL4_Word lifecycle_metric = microkit_mr_get(2);
         ret = monitor_call_profile(pc_id, lifecycle_metric);
         break;
+    case PC_MONITOR_CALL_QUERY_EXIT_REASON:
+        ret = monitor_call_query_exit_reason(microkit_mr_get(1));
+        break;
     case PC_MONITOR_CALL_FLIP_ACL_RULE:
         pd_io_acl_rule = !pd_io_acl_rule;
         break;
@@ -52,7 +55,8 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         break;
     case PC_MONITOR_CALL_TERMINATE:
         TSLDR_DBG_PRINT(PROGNAME "Exit and uninstantiate a dynamic PD\n");
-        ret = monitor_call_stop_and_restore_protocon(ch - PC_MONITOR_PROTOCON_BASE_CHANNEL);
+        ret = monitor_call_stop_and_restore_protocon(ch - PC_MONITOR_PROTOCON_BASE_CHANNEL,
+                                                      PC_EXIT_TERMINATED);
         break;
     case PC_MONITOR_CALL_SUSPEND: {
         seL4_Word target_pd_id = seL4_GetMR(1);
@@ -80,7 +84,7 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
             target_pd_id = monitor_get_pcid_from_ch(ch);
         }
         TSLDR_DBG_PRINT(PROGNAME "Terminate dynamic PD with ID: %d\n", target_pd_id);
-        ret = monitor_call_stop_and_restore_protocon(target_pd_id);
+        ret = monitor_call_stop_and_restore_protocon(target_pd_id, PC_EXIT_STOPPED);
         break;
     }
     default: {
@@ -92,7 +96,7 @@ seL4_MessageInfo_t monitor_main_handle_pccall(microkit_channel ch)
         } else {
             /* An unknown call from an untrusted payload is a protocol
              * violation. Do not rely on that payload to terminate itself. */
-            ret = monitor_call_stop_and_restore_protocon(pc_id);
+            ret = monitor_call_stop_and_restore_protocon(pc_id, PC_EXIT_INVALID_CALL);
         }
         break;
     }

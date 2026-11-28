@@ -21,6 +21,17 @@
 #define PC_MONITOR_CALL_DEPLOY_TO_PROTOCON (22)
 #define PC_MONITOR_CALL_DEPLOY_RESULT (23)
 #define PC_MONITOR_CALL_PROFILE (24)
+#define PC_MONITOR_CALL_QUERY_EXIT_REASON (25)
+
+/* Describes why a Protocon's most recent active lifecycle ended. NONE is set
+ * before a new payload starts and remains set until that lifecycle exits. */
+typedef enum {
+    PC_EXIT_NONE,
+    PC_EXIT_TERMINATED,
+    PC_EXIT_FAULTED,
+    PC_EXIT_INVALID_CALL,
+    PC_EXIT_STOPPED,
+} pc_exit_reason_t;
 
 /* PC_MONITOR_CALL_DEPLOY_RESULT message-register layout. The same result
  * describes targeted and Monitor-selected deployments; peer masks are zero

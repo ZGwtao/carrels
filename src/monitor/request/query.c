@@ -60,3 +60,13 @@ seL4_MessageInfo_t monitor_call_query_protocons(microkit_channel ch)
     microkit_mr_set(1, monitor_get_pcid_from_ch(ch));
     return ret;
 }
+
+seL4_MessageInfo_t monitor_call_query_exit_reason(seL4_Word pc_id)
+{
+    if (pc_id >= PC_CHILD_PER_MONITOR_MAX_NUM) {
+        return microkit_msginfo_new(MON_INVALID_PC_ID, 0);
+    }
+
+    microkit_mr_set(0, protocon_state_get_exit_reason((uint32_t)pc_id));
+    return microkit_msginfo_new(MON_NO_ERROR, 1);
+}

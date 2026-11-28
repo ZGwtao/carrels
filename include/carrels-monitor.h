@@ -104,6 +104,9 @@ typedef struct pc_state {
     /* Record the size to avoid memzero-ing redundant payload region */
     size_t loaded_image_size;
 
+    /* Exit reason for the most recently started payload lifecycle. */
+    pc_exit_reason_t last_exit_reason;
+
 } pc_state_t;
 
 extern pc_state_t protocon_states[PC_CHILD_PER_MONITOR_MAX_NUM];
@@ -132,6 +135,16 @@ static inline bool protocon_state_check_lifecycle_state(uint32_t pc_id,
                                                         protocon_lifecycle_state_t state)
 {
     return protocon_state_get_lifecycle_state(pc_id) == state;
+}
+
+static inline void protocon_state_set_exit_reason(uint32_t pc_id, pc_exit_reason_t reason)
+{
+    protocon_states[pc_id].last_exit_reason = reason;
+}
+
+static inline pc_exit_reason_t protocon_state_get_exit_reason(uint32_t pc_id)
+{
+    return protocon_states[pc_id].last_exit_reason;
 }
 
 static inline void protocon_state_memzero_services(uint32_t pc_id)

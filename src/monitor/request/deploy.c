@@ -324,6 +324,7 @@ static inline void protocon_start(deploy_plan_t *plan)
 {
     protocon_init_txlo_info(plan);
     protocon_init_txlo_context(plan);
+    protocon_state_set_exit_reason(plan->pc_id, PC_EXIT_NONE);
 
     mktxlo_privilege_template_pd(plan->pc_id);
 

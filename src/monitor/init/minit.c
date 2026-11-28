@@ -171,6 +171,7 @@ static inline void ca_monitor_init_protocon_states(uint64_t pc_num)
 {
     for (uint64_t i = 0; i < pc_num; ++i) {
         protocon_states[i].pc_id = i;
+        protocon_states[i].last_exit_reason = PC_EXIT_NONE;
         protocon_state_memzero_services(i);
         protocon_state_memzero_context(i);
         protocon_state_memzero_symb_header(i);

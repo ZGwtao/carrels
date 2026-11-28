@@ -47,6 +47,7 @@ void monitor_main_handle_fault(microkit_child child, microkit_msginfo msginfo)
     }
 
     TSLDR_DBG_PRINT(PROGNAME "Fault label: %llu\n", (unsigned long long)label);
+    protocon_state_set_exit_reason(child, PC_EXIT_FAULTED);
     monitor_profile_mark_terminate(child);
     monitor_call_restore_protocon(child + PC_MONITOR_PROTOCON_BASE_CHANNEL);
 }
